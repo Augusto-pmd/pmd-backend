@@ -1,7 +1,63 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 
+/**
+ * Parse DATABASE_URL into connection parameters
+ */
+function parseDatabaseUrl(url: string): {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  database: string;
+  requiresSsl: boolean;
+} {
+  try {
+    const parsedUrl = new URL(url);
+    const sslMode = parsedUrl.searchParams.get('sslmode');
+    
+    return {
+      host: parsedUrl.hostname,
+      port: parseInt(parsedUrl.port || '5432', 10),
+      username: parsedUrl.username,
+      password: parsedUrl.password,
+      database: parsedUrl.pathname.slice(1), // Remove leading '/'
+      requiresSsl: sslMode === 'require' || sslMode === 'prefer',
+    };
+  } catch (error) {
+    throw new Error(`Invalid DATABASE_URL: ${error.message}`);
+  }
+}
+
 export function databaseConfig(configService: ConfigService): TypeOrmModuleOptions {
+  const databaseUrl = configService.get<string>('DATABASE_URL');
+  const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+
+  // If DATABASE_URL exists, use it (production mode - Render)
+  if (databaseUrl) {
+    const parsed = parseDatabaseUrl(databaseUrl);
+    return {
+      type: 'postgres',
+      host: parsed.host,
+      port: parsed.port,
+      username: parsed.username,
+      password: parsed.password,
+      database: parsed.database,
+      entities: [__dirname + '/../**/*.entity.{ts,js}'],
+      synchronize: false,
+      logging: nodeEnv === 'development',
+      autoLoadEntities: true,
+      retryAttempts: 3,
+      retryDelay: 3000,
+      extra: parsed.requiresSsl ? {
+        ssl: {
+          rejectUnauthorized: false,
+        },
+      } : undefined,
+    } as TypeOrmModuleOptions;
+  }
+
+  // Fallback to individual variables (development mode)
   return {
     type: 'postgres',
     host: configService.get<string>('DB_HOST', 'localhost'),
@@ -11,9 +67,11 @@ export function databaseConfig(configService: ConfigService): TypeOrmModuleOptio
     database: configService.get<string>('DB_DATABASE', 'pmd_management'),
     entities: [__dirname + '/../**/*.entity.{ts,js}'],
     synchronize: false,
-    logging: configService.get<string>('NODE_ENV') === 'development',
+    logging: nodeEnv === 'development',
     autoLoadEntities: true,
     retryAttempts: 3,
     retryDelay: 3000,
+    // No SSL for local development
+    ssl: false,
   };
 }

@@ -142,14 +142,30 @@ npm run migration:generate -- -n MigrationName
 
 See `env.example` for all required environment variables.
 
-Key variables:
-- `DB_HOST` - Database host
-- `DB_PORT` - Database port
-- `DB_USERNAME` - Database username
-- `DB_PASSWORD` - Database password
-- `DB_DATABASE` - Database name
+### Production (Render)
+**REQUIRED:** Set `DATABASE_URL` in Render environment variables:
+```
+DATABASE_URL=postgresql://USERNAME:PASSWORD@HOST:PORT/DATABASE?sslmode=require
+```
+
+The system will automatically:
+- Parse `DATABASE_URL` for connection details
+- Enable SSL for secure connections
+- Configure retry logic for production
+
+### Development (Local)
+Use individual variables or `.env.development`:
+- `DB_HOST` - Database host (default: localhost)
+- `DB_PORT` - Database port (default: 5432)
+- `DB_USERNAME` - Database username (default: postgres)
+- `DB_PASSWORD` - Database password (default: postgres)
+- `DB_DATABASE` - Database name (default: pmd_management)
+
+### Other Variables
 - `JWT_SECRET` - JWT secret key
-- `JWT_EXPIRATION` - JWT expiration time
+- `JWT_EXPIRATION` - JWT expiration time (default: 1d)
+- `PORT` - Application port (default: 3000)
+- `NODE_ENV` - Environment (development/production)
 
 ## 📝 License
 
