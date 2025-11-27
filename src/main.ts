@@ -2,13 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import cors from 'cors';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Set global prefix for all routes
-  app.setGlobalPrefix('api');
+  // app.setGlobalPrefix('api'); // Comentado: Render agrega automáticamente el prefijo /api
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -20,25 +21,21 @@ async function bootstrap() {
   );
 
   // CORS - Configure for frontend integration
-  const allowedOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',')
-    : ['http://localhost:3000', 'http://localhost:3001'];
-  
-  app.enableCors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      
-      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  });
+  app.use(
+    cors({
+      origin: [
+        'https://pmd-frontend-bice.vercel.app',
+        'http://localhost:3000',
+        'http://localhost:5173',
+        /\.vercel\.app$/
+      ],
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true,
+      preflightContinue: false,
+      optionsSuccessStatus: 204,
+    }),
+  );
 
   // Swagger documentation
   const config = new DocumentBuilder()
