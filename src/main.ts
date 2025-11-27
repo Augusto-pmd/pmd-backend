@@ -9,7 +9,23 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Set global prefix for all routes
-  // app.setGlobalPrefix('api'); // Comentado: Render agrega automáticamente el prefijo /api
+  app.setGlobalPrefix('api');
+
+  // CORS - Configure for frontend integration (AL INICIO, antes de cualquier middleware)
+  app.use(
+    cors({
+      origin: [
+        'https://pmd-frontend-bice.vercel.app',
+        /\.vercel\.app$/,
+        'http://localhost:3000',
+        'http://localhost:5173'
+      ],
+      methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+      allowedHeaders: ['Content-Type','Authorization'],
+      credentials: true,
+      optionsSuccessStatus: 200
+    }),
+  );
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -17,23 +33,6 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-    }),
-  );
-
-  // CORS - Configure for frontend integration
-  app.use(
-    cors({
-      origin: [
-        'https://pmd-frontend-bice.vercel.app',
-        'http://localhost:3000',
-        'http://localhost:5173',
-        /\.vercel\.app$/
-      ],
-      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-      credentials: true,
-      preflightContinue: false,
-      optionsSuccessStatus: 204,
     }),
   );
 
