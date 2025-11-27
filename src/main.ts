@@ -9,7 +9,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Set global prefix for all routes
-  app.setGlobalPrefix('api');
+  // app.setGlobalPrefix('api'); // Comentado: Render agrega automáticamente el prefijo /api
 
   // CORS - Configure for frontend integration (AL INICIO, antes de cualquier middleware)
   app.use(
