@@ -24,6 +24,7 @@ import { AuditModule } from './audit/audit.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TasksModule } from './tasks/tasks.module';
 import { StorageModule } from './storage/storage.module';
+import { SeedModule } from './seed/seed.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { StorageModule } from './storage/storage.module';
     DashboardModule,
     TasksModule,
     StorageModule,
+    SeedModule,
   ],
 })
 export class AppModule {}
