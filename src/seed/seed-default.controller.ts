@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Role } from '../roles/roles.entity';
+import { UserRole } from '../common/enums/user-role.enum';
 
 @Controller('seed-default')
 export class SeedDefaultController {
@@ -12,35 +13,29 @@ export class SeedDefaultController {
 
   @Get()
   async seedDefaults() {
-    // Lista de roles base del sistema PMD
-    const roles = [
-      { name: 'superadmin', description: 'Acceso total al sistema' },
-      { name: 'admin', description: 'Administrador general' },
-      { name: 'works_manager', description: 'Gestión de obras' },
-      { name: 'accounting', description: 'Administración y contabilidad' },
-      { name: 'supplier', description: 'Proveedores' },
-      { name: 'auditor', description: 'Auditor interno' },
-      { name: 'staff', description: 'Usuario interno con permisos limitados' },
-      { name: 'viewer', description: 'Solo lectura' },
+    const rolesToCreate = [
+      { name: UserRole.DIRECTION,        description: 'Dirección general', permissions: {} },
+      { name: UserRole.SUPERVISOR,       description: 'Supervisor de obra', permissions: {} },
+      { name: UserRole.ADMINISTRATION,   description: 'Administración del sistema', permissions: {} },
+      { name: UserRole.OPERATOR,         description: 'Operador interno', permissions: {} },
     ];
 
     const created = [];
 
-    for (const r of roles) {
-      const exists = await this.rolesRepo.findOne({ where: { name: r.name as any } });
+    for (const r of rolesToCreate) {
+      const exists = await this.rolesRepo.findOne({ where: { name: r.name } });
 
       if (!exists) {
-        const newRole = this.rolesRepo.create(r as any);
+        const newRole = this.rolesRepo.create(r);
         await this.rolesRepo.save(newRole);
         created.push(r.name);
       }
     }
 
     return {
-      message: 'Default roles seeded',
+      message: 'Roles seeded successfully',
       created,
-      totalRoles: roles.length,
+      total: rolesToCreate.length,
     };
   }
 }
-

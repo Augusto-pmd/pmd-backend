@@ -8,4 +8,3 @@ import { SeedDefaultController } from './seed-default.controller';
   controllers: [SeedDefaultController],
 })
 export class SeedDefaultModule {}
-
