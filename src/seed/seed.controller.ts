@@ -1,8 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../users/users.entity';
-import { Role } from '../roles/roles.entity';
+import { User } from '../users/user.entity';
+import { Role } from '../roles/role.entity';
 import { UserRole } from '../common/enums/user-role.enum';
 import * as bcrypt from 'bcrypt';
 
@@ -36,9 +36,9 @@ export class SeedAdminController {
     const admin = this.usersRepo.create({
       email: 'admin@pmd.com',
       password: hashed,
-      name: 'Administrador PMD',
-      role_id: adminRole.id,
-      is_active: true,
+      fullName: 'Administrador PMD',
+      role: adminRole,
+      isActive: true,
     });
 
     await this.usersRepo.save(admin);

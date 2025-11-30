@@ -4,7 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../../users/users.entity';
+import { User } from '../../users/user.entity';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -26,7 +26,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       relations: ['role'],
     });
 
-    if (!user || !user.is_active) {
+    if (!user || !user.isActive) {
       throw new UnauthorizedException('User not found or inactive');
     }
 

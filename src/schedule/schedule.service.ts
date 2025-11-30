@@ -6,7 +6,7 @@ import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { UserRole } from '../common/enums/user-role.enum';
 import { ScheduleState } from '../common/enums/schedule-state.enum';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 
 @Injectable()
 export class ScheduleService {

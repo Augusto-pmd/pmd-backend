@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { CashboxesService } from './cashboxes.service';
 import { Cashbox } from './cashboxes.entity';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { AlertsService } from '../alerts/alerts.service';
 import { CreateCashboxDto } from './dto/create-cashbox.dto';
 import { CloseCashboxDto } from './dto/close-cashbox.dto';

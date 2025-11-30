@@ -10,7 +10,7 @@ import { CreateAlertDto } from './dto/create-alert.dto';
 import { UpdateAlertDto } from './dto/update-alert.dto';
 import { MarkReadAlertDto } from './dto/mark-read-alert.dto';
 import { AlertType, AlertSeverity } from '../common/enums';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { SupplierDocument } from '../supplier-documents/supplier-documents.entity';
 import { Expense } from '../expenses/expenses.entity';
 import { Contract } from '../contracts/contracts.entity';

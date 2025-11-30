@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Val } from './val.entity';
 import { CreateValDto } from './dto/create-val.dto';
 import { UpdateValDto } from './dto/update-val.dto';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 
 @Injectable()
 export class ValService {

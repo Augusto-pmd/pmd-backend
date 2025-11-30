@@ -2,8 +2,8 @@
  * Test helper utilities for PMD Management System tests
  */
 
-import { User } from '../../users/users.entity';
-import { Role } from '../../roles/roles.entity';
+import { User } from '../../users/user.entity';
+import { Role } from '../../roles/role.entity';
 import { UserRole } from '../enums/user-role.enum';
 
 export const createMockUser = (overrides?: any): User => {
@@ -33,12 +33,11 @@ export const createMockUser = (overrides?: any): User => {
 
   const user = new User();
   user.id = overrides?.id || 'user-id';
-  user.name = overrides?.name || 'Test User';
+  user.fullName = overrides?.fullName || 'Test User';
   user.email = overrides?.email || 'test@example.com';
   user.password = 'hashedPassword';
-  user.is_active = overrides?.is_active !== undefined ? overrides.is_active : true;
+  user.isActive = overrides?.isActive !== undefined ? overrides.isActive : true;
   user.role = role;
-  user.role_id = role.id;
   user.created_at = new Date();
   user.updated_at = new Date();
 

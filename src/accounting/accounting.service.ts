@@ -13,7 +13,7 @@ import { CloseMonthDto } from './dto/close-month.dto';
 import { MonthStatus } from '../common/enums/month-status.enum';
 import { UserRole } from '../common/enums/user-role.enum';
 import { AccountingType } from '../common/enums/accounting-type.enum';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 
 @Injectable()
 export class AccountingService {

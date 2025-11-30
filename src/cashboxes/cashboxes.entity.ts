@@ -8,7 +8,7 @@ import {
   JoinColumn,
   OneToMany,
 } from 'typeorm';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { CashboxStatus } from '../common/enums/cashbox-status.enum';
 import { CashMovement } from '../cash-movements/cash-movements.entity';
 
@@ -20,7 +20,7 @@ export class Cashbox {
   @Column({ type: 'uuid' })
   user_id: string;
 
-  @ManyToOne(() => User, (user) => user.cashboxes)
+  @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
   user: User;
 

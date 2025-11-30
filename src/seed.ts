@@ -1,8 +1,8 @@
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { config } from 'dotenv';
-import { Role } from './roles/roles.entity';
-import { User } from './users/users.entity';
+import { Role } from './roles/role.entity';
+import { User } from './users/user.entity';
 import { Rubric } from './rubrics/rubrics.entity';
 import { Supplier } from './suppliers/suppliers.entity';
 import { SupplierDocument } from './supplier-documents/supplier-documents.entity';
@@ -183,9 +183,11 @@ async function seed() {
       let user = await userRepository.findOne({ where: { email: userData.email } });
       if (!user) {
         user = userRepository.create({
-          ...userData,
-          role_id: userData.role.id,
-          is_active: true,
+          fullName: userData.name,
+          email: userData.email,
+          password: userData.password,
+          role: userData.role,
+          isActive: true,
         });
         user = await userRepository.save(user);
         console.log(`  ✅ Created user: ${userData.email}`);

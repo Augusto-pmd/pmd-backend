@@ -8,7 +8,7 @@ import {
   JoinColumn,
   OneToMany,
 } from 'typeorm';
-import { Role } from '../roles/roles.entity';
+import { Role } from '../roles/role.entity';
 import { UserRole } from '../common/enums/user-role.enum';
 import { Cashbox } from '../cashboxes/cashboxes.entity';
 import { Expense } from '../expenses/expenses.entity';

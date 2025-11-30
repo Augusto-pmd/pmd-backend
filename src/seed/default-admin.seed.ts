@@ -1,8 +1,8 @@
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { config } from 'dotenv';
-import { Role } from '../roles/roles.entity';
-import { User } from '../users/users.entity';
+import { Role } from '../roles/role.entity';
+import { User } from '../users/user.entity';
 import { Cashbox } from '../cashboxes/cashboxes.entity';
 import { Expense } from '../expenses/expenses.entity';
 import { Work } from '../works/works.entity';
@@ -119,12 +119,11 @@ async function seedDefaultAdmin() {
       const hashedPassword = await bcrypt.hash('123456', 10);
       
       adminUser = userRepository.create({
-        name: 'Root Admin',
+        fullName: 'Root Admin',
         email: adminEmail,
         password: hashedPassword,
-        role_id: adminRole.id,
-        phone: null,
-        is_active: true,
+        role: adminRole,
+        isActive: true,
       });
 
       adminUser = await userRepository.save(adminUser);

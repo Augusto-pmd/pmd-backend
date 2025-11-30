@@ -8,7 +8,7 @@ import {
   JoinColumn,
   OneToMany,
 } from 'typeorm';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { Currency } from '../common/enums/currency.enum';
 import { WorkStatus } from '../common/enums/work-status.enum';
 import { WorkBudget } from '../work-budgets/work-budgets.entity';
@@ -53,7 +53,7 @@ export class Work {
   @Column({ type: 'uuid', nullable: true })
   supervisor_id: string;
 
-  @ManyToOne(() => User, (user) => user.supervised_works)
+  @ManyToOne(() => User)
   @JoinColumn({ name: 'supervisor_id' })
   supervisor: User;
 

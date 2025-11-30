@@ -26,6 +26,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { StorageModule } from './storage/storage.module';
 import { SeedModule } from './seed/seed.module';
 import { SeedDefaultModule } from './seed/seed-default.module';
+import { SeedAdminModule } from './seed/seed-admin.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { SeedDefaultModule } from './seed/seed-default.module';
     StorageModule,
     SeedModule,
     SeedDefaultModule,
+    SeedAdminModule,
   ],
 })
 export class AppModule {}

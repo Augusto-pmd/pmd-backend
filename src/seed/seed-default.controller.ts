@@ -1,33 +1,36 @@
 import { Controller, Get } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Role } from '../roles/roles.entity';
+import { Role } from '../roles/role.entity';
 import { UserRole } from '../common/enums/user-role.enum';
 
 @Controller('seed-default')
 export class SeedDefaultController {
   constructor(
     @InjectRepository(Role)
-    private readonly rolesRepo: Repository<Role>,
+    private rolesRepo: Repository<Role>,
   ) {}
 
   @Get()
-  async seedDefaults() {
-    const rolesToCreate = [
-      { name: UserRole.DIRECTION,        description: 'Dirección general', permissions: {} },
-      { name: UserRole.SUPERVISOR,       description: 'Supervisor de obra', permissions: {} },
-      { name: UserRole.ADMINISTRATION,   description: 'Administración del sistema', permissions: {} },
-      { name: UserRole.OPERATOR,         description: 'Operador interno', permissions: {} },
+  async run() {
+    const baseRoles = [
+      { name: UserRole.DIRECTION, description: 'Dirección general' },
+      { name: UserRole.SUPERVISOR, description: 'Supervisor de obra' },
+      { name: UserRole.ADMINISTRATION, description: 'Administración' },
+      { name: UserRole.OPERATOR, description: 'Operador interno' },
     ];
 
     const created = [];
 
-    for (const r of rolesToCreate) {
+    for (const r of baseRoles) {
       const exists = await this.rolesRepo.findOne({ where: { name: r.name } });
-
       if (!exists) {
-        const newRole = this.rolesRepo.create(r);
-        await this.rolesRepo.save(newRole);
+        const role = this.rolesRepo.create({
+          name: r.name,
+          description: r.description,
+          permissions: {},
+        });
+        await this.rolesRepo.save(role);
         created.push(r.name);
       }
     }
@@ -35,7 +38,6 @@ export class SeedDefaultController {
     return {
       message: 'Roles seeded successfully',
       created,
-      total: rolesToCreate.length,
     };
   }
 }

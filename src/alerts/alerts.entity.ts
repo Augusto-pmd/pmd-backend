@@ -9,7 +9,7 @@ import {
 } from 'typeorm';
 import { AlertType } from '../common/enums/alert-type.enum';
 import { AlertSeverity } from '../common/enums/alert-severity.enum';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { Work } from '../works/works.entity';
 import { Supplier } from '../suppliers/suppliers.entity';
 import { Expense } from '../expenses/expenses.entity';

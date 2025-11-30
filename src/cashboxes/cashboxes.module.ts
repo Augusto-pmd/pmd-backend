@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CashboxesService } from './cashboxes.service';
 import { CashboxesController } from './cashboxes.controller';
 import { Cashbox } from './cashboxes.entity';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { AlertsModule } from '../alerts/alerts.module';
 
 @Module({

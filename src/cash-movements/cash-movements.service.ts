@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { CashMovement } from './cash-movements.entity';
 import { CreateCashMovementDto } from './dto/create-cash-movement.dto';
 import { UpdateCashMovementDto } from './dto/update-cash-movement.dto';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 
 @Injectable()
 export class CashMovementsService {

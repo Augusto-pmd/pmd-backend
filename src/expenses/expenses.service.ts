@@ -16,7 +16,7 @@ import { ValidateExpenseDto } from './dto/validate-expense.dto';
 import { ExpenseState } from '../common/enums/expense-state.enum';
 import { DocumentType } from '../common/enums/document-type.enum';
 import { UserRole } from '../common/enums/user-role.enum';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { AlertsService } from '../alerts/alerts.service';
 import { AlertType, AlertSeverity } from '../common/enums';
 import { AccountingRecord } from '../accounting/accounting.entity';

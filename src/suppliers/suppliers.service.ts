@@ -13,7 +13,7 @@ import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { SupplierStatus } from '../common/enums/supplier-status.enum';
 import { SupplierDocumentType } from '../common/enums/supplier-document-type.enum';
 import { UserRole } from '../common/enums/user-role.enum';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { AlertsService } from '../alerts/alerts.service';
 import { AlertType, AlertSeverity } from '../common/enums';
 

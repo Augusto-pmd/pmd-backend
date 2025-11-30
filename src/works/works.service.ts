@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Work } from './works.entity';
 import { CreateWorkDto } from './dto/create-work.dto';
 import { UpdateWorkDto } from './dto/update-work.dto';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { UserRole } from '../common/enums/user-role.enum';
 
 @Injectable()

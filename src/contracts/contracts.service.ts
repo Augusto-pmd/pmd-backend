@@ -10,7 +10,7 @@ import { Contract } from './contracts.entity';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
 import { UserRole } from '../common/enums/user-role.enum';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { AlertsService } from '../alerts/alerts.service';
 import { AlertType, AlertSeverity } from '../common/enums';
 import { Supplier } from '../suppliers/suppliers.entity';

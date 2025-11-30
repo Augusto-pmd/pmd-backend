@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 
 @Injectable()
 export class DashboardService {
@@ -8,7 +8,7 @@ export class DashboardService {
     return {
       user: {
         id: user.id,
-        name: user.name,
+        fullName: user.fullName,
         role: user.role.name,
       },
       summary: {

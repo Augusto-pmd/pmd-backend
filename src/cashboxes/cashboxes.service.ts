@@ -13,7 +13,7 @@ import { CloseCashboxDto } from './dto/close-cashbox.dto';
 import { ApproveDifferenceDto } from './dto/approve-difference.dto';
 import { CashboxStatus } from '../common/enums/cashbox-status.enum';
 import { UserRole } from '../common/enums/user-role.enum';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { AlertsService } from '../alerts/alerts.service';
 import { AlertType, AlertSeverity } from '../common/enums';
 

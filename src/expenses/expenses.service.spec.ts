@@ -11,7 +11,7 @@ import { AccountingRecord } from '../accounting/accounting.entity';
 import { AlertsService } from '../alerts/alerts.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { ValidateExpenseDto } from './dto/validate-expense.dto';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { Currency, ExpenseState, DocumentType, UserRole, WorkStatus } from '../common/enums';
 import { createMockUser } from '../common/test/test-helpers';
 

@@ -11,7 +11,7 @@ import {
 import { Work } from '../works/works.entity';
 import { Supplier } from '../suppliers/suppliers.entity';
 import { Rubric } from '../rubrics/rubrics.entity';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { Currency } from '../common/enums/currency.enum';
 import { ExpenseState } from '../common/enums/expense-state.enum';
 import { DocumentType } from '../common/enums/document-type.enum';
@@ -82,7 +82,7 @@ export class Expense {
   @Column({ type: 'uuid' })
   created_by_id: string;
 
-  @ManyToOne(() => User, (user) => user.expenses)
+  @ManyToOne(() => User)
   @JoinColumn({ name: 'created_by_id' })
   created_by: User;
 

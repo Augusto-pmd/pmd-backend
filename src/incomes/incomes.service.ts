@@ -5,7 +5,7 @@ import { Income } from './incomes.entity';
 import { Work } from '../works/works.entity';
 import { CreateIncomeDto } from './dto/create-income.dto';
 import { UpdateIncomeDto } from './dto/update-income.dto';
-import { User } from '../users/users.entity';
+import { User } from '../users/user.entity';
 import { UserRole } from '../common/enums/user-role.enum';
 
 @Injectable()
