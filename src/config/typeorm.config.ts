@@ -7,7 +7,7 @@ export default registerAs('typeorm', (): TypeOrmModuleOptions => {
     url: process.env.DATABASE_URL,
 
     autoLoadEntities: true,
-    synchronize: false,
+    synchronize: true,
 
     ssl: true,
     extra: {
