@@ -27,6 +27,7 @@ import { StorageModule } from './storage/storage.module';
 import { SeedModule } from './seed/seed.module';
 import { SeedDefaultModule } from './seed/seed-default.module';
 import { SeedAdminModule } from './seed/seed-admin.module';
+import { DebugModule } from './debug/debug.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { SeedAdminModule } from './seed/seed-admin.module';
     SeedModule,
     SeedDefaultModule,
     SeedAdminModule,
+    DebugModule,
   ],
 })
 export class AppModule {}
