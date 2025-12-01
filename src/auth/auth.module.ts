@@ -6,12 +6,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { UsersModule } from '../users/users.module';
 import { User } from '../users/user.entity';
 import { Role } from '../roles/role.entity';
 
 @Module({
   imports: [
+    UsersModule,
     PassportModule,
+    ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
