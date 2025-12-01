@@ -38,7 +38,7 @@ import { DebugModule } from './debug/debug.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => config.get('typeorm'),
+      useFactory: (config: ConfigService) => config.get('typeorm') || {},
     }),
     CommonModule,
     AuthModule,
