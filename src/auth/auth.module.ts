@@ -9,6 +9,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { User } from '../users/user.entity';
 import { Role } from '../roles/role.entity';
+import { Organization } from '../organizations/organization.entity';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { Role } from '../roles/role.entity';
       }),
       inject: [ConfigService],
     }),
-    TypeOrmModule.forFeature([User, Role]),
+    TypeOrmModule.forFeature([User, Role, Organization]),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

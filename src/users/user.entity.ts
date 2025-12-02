@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Role } from '../roles/role.entity';
+import { Organization } from '../organizations/organization.entity';
 
 @Entity('users')
 export class User {
@@ -29,6 +30,10 @@ export class User {
   @ManyToOne(() => Role, (role) => role.users, { eager: true })
   @JoinColumn({ name: 'role_id' })
   role: Role;
+
+  @ManyToOne(() => Organization, (org) => org.users, { nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: Organization;
 
   @CreateDateColumn()
   created_at: Date;

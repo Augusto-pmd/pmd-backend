@@ -21,7 +21,7 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.userRepository.findOne({
       where: { email },
-      relations: ['role'],
+      relations: ['role', 'organization'],
     });
 
     if (!user) {
@@ -73,6 +73,10 @@ export class AuthService {
           id: user.role.id,
           name: user.role.name,
         } : null,
+        organizationId: user.organization?.id ?? null,
+        organization: user.organization
+          ? { id: user.organization.id, name: user.organization.name }
+          : null,
       },
     };
   }
