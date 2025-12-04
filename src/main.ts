@@ -14,11 +14,11 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:3000',
-      'https://pmd-frontend-two.vercel.app',
-      'https://pmd-frontend-nine.vercel.app',
+      'https://pmd-frontend-two.vercel.app', // NUEVO FRONTEND
+      'https://pmd-frontend-nine.vercel.app', // opcional si aún se usa
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Authorization',
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   });
 
