@@ -18,7 +18,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() dto: LoginDto, @Res() res: Response) {
-    const { access_token, user } = await this.authService.login(dto);
+    const { access_token, refresh_token, user } = await this.authService.login(dto);
 
     const isProd = process.env.NODE_ENV === 'production';
 
@@ -27,11 +27,12 @@ export class AuthController {
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
       path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000
+      maxAge: 604800000
     });
 
     return res.status(200).json({
       access_token,
+      refresh_token,
       user: {
         ...user,
         organizationId: user.organizationId ?? user.organization?.id ?? null

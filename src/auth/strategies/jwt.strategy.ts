@@ -34,11 +34,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const organizationId = user.organization?.id ?? payload.organizationId ?? null;
 
     // Return user object in the exact format expected by the frontend
+    // Include all necessary fields for authenticated endpoints
     return {
       id: payload.sub,
       email: payload.email,
+      fullName: user.fullName,
       role: payload.role,
       organizationId: organizationId,
+      organization: user.organization ? {
+        id: user.organization.id,
+        name: user.organization.name,
+      } : null,
     };
   }
 }

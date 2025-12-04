@@ -1,9 +1,10 @@
-Redeploy triggered: CORS configuration update
+Redeploy triggered: Backend full diagnostics and fixes
 Timestamp: 2024-12-19
-Changes: 
-- Updated main.ts CORS with specific methods and headers
-- Added pmd-frontend-two.vercel.app to allowed origins
-- Configured methods: GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS
-- Configured allowedHeaders: Content-Type, Authorization
-- Removed unused cors import
-- Listen on 0.0.0.0 confirmed for Render
+Changes:
+- Fixed jwt.strategy.ts: removed user.name reference (User entity only has fullName)
+- Updated main.ts: added new frontend domain to CORS
+- Updated auth.controller.ts: added refresh_token to login response
+- Verified build compiles successfully
+- Verified all modules are loaded in AppModule
+- Verified Auth endpoints are correctly configured
+- Verified Render commands (start/build) are correct

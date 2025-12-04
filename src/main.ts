@@ -14,8 +14,9 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:3000',
-      'https://pmd-frontend-two.vercel.app', // NUEVO FRONTEND
-      'https://pmd-frontend-nine.vercel.app', // opcional si aún se usa
+      'https://pmd-frontend-nc567rq28-augustos-projects-de3cbc36.vercel.app', // TU FRONTEND REAL ACTUAL
+      'https://pmd-frontend-two.vercel.app',   // opcional
+      'https://pmd-frontend-nine.vercel.app'   // opcional
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -84,7 +85,7 @@ async function bootstrap() {
   const port = process.env.PORT || 8080;
   
   // Log de inicio visible para Render
-  console.log("🔥 PMD Backend is starting on port", port);
+  console.log("🚀 PMD Backend booting on port:", port);
   
   await app.listen(port, '0.0.0.0');
   console.log(`Application is running on: http://localhost:${port}`);
