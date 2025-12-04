@@ -88,7 +88,8 @@ async function bootstrap() {
   });
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT') || process.env.PORT || 3000;
+  // Render requires port 8080 or 10000 - use 8080 as default
+  const port = configService.get<number>('PORT') || process.env.PORT || 8080;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
   console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
