@@ -1,6 +1,9 @@
-Redeploy triggered: Login and cookies configuration fix
+Redeploy triggered: CORS configuration update
 Timestamp: 2024-12-19
 Changes: 
-- Updated auth.controller.ts login endpoint for cross-site cookies
-- Updated main.ts CORS configuration
-- Updated main.ts to listen on 0.0.0.0 for Render
+- Updated main.ts CORS with specific methods and headers
+- Added pmd-frontend-two.vercel.app to allowed origins
+- Configured methods: GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS
+- Configured allowedHeaders: Content-Type, Authorization
+- Removed unused cors import
+- Listen on 0.0.0.0 confirmed for Render

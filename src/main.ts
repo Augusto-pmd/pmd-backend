@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-const cors = require('cors');
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -15,10 +14,12 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:3000',
+      'https://pmd-frontend-two.vercel.app',
       'https://pmd-frontend-nine.vercel.app',
-      'https://pmd-frontend-two.vercel.app'
     ],
-    credentials: true
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Authorization',
+    credentials: true,
   });
 
   // Global validation pipe
@@ -79,7 +80,6 @@ async function bootstrap() {
     },
   });
 
-  const configService = app.get(ConfigService);
   // Render requires port 8080 or 10000 - use 8080 as default
   const port = process.env.PORT || 8080;
   
