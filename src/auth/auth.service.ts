@@ -81,14 +81,8 @@ export class AuthService {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
-        role: user.role ? {
-          id: user.role.id,
-          name: user.role.name,
-        } : null,
+        role: user.role?.name || null,
         organizationId: organizationId,
-        organization: user.organization
-          ? { id: user.organization.id, name: user.organization.name }
-          : null,
       },
     };
   }
@@ -186,14 +180,8 @@ export class AuthService {
         id: fullUser.id,
         email: fullUser.email,
         fullName: fullUser.fullName,
-        role: fullUser.role ? {
-          id: fullUser.role.id,
-          name: fullUser.role.name,
-        } : null,
+        role: fullUser.role?.name || null,
         organizationId: organizationId,
-        organization: fullUser.organization
-          ? { id: fullUser.organization.id, name: fullUser.organization.name }
-          : null,
       },
     };
   }

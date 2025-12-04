@@ -32,13 +32,19 @@ export class AuthController {
     });
     
     // Always return JSON, never redirect
+    // Ensure organizationId is always present
+    const userResponse = {
+      id: result.user.id,
+      email: result.user.email,
+      fullName: result.user.fullName,
+      role: result.user.role,
+      organizationId: result.user.organizationId ?? null,
+    };
+    
     return res.status(200).json({
       access_token: result.access_token,
       refresh_token: result.refresh_token,
-      user: {
-        ...result.user,
-        organizationId: result.user.organizationId ?? result.user.organization?.id ?? null,
-      },
+      user: userResponse,
     });
   }
 
@@ -64,13 +70,19 @@ export class AuthController {
     });
     
     // Always return JSON, never redirect
+    // Ensure organizationId is always present
+    const userResponse = {
+      id: result.user.id,
+      email: result.user.email,
+      fullName: result.user.fullName,
+      role: result.user.role,
+      organizationId: result.user.organizationId ?? null,
+    };
+    
     return res.status(200).json({
       access_token: result.access_token,
       refresh_token: result.refresh_token,
-      user: {
-        ...result.user,
-        organizationId: result.user.organizationId ?? result.user.organization?.id ?? null,
-      },
+      user: userResponse,
     });
   }
 

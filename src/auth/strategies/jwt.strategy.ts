@@ -30,17 +30,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User not found or inactive');
     }
 
+    // Extract organizationId from user.organization.id or payload
     const organizationId = user.organization?.id ?? payload.organizationId ?? null;
 
-    // Return user object with organizationId included
-    const { password: _, ...userWithoutPassword } = user as any;
+    // Return user object in the exact format expected by the frontend
     return {
-      ...userWithoutPassword,
-      id: user.id,
-      email: user.email,
-      role: user.role,
+      id: payload.sub,
+      email: payload.email,
+      role: payload.role,
       organizationId: organizationId,
-      organization: user.organization,
     };
   }
 }
