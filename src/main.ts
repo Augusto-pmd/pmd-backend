@@ -15,10 +15,11 @@ async function bootstrap() {
   const isProduction = process.env.NODE_ENV === 'production';
   app.enableCors({
     origin: [
+      'http://localhost:3000',
+      'https://pmd-frontend-nine.vercel.app',
       'https://pmd-frontend-bice.vercel.app',
       'https://pmd-frontend.vercel.app',
       /\.vercel\.app$/,
-      'http://localhost:3000',
       'http://localhost:5173'
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

@@ -17,27 +17,29 @@ export class AuthController {
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response) {
+  async login(@Body() loginDto: LoginDto, @Res() res: Response) {
     const result = await this.authService.login(loginDto);
     
-    // Set token as HTTP-only cookie
+    // Set token as cookie with conditional SameSite for production
     const isProduction = process.env.NODE_ENV === 'production';
-    const cookieDomain = process.env.COOKIE_DOMAIN || undefined; // e.g., '.tudominio.com' para subdominios
     
     res.cookie('token', result.access_token, {
-      httpOnly: true,
-      secure: isProduction, // Requiere HTTPS en producción
-      sameSite: isProduction ? 'none' : 'lax', // 'none' permite cross-site en producción si es necesario
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      httpOnly: false, // Allow frontend to read cookie if needed
+      secure: isProduction, // Only in production (HTTPS required)
+      sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-site in production, 'lax' for dev
       path: '/',
-      domain: cookieDomain, // Solo si necesitas compartir cookies entre subdominios
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
     
-    return {
-      user: result.user,
+    // Always return JSON, never redirect
+    return res.status(200).json({
       access_token: result.access_token,
       refresh_token: result.refresh_token,
-    };
+      user: {
+        ...result.user,
+        organizationId: result.user.organizationId ?? result.user.organization?.id ?? null,
+      },
+    });
   }
 
   @Get('refresh')
@@ -47,27 +49,29 @@ export class AuthController {
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async refresh(@Req() req: Request) {
+  async refresh(@Req() req: Request, @Res() res: Response) {
     const result = await this.authService.refresh(req.user);
     
-    // Set token as HTTP-only cookie
+    // Set token as cookie with conditional SameSite for production
     const isProduction = process.env.NODE_ENV === 'production';
-    const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
     
-    (req.res as Response).cookie('token', result.access_token, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    res.cookie('token', result.access_token, {
+      httpOnly: false, // Allow frontend to read cookie if needed
+      secure: isProduction, // Only in production (HTTPS required)
+      sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-site in production, 'lax' for dev
       path: '/',
-      domain: cookieDomain,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
     
-    return {
-      user: result.user,
+    // Always return JSON, never redirect
+    return res.status(200).json({
       access_token: result.access_token,
       refresh_token: result.refresh_token,
-    };
+      user: {
+        ...result.user,
+        organizationId: result.user.organizationId ?? result.user.organization?.id ?? null,
+      },
+    });
   }
 
   @Post('register')
