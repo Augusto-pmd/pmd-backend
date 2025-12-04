@@ -42,6 +42,12 @@ export class SupplierDocument {
   @Column({ type: 'boolean', default: true })
   is_valid: boolean;
 
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  version: string;
+
+  @Column({ type: 'text', nullable: true })
+  notes: string;
+
   @CreateDateColumn()
   created_at: Date;
 

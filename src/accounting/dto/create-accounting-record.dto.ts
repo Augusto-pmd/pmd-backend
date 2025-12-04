@@ -22,8 +22,7 @@ export class CreateAccountingRecordDto {
   expense_id?: string;
 
   @IsUUID()
-  @IsOptional()
-  work_id?: string;
+  work_id: string;
 
   @IsUUID()
   @IsOptional()

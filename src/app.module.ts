@@ -10,6 +10,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
 import { SupplierDocumentsModule } from './supplier-documents/supplier-documents.module';
 import { WorksModule } from './works/works.module';
 import { WorkBudgetsModule } from './work-budgets/work-budgets.module';
+import { WorkDocumentsModule } from './work-documents/work-documents.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { RubricsModule } from './rubrics/rubrics.module';
 import { ExpensesModule } from './expenses/expenses.module';
@@ -28,6 +29,7 @@ import { SeedModule } from './seed/seed.module';
 import { SeedDefaultModule } from './seed/seed-default.module';
 import { SeedAdminModule } from './seed/seed-admin.module';
 import { DebugModule } from './debug/debug.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -48,6 +50,7 @@ import { DebugModule } from './debug/debug.module';
     SupplierDocumentsModule,
     WorksModule,
     WorkBudgetsModule,
+    WorkDocumentsModule,
     ContractsModule,
     RubricsModule,
     ExpensesModule,
@@ -66,6 +69,7 @@ import { DebugModule } from './debug/debug.module';
     SeedDefaultModule,
     SeedAdminModule,
     DebugModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

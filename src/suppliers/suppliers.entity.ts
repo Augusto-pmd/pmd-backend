@@ -4,9 +4,12 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
   OneToMany,
 } from 'typeorm';
 import { SupplierStatus } from '../common/enums/supplier-status.enum';
+import { Organization } from '../organizations/organization.entity';
 import { SupplierDocument } from '../supplier-documents/supplier-documents.entity';
 import { Contract } from '../contracts/contracts.entity';
 import { Expense } from '../expenses/expenses.entity';
@@ -43,6 +46,13 @@ export class Supplier {
 
   @Column({ type: 'uuid', nullable: true })
   created_by_id: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  organization_id: string;
+
+  @ManyToOne(() => Organization, { nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: Organization;
 
   @CreateDateColumn()
   created_at: Date;

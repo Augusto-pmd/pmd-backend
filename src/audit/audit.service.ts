@@ -55,6 +55,16 @@ export class AuditService {
       take: 500,
     });
   }
+
+  async remove(id: string): Promise<void> {
+    const auditLog = await this.findOne(id);
+    await this.auditLogRepository.remove(auditLog);
+  }
+
+  async removeAll(): Promise<{ deleted: number }> {
+    const result = await this.auditLogRepository.delete({});
+    return { deleted: result.affected || 0 };
+  }
 }
 
 

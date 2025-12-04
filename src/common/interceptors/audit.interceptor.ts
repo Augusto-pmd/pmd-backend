@@ -34,6 +34,7 @@ export class AuditInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap(async (response) => {
         try {
+          const organizationId = user?.organizationId ?? user?.organization?.id ?? null;
           const auditLog = this.auditLogRepository.create({
             user_id: user?.id || null,
             action,
@@ -45,6 +46,8 @@ export class AuditInterceptor implements NestInterceptor {
             ip_address: ipAddress,
             user_agent: userAgent,
             criticality,
+            // Store organizationId in metadata if audit entity supports it
+            ...(organizationId && { metadata: { organizationId } }),
           });
 
           await this.auditLogRepository.save(auditLog);

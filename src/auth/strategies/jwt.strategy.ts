@@ -23,16 +23,25 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: any) {
     const user = await this.userRepository.findOne({
       where: { id: payload.sub },
-      relations: ['role'],
+      relations: ['role', 'organization'],
     });
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    // Remove password from user object
+    const organizationId = user.organization?.id ?? payload.organizationId ?? null;
+
+    // Return user object with organizationId included
     const { password: _, ...userWithoutPassword } = user as any;
-    return userWithoutPassword;
+    return {
+      ...userWithoutPassword,
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      organizationId: organizationId,
+      organization: user.organization,
+    };
   }
 }
 

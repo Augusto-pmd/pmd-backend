@@ -15,22 +15,37 @@ export class WorksService {
   ) {}
 
   async create(createWorkDto: CreateWorkDto, user: User): Promise<Work> {
+    const organizationId = user.organization?.id ?? null;
     const work = this.workRepository.create({
       ...createWorkDto,
       start_date: new Date(createWorkDto.start_date),
       end_date: createWorkDto.end_date ? new Date(createWorkDto.end_date) : null,
+      organization_id: organizationId,
     });
 
     return await this.workRepository.save(work);
   }
 
   async findAll(user: User): Promise<Work[]> {
+    const organizationId = user.organization?.id ?? null;
     const queryBuilder = this.workRepository.createQueryBuilder('work');
 
-    if (user.role.name === UserRole.SUPERVISOR) {
-      queryBuilder.where('work.supervisor_id = :supervisorId', {
-        supervisorId: user.id,
+    if (organizationId) {
+      queryBuilder.where('work.organization_id = :organizationId', {
+        organizationId,
       });
+    }
+
+    if (user.role.name === UserRole.SUPERVISOR) {
+      if (organizationId) {
+        queryBuilder.andWhere('work.supervisor_id = :supervisorId', {
+          supervisorId: user.id,
+        });
+      } else {
+        queryBuilder.where('work.supervisor_id = :supervisorId', {
+          supervisorId: user.id,
+        });
+      }
     }
 
     return await queryBuilder
@@ -41,6 +56,7 @@ export class WorksService {
   }
 
   async findOne(id: string, user: User): Promise<Work> {
+    const organizationId = user.organization?.id ?? null;
     const work = await this.workRepository.findOne({
       where: { id },
       relations: ['supervisor', 'budgets', 'contracts', 'expenses', 'incomes'],
@@ -48,6 +64,10 @@ export class WorksService {
 
     if (!work) {
       throw new NotFoundException(`Work with ID ${id} not found`);
+    }
+
+    if (organizationId && work.organization_id !== organizationId) {
+      throw new ForbiddenException('Work does not belong to your organization');
     }
 
     if (

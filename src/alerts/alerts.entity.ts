@@ -85,6 +85,9 @@ export class Alert {
   @JoinColumn({ name: 'cashbox_id' })
   cashbox: Cashbox;
 
+  @Column({ type: 'uuid', nullable: true })
+  document_id: string;
+
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;
 

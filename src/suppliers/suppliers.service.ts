@@ -36,9 +36,11 @@ export class SuppliersService {
       createSupplierDto.status = SupplierStatus.PROVISIONAL;
     }
 
+    const organizationId = user.organization?.id ?? null;
     const supplier = this.supplierRepository.create({
       ...createSupplierDto,
       created_by_id: user.id,
+      organization_id: organizationId,
     });
 
     const savedSupplier = await this.supplierRepository.save(supplier);
@@ -174,13 +176,22 @@ export class SuppliersService {
   }
 
   async findAll(user: User): Promise<Supplier[]> {
+    const organizationId = user.organization?.id ?? null;
+    const where: any = {};
+    
+    if (organizationId) {
+      where.organization_id = organizationId;
+    }
+
     return await this.supplierRepository.find({
+      where,
       relations: ['documents'],
       order: { created_at: 'DESC' },
     });
   }
 
   async findOne(id: string, user: User): Promise<Supplier> {
+    const organizationId = user.organization?.id ?? null;
     const supplier = await this.supplierRepository.findOne({
       where: { id },
       relations: ['documents', 'contracts'],
@@ -188,6 +199,10 @@ export class SuppliersService {
 
     if (!supplier) {
       throw new NotFoundException(`Supplier with ID ${id} not found`);
+    }
+
+    if (organizationId && supplier.organization_id !== organizationId) {
+      throw new ForbiddenException('Supplier does not belong to your organization');
     }
 
     return supplier;

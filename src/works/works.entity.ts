@@ -9,6 +9,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { User } from '../users/user.entity';
+import { Organization } from '../organizations/organization.entity';
 import { Currency } from '../common/enums/currency.enum';
 import { WorkStatus } from '../common/enums/work-status.enum';
 import { WorkBudget } from '../work-budgets/work-budgets.entity';
@@ -16,6 +17,7 @@ import { Contract } from '../contracts/contracts.entity';
 import { Expense } from '../expenses/expenses.entity';
 import { Income } from '../incomes/incomes.entity';
 import { Schedule } from '../schedule/schedule.entity';
+import { WorkDocument } from '../work-documents/work-documents.entity';
 
 @Entity('works')
 export class Work {
@@ -57,6 +59,13 @@ export class Work {
   @JoinColumn({ name: 'supervisor_id' })
   supervisor: User;
 
+  @Column({ type: 'uuid', nullable: true })
+  organization_id: string;
+
+  @ManyToOne(() => Organization, { nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: Organization;
+
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   total_budget: number;
 
@@ -95,5 +104,8 @@ export class Work {
 
   @OneToMany(() => Schedule, (schedule) => schedule.work)
   schedules: Schedule[];
+
+  @OneToMany(() => WorkDocument, (document) => document.work)
+  documents: WorkDocument[];
 }
 

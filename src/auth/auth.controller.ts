@@ -1,9 +1,10 @@
-import { Controller, Post, HttpCode, HttpStatus, Body, Res } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Controller, Post, Get, HttpCode, HttpStatus, Body, Res, Req, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -35,6 +36,37 @@ export class AuthController {
     return {
       user: result.user,
       access_token: result.access_token,
+      refresh_token: result.refresh_token,
+    };
+  }
+
+  @Get('refresh')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async refresh(@Req() req: Request) {
+    const result = await this.authService.refresh(req.user);
+    
+    // Set token as HTTP-only cookie
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
+    
+    (req.res as Response).cookie('token', result.access_token, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: '/',
+      domain: cookieDomain,
+    });
+    
+    return {
+      user: result.user,
+      access_token: result.access_token,
+      refresh_token: result.refresh_token,
     };
   }
 

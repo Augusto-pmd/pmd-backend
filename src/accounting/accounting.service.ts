@@ -38,18 +38,31 @@ export class AccountingService {
       );
     }
 
-    const record = this.accountingRepository.create(createAccountingRecordDto);
+    const organizationId = user.organization?.id ?? null;
+    const record = this.accountingRepository.create({
+      ...createAccountingRecordDto,
+      organization_id: organizationId,
+    });
     return await this.accountingRepository.save(record);
   }
 
   async findAll(user: User): Promise<AccountingRecord[]> {
+    const organizationId = user.organization?.id ?? null;
+    const where: any = {};
+    
+    if (organizationId) {
+      where.organization_id = organizationId;
+    }
+
     return await this.accountingRepository.find({
+      where,
       relations: ['expense', 'work', 'supplier'],
       order: { date: 'DESC', created_at: 'DESC' },
     });
   }
 
   async findOne(id: string, user: User): Promise<AccountingRecord> {
+    const organizationId = user.organization?.id ?? null;
     const record = await this.accountingRepository.findOne({
       where: { id },
       relations: ['expense', 'work', 'supplier'],
@@ -57,6 +70,10 @@ export class AccountingService {
 
     if (!record) {
       throw new NotFoundException(`Accounting record with ID ${id} not found`);
+    }
+
+    if (organizationId && record.organization_id !== organizationId) {
+      throw new ForbiddenException('Accounting record does not belong to your organization');
     }
 
     return record;

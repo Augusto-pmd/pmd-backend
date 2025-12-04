@@ -39,6 +39,12 @@ export class RolesController {
     return this.rolesService.findOne(id);
   }
 
+  @Get(':id/permissions')
+  @Roles(UserRole.DIRECTION, UserRole.SUPERVISOR, UserRole.ADMINISTRATION)
+  getPermissions(@Param('id') id: string) {
+    return this.rolesService.getPermissions(id);
+  }
+
   @Patch(':id')
   @Roles(UserRole.DIRECTION)
   update(@Param('id') id: string, @Body() updateRoleDto: UpdateRoleDto) {

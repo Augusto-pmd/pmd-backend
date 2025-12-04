@@ -12,20 +12,21 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // CORS - Configure for frontend integration (AL INICIO, antes de cualquier middleware)
-  app.use(
-    cors({
-      origin: [
-        'https://pmd-frontend-bice.vercel.app',
-        /\.vercel\.app$/,
-        'http://localhost:3000',
-        'http://localhost:5173'
-      ],
-      methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-      allowedHeaders: ['Content-Type','Authorization'],
-      credentials: true,
-      optionsSuccessStatus: 200
-    }),
-  );
+  const isProduction = process.env.NODE_ENV === 'production';
+  app.enableCors({
+    origin: [
+      'https://pmd-frontend-bice.vercel.app',
+      'https://pmd-frontend.vercel.app',
+      /\.vercel\.app$/,
+      'http://localhost:3000',
+      'http://localhost:5173'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    credentials: true,
+    optionsSuccessStatus: 200,
+    preflightContinue: false,
+  });
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -74,6 +75,7 @@ async function bootstrap() {
     .addTag('Alerts', 'Alert management endpoints')
     .addTag('Accounting', 'Accounting records and reports endpoints')
     .addTag('Audit', 'Audit log endpoints')
+    .addTag('Health', 'Health check endpoints')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document, {
@@ -85,10 +87,11 @@ async function bootstrap() {
   });
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT', 3000);
+  const port = configService.get<number>('PORT') || process.env.PORT || 3000;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
   console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
+  console.log(`Health check: http://localhost:${port}/api/health`);
 }
 
 bootstrap();

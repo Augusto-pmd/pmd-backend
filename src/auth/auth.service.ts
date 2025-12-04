@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/co
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { User } from '../users/user.entity';
 import { Role } from '../roles/role.entity';
 import * as bcrypt from 'bcrypt';
@@ -16,6 +17,7 @@ export class AuthService {
     @InjectRepository(Role)
     private roleRepository: Repository<Role>,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -49,22 +51,32 @@ export class AuthService {
     return result;
   }
 
-  async login(loginDto: LoginDto): Promise<{ access_token: string; user: any }> {
+  async login(loginDto: LoginDto): Promise<{ access_token: string; refresh_token: string; user: any }> {
     const user = await this.validateUser(loginDto.email, loginDto.password);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    const organizationId = user.organization?.id ?? null;
+
     const payload = { 
+      sub: user.id,
       email: user.email, 
-      sub: user.id, 
-      role: user.role?.name || null 
+      role: user.role?.name || null,
+      organizationId: organizationId,
     };
     
-    const access_token = this.jwtService.sign(payload);
+    const access_token = this.jwtService.sign(payload, {
+      expiresIn: this.configService.get<string>('JWT_EXPIRATION', '1d'),
+    });
+
+    const refresh_token = this.jwtService.sign(payload, {
+      expiresIn: '7d',
+    });
     
     return {
       access_token,
+      refresh_token,
       user: {
         id: user.id,
         email: user.email,
@@ -73,7 +85,7 @@ export class AuthService {
           id: user.role.id,
           name: user.role.name,
         } : null,
-        organizationId: user.organization?.id ?? null,
+        organizationId: organizationId,
         organization: user.organization
           ? { id: user.organization.id, name: user.organization.name }
           : null,
@@ -136,6 +148,53 @@ export class AuthService {
       } : null,
       created_at: result.created_at,
       updated_at: result.updated_at,
+    };
+  }
+
+  async refresh(user: any): Promise<{ access_token: string; refresh_token: string; user: any }> {
+    // Reload user with organization relation
+    const fullUser = await this.userRepository.findOne({
+      where: { id: user.id },
+      relations: ['role', 'organization'],
+    });
+
+    if (!fullUser || !fullUser.isActive) {
+      throw new UnauthorizedException('User not found or inactive');
+    }
+
+    const organizationId = fullUser.organization?.id ?? null;
+
+    const payload = {
+      sub: fullUser.id,
+      email: fullUser.email,
+      role: fullUser.role?.name || null,
+      organizationId: organizationId,
+    };
+
+    const access_token = this.jwtService.sign(payload, {
+      expiresIn: this.configService.get<string>('JWT_EXPIRATION', '1d'),
+    });
+
+    const refresh_token = this.jwtService.sign(payload, {
+      expiresIn: '7d',
+    });
+
+    return {
+      access_token,
+      refresh_token,
+      user: {
+        id: fullUser.id,
+        email: fullUser.email,
+        fullName: fullUser.fullName,
+        role: fullUser.role ? {
+          id: fullUser.role.id,
+          name: fullUser.role.name,
+        } : null,
+        organizationId: organizationId,
+        organization: fullUser.organization
+          ? { id: fullUser.organization.id, name: fullUser.organization.name }
+          : null,
+      },
     };
   }
 }

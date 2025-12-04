@@ -3,6 +3,7 @@ import {
   Get,
   Param,
   Query,
+  Delete,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -38,6 +39,18 @@ export class AuditController {
   @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION)
   findByUser(@Param('userId') userId: string) {
     return this.auditService.findByUser(userId);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.DIRECTION)
+  remove(@Param('id') id: string) {
+    return this.auditService.remove(id);
+  }
+
+  @Delete()
+  @Roles(UserRole.DIRECTION)
+  removeAll() {
+    return this.auditService.removeAll();
   }
 }
 

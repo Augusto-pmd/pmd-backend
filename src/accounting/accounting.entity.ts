@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { AccountingType } from '../common/enums/accounting-type.enum';
 import { Currency } from '../common/enums/currency.enum';
+import { Organization } from '../organizations/organization.entity';
 import { Expense } from '../expenses/expenses.entity';
 import { Work } from '../works/works.entity';
 import { Supplier } from '../suppliers/suppliers.entity';
@@ -45,6 +46,13 @@ export class AccountingRecord {
   @ManyToOne(() => Supplier, { nullable: true })
   @JoinColumn({ name: 'supplier_id' })
   supplier: Supplier;
+
+  @Column({ type: 'uuid', nullable: true })
+  organization_id: string;
+
+  @ManyToOne(() => Organization, { nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: Organization;
 
   @Column({ type: 'date' })
   date: Date;

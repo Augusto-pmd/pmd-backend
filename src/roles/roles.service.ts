@@ -41,6 +41,11 @@ export class RolesService {
     const role = await this.findOne(id);
     await this.roleRepository.remove(role);
   }
+
+  async getPermissions(id: string): Promise<Record<string, any>> {
+    const role = await this.findOne(id);
+    return role.permissions || {};
+  }
 }
 
 

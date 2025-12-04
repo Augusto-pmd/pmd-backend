@@ -33,5 +33,14 @@ export class CreateSupplierDocumentDto {
   @IsBoolean()
   @IsOptional()
   is_valid?: boolean;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(50)
+  version?: string;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
 }
 

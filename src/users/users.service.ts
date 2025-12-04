@@ -34,9 +34,17 @@ export class UsersService {
     return await this.userRepository.save(user);
   }
 
-  async findAll(): Promise<User[]> {
+  async findAll(user?: User): Promise<User[]> {
+    const organizationId = user?.organization?.id ?? null;
+    const where: any = {};
+    
+    if (organizationId) {
+      where.organization_id = organizationId;
+    }
+
     return await this.userRepository.find({
-      relations: ['role'],
+      where,
+      relations: ['role', 'organization'],
     });
   }
 
@@ -67,6 +75,20 @@ export class UsersService {
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
     await this.userRepository.remove(user);
+  }
+
+  async updateRole(id: string, roleId: string): Promise<User> {
+    const user = await this.findOne(id);
+    const role = await this.roleRepository.findOne({
+      where: { id: roleId },
+    });
+
+    if (!role) {
+      throw new NotFoundException(`Role with ID ${roleId} not found`);
+    }
+
+    user.role = role;
+    return await this.userRepository.save(user);
   }
 }
 

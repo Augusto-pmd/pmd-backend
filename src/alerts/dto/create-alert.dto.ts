@@ -48,6 +48,10 @@ export class CreateAlertDto {
   @IsOptional()
   cashbox_id?: string;
 
+  @IsUUID()
+  @IsOptional()
+  document_id?: string;
+
   @IsObject()
   @IsOptional()
   metadata?: Record<string, any>;
