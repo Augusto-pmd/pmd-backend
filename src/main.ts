@@ -12,21 +12,13 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // CORS - Configure for frontend integration (AL INICIO, antes de cualquier middleware)
-  const isProduction = process.env.NODE_ENV === 'production';
   app.enableCors({
     origin: [
       'http://localhost:3000',
       'https://pmd-frontend-nine.vercel.app',
-      'https://pmd-frontend-bice.vercel.app',
-      'https://pmd-frontend.vercel.app',
-      /\.vercel\.app$/,
-      'http://localhost:5173'
+      'https://pmd-frontend-two.vercel.app'
     ],
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    credentials: true,
-    optionsSuccessStatus: 200,
-    preflightContinue: false,
+    credentials: true
   });
 
   // Global validation pipe
@@ -89,8 +81,12 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   // Render requires port 8080 or 10000 - use 8080 as default
-  const port = configService.get<number>('PORT') || process.env.PORT || 8080;
-  await app.listen(port);
+  const port = process.env.PORT || 8080;
+  
+  // Log de inicio visible para Render
+  console.log("🔥 PMD Backend is starting on port", port);
+  
+  await app.listen(port, '0.0.0.0');
   console.log(`Application is running on: http://localhost:${port}`);
   console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
   console.log(`Health check: http://localhost:${port}/api/health`);

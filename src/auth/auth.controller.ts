@@ -17,34 +17,25 @@ export class AuthController {
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async login(@Body() loginDto: LoginDto, @Res() res: Response) {
-    const result = await this.authService.login(loginDto);
-    
-    // Set token as cookie with conditional SameSite for production
-    const isProduction = process.env.NODE_ENV === 'production';
-    
-    res.cookie('token', result.access_token, {
-      httpOnly: false, // Allow frontend to read cookie if needed
-      secure: isProduction, // Only in production (HTTPS required)
-      sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-site in production, 'lax' for dev
+  async login(@Body() dto: LoginDto, @Res() res: Response) {
+    const { access_token, user } = await this.authService.login(dto);
+
+    const isProd = process.env.NODE_ENV === 'production';
+
+    res.cookie('token', access_token, {
+      httpOnly: false,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    
-    // Always return JSON, never redirect
-    // Ensure organizationId is always present
-    const userResponse = {
-      id: result.user.id,
-      email: result.user.email,
-      fullName: result.user.fullName,
-      role: result.user.role,
-      organizationId: result.user.organizationId ?? null,
-    };
-    
+
     return res.status(200).json({
-      access_token: result.access_token,
-      refresh_token: result.refresh_token,
-      user: userResponse,
+      access_token,
+      user: {
+        ...user,
+        organizationId: user.organizationId ?? user.organization?.id ?? null
+      }
     });
   }
 
@@ -66,23 +57,23 @@ export class AuthController {
       secure: isProduction, // Only in production (HTTPS required)
       sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-site in production, 'lax' for dev
       path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 604800000, // 7 days
     });
     
     // Always return JSON, never redirect
-    // Ensure organizationId is always present
-    const userResponse = {
-      id: result.user.id,
-      email: result.user.email,
-      fullName: result.user.fullName,
-      role: result.user.role,
-      organizationId: result.user.organizationId ?? null,
-    };
+    // Ensure organizationId is always present - use fallback chain
+    const organizationId = result.user.organizationId ?? result.user.organization?.id ?? null;
     
     return res.status(200).json({
       access_token: result.access_token,
       refresh_token: result.refresh_token,
-      user: userResponse,
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        fullName: result.user.fullName,
+        role: result.user.role,
+        organizationId: organizationId,
+      },
     });
   }
 

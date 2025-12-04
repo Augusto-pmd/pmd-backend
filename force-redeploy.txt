@@ -1,6 +1,6 @@
-# Force Redeploy Trigger
-# This file forces Render to perform a full redeploy without using cache
-# Render detects changes in this file and executes a fresh build
-
-Timestamp: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-
+Redeploy triggered: Login and cookies configuration fix
+Timestamp: 2024-12-19
+Changes: 
+- Updated auth.controller.ts login endpoint for cross-site cookies
+- Updated main.ts CORS configuration
+- Updated main.ts to listen on 0.0.0.0 for Render
