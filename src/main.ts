@@ -14,9 +14,8 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:3000',
-      'https://pmd-frontend-nc567rq28-augustos-projects-de3cbc36.vercel.app', // TU FRONTEND REAL ACTUAL
-      'https://pmd-frontend-two.vercel.app',   // opcional
-      'https://pmd-frontend-nine.vercel.app'   // opcional
+      'https://pmd-frontend-two.vercel.app',
+      'https://pmd-frontend-eta.vercel.app', // frontend activo
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: ['Content-Type', 'Authorization'],
