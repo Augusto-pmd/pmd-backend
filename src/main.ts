@@ -12,14 +12,24 @@ async function bootstrap() {
 
   // CORS - Configure for frontend integration (AL INICIO, antes de cualquier middleware)
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'https://pmd-frontend-two.vercel.app',
-      'https://pmd-frontend-eta.vercel.app', // frontend activo
-    ],
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        /^https?:\/\/localhost:3000$/,
+        /^https?:\/\/pmd-frontend-.*\.vercel\.app$/   // acepta TODOS los builds de Vercel
+      ];
+
+      if (!origin) return callback(null, true); // permite móviles, postman, etc.
+
+      const isAllowed = allowedOrigins.some((pattern) => pattern.test(origin));
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked for origin: ${origin}`));
+      }
+    },
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   });
 
   // Global validation pipe
