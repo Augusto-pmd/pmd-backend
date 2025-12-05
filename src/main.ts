@@ -15,17 +15,15 @@ async function bootstrap() {
     origin: (origin, callback) => {
       const allowedOrigins = [
         /^https?:\/\/localhost:3000$/,
-        /^https?:\/\/pmd-frontend-.*\.vercel\.app$/   // acepta TODOS los builds de Vercel
+        /^https?:\/\/pmd-frontend-.*\.vercel\.app$/ // todos los subdominios del frontend
       ];
 
-      if (!origin) return callback(null, true); // permite móviles, postman, etc.
+      if (!origin) return callback(null, true);
 
-      const isAllowed = allowedOrigins.some((pattern) => pattern.test(origin));
-      if (isAllowed) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS blocked for origin: ${origin}`));
-      }
+      const isAllowed = allowedOrigins.some(p => p.test(origin));
+      isAllowed
+        ? callback(null, true)
+        : callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
