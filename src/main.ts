@@ -94,7 +94,7 @@ async function bootstrap() {
   // Log de inicio visible para Render
   console.log("🚀 PMD Backend booting on port:", port);
   
-  await app.listen(process.env.PORT || 10000, '0.0.0.0');
+  await app.listen(port, '0.0.0.0');
   console.log(`Application is running on: http://localhost:${port}`);
   console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
   console.log(`Health check: http://localhost:${port}/api/health`);
