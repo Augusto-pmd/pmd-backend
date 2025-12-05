@@ -8,6 +8,7 @@ import { Role } from '../roles/role.entity';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 
 @Injectable()
 export class AuthService {
@@ -57,7 +58,16 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const organizationId = user.organization?.id ?? null;
+    // Ensure organizationId is always present with fallback to default organization
+    let organizationId = getOrganizationId(user);
+    if (!organizationId) {
+      organizationId = "1"; // organización por defecto (UUID string)
+    }
+
+    // Ensure organization object is present if frontend expects it
+    if (!user.organization) {
+      user.organization = { id: "1", name: "PMD Arquitectura" } as any;
+    }
 
     const payload = { 
       sub: user.id,
@@ -83,6 +93,7 @@ export class AuthService {
         fullName: user.fullName,
         role: user.role?.name || null,
         organizationId: organizationId,
+        organization: user.organization,
       },
     };
   }
@@ -156,7 +167,16 @@ export class AuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    const organizationId = fullUser.organization?.id ?? null;
+    // Ensure organizationId is always present with fallback to default organization
+    let organizationId = getOrganizationId(fullUser);
+    if (!organizationId) {
+      organizationId = "1"; // organización por defecto (UUID string)
+    }
+
+    // Ensure organization object is present if frontend expects it
+    if (!fullUser.organization) {
+      fullUser.organization = { id: "1", name: "PMD Arquitectura" } as any;
+    }
 
     const payload = {
       sub: fullUser.id,
@@ -182,6 +202,7 @@ export class AuthService {
         fullName: fullUser.fullName,
         role: fullUser.role?.name || null,
         organizationId: organizationId,
+        organization: fullUser.organization,
       },
     };
   }
