@@ -15,9 +15,11 @@ async function bootstrap() {
     origin: (origin, callback) => {
       const allowedOrigins = [
         /^https?:\/\/localhost:3000$/,
-        /^https?:\/\/pmd-frontend-.*\.vercel\.app$/ // todos los subdominios del frontend
+        /^https?:\/\/pmd-frontend-.*\.vercel\.app$/, // todos los subdominios del frontend en Vercel
+        /^https?:\/\/.*\.onrender\.com$/, // todos los subdominios de Render
       ];
 
+      // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
       const isAllowed = allowedOrigins.some(p => p.test(origin));
