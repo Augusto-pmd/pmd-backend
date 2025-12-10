@@ -7,6 +7,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
+import { getDefaultRole } from '../common/helpers/get-default-role.helper';
 
 @Injectable()
 export class UsersService {
@@ -35,7 +36,7 @@ export class UsersService {
     return await this.userRepository.save(user);
   }
 
-  async findAll(user?: User): Promise<User[]> {
+  async findAll(user?: User): Promise<any[]> {
     const organizationId = user ? getOrganizationId(user) : null;
     const where: any = {};
     
@@ -43,9 +44,59 @@ export class UsersService {
       where.organization_id = organizationId;
     }
 
-    return await this.userRepository.find({
+    // Load users with relations
+    const users = await this.userRepository.find({
       where,
       relations: ['role', 'organization'],
+    });
+
+    // Get default role and organization for fallbacks
+    const defaultRole = await getDefaultRole(this.roleRepository);
+    const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
+
+    // Normalize all users to prevent 500 errors
+    return users.map((u) => {
+      // Normalize role - ensure it's always an object with id and name
+      let role = defaultRole;
+      let roleId = defaultRole.id;
+
+      if (u.role && u.role.id && u.role.name) {
+        role = {
+          id: u.role.id,
+          name: u.role.name,
+        };
+        roleId = u.role.id;
+      }
+
+      // Normalize organizationId
+      const userOrgId = getOrganizationId(u) || DEFAULT_ORG_ID;
+
+      // Normalize organization object
+      let organization = {
+        id: DEFAULT_ORG_ID,
+        name: 'PMD Arquitectura',
+      };
+
+      if (u.organization && u.organization.id && u.organization.name) {
+        organization = {
+          id: u.organization.id,
+          name: u.organization.name,
+        };
+      }
+
+      // Return normalized user object
+      return {
+        id: u.id,
+        email: u.email,
+        fullName: u.fullName,
+        role: role,
+        roleId: roleId,
+        organizationId: userOrgId,
+        organization: organization,
+        isActive: u.isActive,
+        created_at: u.created_at,
+        updated_at: u.updated_at,
+      };
     });
   }
 

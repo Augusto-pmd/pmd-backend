@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
+import { getDefaultRole } from '../common/helpers/get-default-role.helper';
 
 @Injectable()
 export class AuthService {
@@ -61,6 +62,9 @@ export class AuthService {
 
     // Default organization UUID (same as in seed)
     const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
+
+    // Get default role
+    const defaultRole = await getDefaultRole(this.roleRepository);
 
     // Ensure organizationId is always present in database
     let organizationId = getOrganizationId(user);
@@ -129,10 +133,17 @@ export class AuthService {
       user.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
     }
 
+    // Normalize role - always return as object
+    const role = user.role && user.role.id && user.role.name
+      ? { id: user.role.id, name: user.role.name }
+      : defaultRole;
+
+    const roleId = user.role?.id || defaultRole.id;
+
     const payload = { 
       sub: user.id,
       email: user.email, 
-      role: user.role?.name || null,
+      role: role.name,
       organizationId: organizationId,
     };
     
@@ -151,7 +162,8 @@ export class AuthService {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
-        role: user.role?.name || null,
+        role: role,
+        roleId: roleId,
         organizationId: organizationId,
         organization: user.organization && {
           id: user.organization.id,
@@ -233,6 +245,9 @@ export class AuthService {
     // Default organization UUID (same as in seed)
     const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
 
+    // Get default role
+    const defaultRole = await getDefaultRole(this.roleRepository);
+
     // Ensure organizationId is always present in database
     let organizationId = getOrganizationId(fullUser);
     if (!organizationId) {
@@ -276,10 +291,17 @@ export class AuthService {
       fullUser.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
     }
 
+    // Normalize role - always return as object
+    const role = fullUser.role && fullUser.role.id && fullUser.role.name
+      ? { id: fullUser.role.id, name: fullUser.role.name }
+      : defaultRole;
+
+    const roleId = fullUser.role?.id || defaultRole.id;
+
     const payload = {
       sub: fullUser.id,
       email: fullUser.email,
-      role: fullUser.role?.name || null,
+      role: role.name,
       organizationId: organizationId,
     };
 
@@ -298,7 +320,8 @@ export class AuthService {
         id: fullUser.id,
         email: fullUser.email,
         fullName: fullUser.fullName,
-        role: fullUser.role?.name || null,
+        role: role,
+        roleId: roleId,
         organizationId: organizationId,
         organization: fullUser.organization && {
           id: fullUser.organization.id,
@@ -321,6 +344,9 @@ export class AuthService {
 
     // Default organization UUID (same as in seed)
     const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
+
+    // Get default role
+    const defaultRole = await getDefaultRole(this.roleRepository);
 
     // Ensure organizationId is always present
     let organizationId = getOrganizationId(fullUser);
@@ -365,11 +391,19 @@ export class AuthService {
       fullUser.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
     }
 
+    // Normalize role - always return as object
+    const role = fullUser.role && fullUser.role.id && fullUser.role.name
+      ? { id: fullUser.role.id, name: fullUser.role.name }
+      : defaultRole;
+
+    const roleId = fullUser.role?.id || defaultRole.id;
+
     return {
       id: fullUser.id,
       email: fullUser.email,
       fullName: fullUser.fullName,
-      role: fullUser.role?.name || null,
+      role: role,
+      roleId: roleId,
       organizationId: organizationId,
       organization: fullUser.organization && {
         id: fullUser.organization.id,
