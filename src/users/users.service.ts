@@ -6,6 +6,7 @@ import { Role } from '../roles/role.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
+import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 
 @Injectable()
 export class UsersService {
@@ -35,7 +36,7 @@ export class UsersService {
   }
 
   async findAll(user?: User): Promise<User[]> {
-    const organizationId = user?.organization?.id ?? null;
+    const organizationId = user ? getOrganizationId(user) : null;
     const where: any = {};
     
     if (organizationId) {

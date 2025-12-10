@@ -14,6 +14,7 @@ import { MonthStatus } from '../common/enums/month-status.enum';
 import { UserRole } from '../common/enums/user-role.enum';
 import { AccountingType } from '../common/enums/accounting-type.enum';
 import { User } from '../users/user.entity';
+import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 
 @Injectable()
 export class AccountingService {
@@ -38,7 +39,7 @@ export class AccountingService {
       );
     }
 
-    const organizationId = user.organization?.id ?? null;
+    const organizationId = getOrganizationId(user);
     const record = this.accountingRepository.create({
       ...createAccountingRecordDto,
       organization_id: organizationId,
@@ -47,7 +48,7 @@ export class AccountingService {
   }
 
   async findAll(user: User): Promise<AccountingRecord[]> {
-    const organizationId = user.organization?.id ?? null;
+    const organizationId = getOrganizationId(user);
     const where: any = {};
     
     if (organizationId) {
@@ -62,7 +63,7 @@ export class AccountingService {
   }
 
   async findOne(id: string, user: User): Promise<AccountingRecord> {
-    const organizationId = user.organization?.id ?? null;
+    const organizationId = getOrganizationId(user);
     const record = await this.accountingRepository.findOne({
       where: { id },
       relations: ['expense', 'work', 'supplier'],

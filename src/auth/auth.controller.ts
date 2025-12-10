@@ -33,11 +33,20 @@ export class AuthController {
     return res.status(200).json({
       access_token,
       refresh_token,
-      user: {
-        ...user,
-        organizationId: user.organizationId ?? user.organization?.id ?? null
-      }
+      user,
     });
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async loadMe(@Req() req: Request) {
+    const user = await this.authService.loadMe(req.user);
+    return { user };
   }
 
   @Get('refresh')
@@ -62,19 +71,10 @@ export class AuthController {
     });
     
     // Always return JSON, never redirect
-    // Ensure organizationId is always present - use fallback chain
-    const organizationId = result.user.organizationId ?? result.user.organization?.id ?? null;
-    
     return res.status(200).json({
       access_token: result.access_token,
       refresh_token: result.refresh_token,
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        fullName: result.user.fullName,
-        role: result.user.role,
-        organizationId: organizationId,
-      },
+      user: result.user,
     });
   }
 

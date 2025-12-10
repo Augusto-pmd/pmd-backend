@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { User } from '../users/user.entity';
 import { Role } from '../roles/role.entity';
+import { Organization } from '../organizations/organization.entity';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -58,15 +59,74 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Ensure organizationId is always present with fallback to default organization
+    // Default organization UUID (same as in seed)
+    const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
+
+    // Ensure organizationId is always present in database
     let organizationId = getOrganizationId(user);
     if (!organizationId) {
-      organizationId = "1"; // organización por defecto (UUID string)
+      // If user doesn't have organizationId, assign default organization
+      const fullUser = await this.userRepository.findOne({
+        where: { id: user.id },
+        relations: ['organization'],
+      });
+      
+      if (fullUser && !fullUser.organization) {
+        // Try to find default organization
+        const orgRepository = this.userRepository.manager.getRepository(Organization);
+        let defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
+        
+        if (!defaultOrg) {
+          // Create default organization if it doesn't exist
+          defaultOrg = orgRepository.create({
+            id: DEFAULT_ORG_ID,
+            name: 'PMD Arquitectura',
+            description: 'Organización por defecto PMD',
+          });
+          defaultOrg = await orgRepository.save(defaultOrg);
+        }
+        
+        fullUser.organization = defaultOrg;
+        await this.userRepository.save(fullUser);
+        organizationId = DEFAULT_ORG_ID;
+        user.organization = defaultOrg;
+      } else if (fullUser?.organization) {
+        organizationId = fullUser.organization.id;
+        user.organization = fullUser.organization;
+      } else {
+        organizationId = DEFAULT_ORG_ID;
+      }
+    } else if (!user.organization) {
+      // If organizationId exists but organization object is not loaded, load it
+      const fullUser = await this.userRepository.findOne({
+        where: { id: user.id },
+        relations: ['organization'],
+      });
+      if (fullUser?.organization) {
+        user.organization = fullUser.organization;
+        organizationId = fullUser.organization.id;
+      } else {
+        // Try to load organization by ID
+        const orgRepository = this.userRepository.manager.getRepository(Organization);
+        const org = await orgRepository.findOne({ where: { id: organizationId } });
+        if (org) {
+          user.organization = org;
+        } else {
+          // Fallback to default if organizationId doesn't exist in DB
+          const defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
+          if (defaultOrg) {
+            user.organization = defaultOrg;
+            organizationId = DEFAULT_ORG_ID;
+          } else {
+            user.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
+          }
+        }
+      }
     }
 
     // Ensure organization object is present if frontend expects it
     if (!user.organization) {
-      user.organization = { id: "1", name: "PMD Arquitectura" } as any;
+      user.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
     }
 
     const payload = { 
@@ -93,7 +153,10 @@ export class AuthService {
         fullName: user.fullName,
         role: user.role?.name || null,
         organizationId: organizationId,
-        organization: user.organization,
+        organization: user.organization && {
+          id: user.organization.id,
+          name: user.organization.name,
+        },
       },
     };
   }
@@ -167,15 +230,50 @@ export class AuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    // Ensure organizationId is always present with fallback to default organization
+    // Default organization UUID (same as in seed)
+    const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
+
+    // Ensure organizationId is always present in database
     let organizationId = getOrganizationId(fullUser);
     if (!organizationId) {
-      organizationId = "1"; // organización por defecto (UUID string)
+      // If user doesn't have organizationId, assign default organization
+      const orgRepository = this.userRepository.manager.getRepository(Organization);
+      let defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
+      
+      if (!defaultOrg) {
+        // Create default organization if it doesn't exist
+        defaultOrg = orgRepository.create({
+          id: DEFAULT_ORG_ID,
+          name: 'PMD Arquitectura',
+          description: 'Organización por defecto PMD',
+        });
+        defaultOrg = await orgRepository.save(defaultOrg);
+      }
+      
+      fullUser.organization = defaultOrg;
+      await this.userRepository.save(fullUser);
+      organizationId = DEFAULT_ORG_ID;
+    } else if (!fullUser.organization) {
+      // If organizationId exists but organization object is not loaded, load it
+      const orgRepository = this.userRepository.manager.getRepository(Organization);
+      const org = await orgRepository.findOne({ where: { id: organizationId } });
+      if (org) {
+        fullUser.organization = org;
+      } else {
+        // Fallback to default if organizationId doesn't exist in DB
+        const defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
+        if (defaultOrg) {
+          fullUser.organization = defaultOrg;
+          organizationId = DEFAULT_ORG_ID;
+        } else {
+          fullUser.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
+        }
+      }
     }
 
     // Ensure organization object is present if frontend expects it
     if (!fullUser.organization) {
-      fullUser.organization = { id: "1", name: "PMD Arquitectura" } as any;
+      fullUser.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
     }
 
     const payload = {
@@ -202,7 +300,80 @@ export class AuthService {
         fullName: fullUser.fullName,
         role: fullUser.role?.name || null,
         organizationId: organizationId,
-        organization: fullUser.organization,
+        organization: fullUser.organization && {
+          id: fullUser.organization.id,
+          name: fullUser.organization.name,
+        },
+      },
+    };
+  }
+
+  async loadMe(user: any): Promise<any> {
+    // Reload user with organization relation
+    const fullUser = await this.userRepository.findOne({
+      where: { id: user.id },
+      relations: ['role', 'organization'],
+    });
+
+    if (!fullUser || !fullUser.isActive) {
+      throw new UnauthorizedException('User not found or inactive');
+    }
+
+    // Default organization UUID (same as in seed)
+    const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
+
+    // Ensure organizationId is always present
+    let organizationId = getOrganizationId(fullUser);
+    if (!organizationId) {
+      // If user doesn't have organizationId, assign default organization
+      const orgRepository = this.userRepository.manager.getRepository(Organization);
+      let defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
+      
+      if (!defaultOrg) {
+        // Create default organization if it doesn't exist
+        defaultOrg = orgRepository.create({
+          id: DEFAULT_ORG_ID,
+          name: 'PMD Arquitectura',
+          description: 'Organización por defecto PMD',
+        });
+        defaultOrg = await orgRepository.save(defaultOrg);
+      }
+      
+      fullUser.organization = defaultOrg;
+      await this.userRepository.save(fullUser);
+      organizationId = DEFAULT_ORG_ID;
+    } else if (!fullUser.organization) {
+      // If organizationId exists but organization object is not loaded, load it
+      const orgRepository = this.userRepository.manager.getRepository(Organization);
+      const org = await orgRepository.findOne({ where: { id: organizationId } });
+      if (org) {
+        fullUser.organization = org;
+      } else {
+        // Fallback to default if organizationId doesn't exist in DB
+        const defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
+        if (defaultOrg) {
+          fullUser.organization = defaultOrg;
+          organizationId = DEFAULT_ORG_ID;
+        } else {
+          fullUser.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
+        }
+      }
+    }
+
+    // Ensure organization object is present
+    if (!fullUser.organization) {
+      fullUser.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
+    }
+
+    return {
+      id: fullUser.id,
+      email: fullUser.email,
+      fullName: fullUser.fullName,
+      role: fullUser.role?.name || null,
+      organizationId: organizationId,
+      organization: fullUser.organization && {
+        id: fullUser.organization.id,
+        name: fullUser.organization.name,
       },
     };
   }

@@ -16,6 +16,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 import { User } from '../users/user.entity';
 import { AlertsService } from '../alerts/alerts.service';
 import { AlertType, AlertSeverity } from '../common/enums';
+import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 
 @Injectable()
 export class SuppliersService {
@@ -36,7 +37,7 @@ export class SuppliersService {
       createSupplierDto.status = SupplierStatus.PROVISIONAL;
     }
 
-    const organizationId = user.organization?.id ?? null;
+    const organizationId = getOrganizationId(user);
     const supplier = this.supplierRepository.create({
       ...createSupplierDto,
       created_by_id: user.id,
@@ -176,7 +177,7 @@ export class SuppliersService {
   }
 
   async findAll(user: User): Promise<Supplier[]> {
-    const organizationId = user.organization?.id ?? null;
+    const organizationId = getOrganizationId(user);
     const where: any = {};
     
     if (organizationId) {
@@ -191,7 +192,7 @@ export class SuppliersService {
   }
 
   async findOne(id: string, user: User): Promise<Supplier> {
-    const organizationId = user.organization?.id ?? null;
+    const organizationId = getOrganizationId(user);
     const supplier = await this.supplierRepository.findOne({
       where: { id },
       relations: ['documents', 'contracts'],

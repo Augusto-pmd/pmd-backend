@@ -6,6 +6,7 @@ import { CreateWorkDto } from './dto/create-work.dto';
 import { UpdateWorkDto } from './dto/update-work.dto';
 import { User } from '../users/user.entity';
 import { UserRole } from '../common/enums/user-role.enum';
+import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 
 @Injectable()
 export class WorksService {
@@ -15,7 +16,7 @@ export class WorksService {
   ) {}
 
   async create(createWorkDto: CreateWorkDto, user: User): Promise<Work> {
-    const organizationId = user.organization?.id ?? null;
+    const organizationId = getOrganizationId(user);
     const work = this.workRepository.create({
       ...createWorkDto,
       start_date: new Date(createWorkDto.start_date),
@@ -27,7 +28,7 @@ export class WorksService {
   }
 
   async findAll(user: User): Promise<Work[]> {
-    const organizationId = user.organization?.id ?? null;
+    const organizationId = getOrganizationId(user);
     const queryBuilder = this.workRepository.createQueryBuilder('work');
 
     if (organizationId) {
@@ -56,7 +57,7 @@ export class WorksService {
   }
 
   async findOne(id: string, user: User): Promise<Work> {
-    const organizationId = user.organization?.id ?? null;
+    const organizationId = getOrganizationId(user);
     const work = await this.workRepository.findOne({
       where: { id },
       relations: ['supervisor', 'budgets', 'contracts', 'expenses', 'incomes'],

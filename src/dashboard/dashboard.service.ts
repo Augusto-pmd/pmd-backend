@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { User } from '../users/user.entity';
+import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 
 @Injectable()
 export class DashboardService {
   async getDashboard(user: User) {
-    const organizationId = user.organization?.id ?? null;
+    const organizationId = getOrganizationId(user);
     
     // Basic dashboard implementation
     return {

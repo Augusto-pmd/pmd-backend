@@ -6,6 +6,7 @@ import { Work } from '../works/works.entity';
 import { CreateWorkDocumentDto } from './dto/create-work-document.dto';
 import { UpdateWorkDocumentDto } from './dto/update-work-document.dto';
 import { User } from '../users/user.entity';
+import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 
 @Injectable()
 export class WorkDocumentsService {
@@ -25,7 +26,7 @@ export class WorkDocumentsService {
       throw new NotFoundException(`Work with ID ${createDto.work_id} not found`);
     }
 
-    const organizationId = user.organization?.id ?? null;
+    const organizationId = getOrganizationId(user);
     if (organizationId && work.organization_id !== organizationId) {
       throw new ForbiddenException('Work does not belong to your organization');
     }
@@ -35,7 +36,7 @@ export class WorkDocumentsService {
   }
 
   async findAll(workId?: string, user?: User): Promise<WorkDocument[]> {
-    const organizationId = user?.organization?.id ?? null;
+    const organizationId = user ? getOrganizationId(user) : null;
     const where: any = {};
 
     if (workId) {
@@ -66,7 +67,7 @@ export class WorkDocumentsService {
   }
 
   async findOne(id: string, user: User): Promise<WorkDocument> {
-    const organizationId = user.organization?.id ?? null;
+    const organizationId = getOrganizationId(user);
     const document = await this.workDocumentRepository.findOne({
       where: { id },
       relations: ['work'],

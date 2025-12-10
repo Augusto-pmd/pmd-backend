@@ -3,6 +3,7 @@ import * as bcrypt from 'bcrypt';
 import { config } from 'dotenv';
 import { Role } from './roles/role.entity';
 import { User } from './users/user.entity';
+import { Organization } from './organizations/organization.entity';
 import { Rubric } from './rubrics/rubrics.entity';
 import { Supplier } from './suppliers/suppliers.entity';
 import { SupplierDocument } from './supplier-documents/supplier-documents.entity';
@@ -28,6 +29,7 @@ const dataSource = new DataSource({
   entities: [
     Role,
     User,
+    Organization,
     Rubric,
     Supplier,
     SupplierDocument,
@@ -54,6 +56,7 @@ async function seed() {
 
     const roleRepository = dataSource.getRepository(Role);
     const userRepository = dataSource.getRepository(User);
+    const organizationRepository = dataSource.getRepository(Organization);
     const rubricRepository = dataSource.getRepository(Rubric);
     const supplierRepository = dataSource.getRepository(Supplier);
     const supplierDocumentRepository = dataSource.getRepository(SupplierDocument);
@@ -137,6 +140,28 @@ async function seed() {
       createdRoles[roleData.name] = role;
     }
 
+    // 1.5. Seed Default Organization (idempotent)
+    console.log('🏢 Seeding default organization...');
+    // Use a fixed UUID for the default PMD organization
+    const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
+    let defaultOrg = await organizationRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
+    if (!defaultOrg) {
+      defaultOrg = organizationRepository.create({
+        id: DEFAULT_ORG_ID,
+        name: 'PMD Arquitectura',
+        description: 'Organización por defecto PMD',
+      });
+      defaultOrg = await organizationRepository.save(defaultOrg);
+      console.log(`  ✅ Created organization: ${defaultOrg.name} (${defaultOrg.id})`);
+    } else {
+      // Update name if it exists but is different
+      if (defaultOrg.name !== 'PMD Arquitectura') {
+        defaultOrg.name = 'PMD Arquitectura';
+        defaultOrg = await organizationRepository.save(defaultOrg);
+      }
+      console.log(`  ℹ️  Organization already exists: ${defaultOrg.name} (${defaultOrg.id})`);
+    }
+
     // 2. Seed Users (idempotent)
     console.log('👥 Seeding users...');
     const defaultPassword = await bcrypt.hash('password123', 10);
@@ -180,19 +205,30 @@ async function seed() {
 
     const createdUsers: Record<string, User> = {};
     for (const userData of users) {
-      let user = await userRepository.findOne({ where: { email: userData.email } });
+      let user = await userRepository.findOne({ 
+        where: { email: userData.email },
+        relations: ['organization'],
+      });
       if (!user) {
         user = userRepository.create({
           fullName: userData.name,
           email: userData.email,
           password: userData.password,
           role: userData.role,
+          organization: defaultOrg,
           isActive: true,
         });
         user = await userRepository.save(user);
-        console.log(`  ✅ Created user: ${userData.email}`);
+        console.log(`  ✅ Created user: ${userData.email} with organization ${defaultOrg.name}`);
       } else {
-        console.log(`  ℹ️  User already exists: ${userData.email}`);
+        // Ensure existing users have organizationId set
+        if (!user.organization || !user.organization.id) {
+          user.organization = defaultOrg;
+          user = await userRepository.save(user);
+          console.log(`  ✅ Updated user: ${userData.email} - assigned to organization ${defaultOrg.name}`);
+        } else {
+          console.log(`  ℹ️  User already exists: ${userData.email}`);
+        }
       }
       createdUsers[userData.email] = user;
     }
