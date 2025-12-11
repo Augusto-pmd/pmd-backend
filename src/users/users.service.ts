@@ -33,7 +33,7 @@ export class UsersService {
    */
   private async reloadUserWithRelations(id: string | number): Promise<User> {
     const user = await this.userRepository.findOne({
-      where: { id },
+      where: { id: String(id) },
       relations: ['role', 'organization'],
     });
 
@@ -92,7 +92,7 @@ export class UsersService {
    */
   private async findOneEntity(id: string): Promise<User> {
     const user = await this.userRepository.findOne({
-      where: { id },
+      where: { id: String(id) },
       relations: ['role', 'organization'],
     });
 
