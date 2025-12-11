@@ -1,4 +1,5 @@
 # Render Redeploy Trigger
 # Este archivo fuerza un redeploy limpio en Render
 # Render detecta cambios en este archivo y ejecuta un nuevo build
+# Updated: 2025-12-11 - Cleanup seeds + unified admin seed creation
 
