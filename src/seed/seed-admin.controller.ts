@@ -16,41 +16,50 @@ export class SeedAdminController {
   ) {}
 
   @Get()
-  async run() {
-    const adminRole = await this.rolesRepo.findOne({
-      where: { name: UserRole.ADMINISTRATION },
-    });
+  async createAdmin() {
+    const email = 'admin@pmd.com';
 
-    if (!adminRole) {
-      return {
-        message: 'ERROR: ADMINISTRATION role not found. Run /seed-default first.',
-      };
-    }
-
+    // Si ya existe, devolver mensaje
     const existing = await this.usersRepo.findOne({
-      where: { email: 'admin@pmd.com' },
+      where: { email },
     });
 
     if (existing) {
       return { message: 'Admin already exists' };
     }
 
-    const hashed = await bcrypt.hash('Pmd2024DB', 10);
-
-    const admin = this.usersRepo.create({
-      email: 'admin@pmd.com',
-      fullName: 'Administrador PMD',
-      password: hashed,
-      isActive: true,
-      role: adminRole,
+    // Buscar rol ADMINISTRATION
+    const adminRole = await this.rolesRepo.findOne({
+      where: { name: UserRole.ADMINISTRATION },
     });
 
-    await this.usersRepo.save(admin);
+    if (!adminRole) {
+      return {
+        message: 'ERROR: ADMINISTRATION role not found. Please create the role first.',
+      };
+    }
+
+    // Hashear contraseña
+    const hashed = await bcrypt.hash('1102Pequ', 10);
+
+    // Crear usuario
+    const admin = this.usersRepo.create({
+      email: email,
+      password: hashed,
+      fullName: 'Administrador PMD',
+      role: adminRole,
+      isActive: true,
+    });
+
+    const savedUser = await this.usersRepo.save(admin);
 
     return {
-      message: 'Admin created successfully',
-      email: 'admin@pmd.com',
-      password: 'Pmd2024DB',
+      message: 'Admin created',
+      user: {
+        id: savedUser.id,
+        email: savedUser.email,
+        fullName: savedUser.fullName,
+      },
     };
   }
 }
