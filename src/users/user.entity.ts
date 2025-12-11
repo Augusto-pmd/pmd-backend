@@ -31,9 +31,12 @@ export class User {
   @JoinColumn({ name: 'role_id' })
   role: Role;
 
+  @Column({ name: 'organization_id', nullable: true })
+  organizationId: string | null;
+
   @ManyToOne(() => Organization, (org) => org.users, { nullable: true })
   @JoinColumn({ name: 'organization_id' })
-  organization: Organization;
+  organization: Organization | null;
 
   @CreateDateColumn()
   created_at: Date;

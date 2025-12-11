@@ -1,39 +1,12 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-  OneToMany,
-} from 'typeorm';
-import { UserRole } from '../common/enums/user-role.enum';
-import { User } from '../users/user.entity';
-
-@Entity('roles')
-export class Role {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({
-    type: 'enum',
-    enum: UserRole,
-    unique: true,
-  })
-  name: UserRole;
-
-  @Column({ type: 'text', nullable: true })
-  description: string;
-
-  @Column({ type: 'jsonb', nullable: true })
-  permissions: Record<string, any>;
-
-  @CreateDateColumn()
-  created_at: Date;
-
-  @UpdateDateColumn()
-  updated_at: Date;
-
-  @OneToMany(() => User, (user) => user.role)
-  users: User[];
-}
+/**
+ * Re-export of the official Role entity for backward compatibility
+ * The official entity is defined in role.entity.ts
+ * 
+ * This file exists to maintain compatibility with imports that use:
+ *   import { Role } from './roles.entity'
+ * 
+ * All new code should use:
+ *   import { Role } from './role.entity'
+ */
+export * from './role.entity';
 

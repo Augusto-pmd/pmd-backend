@@ -15,7 +15,10 @@ export class DashboardService {
         role: user.role?.name || user.role,
         organizationId: organizationId,
         organization: user.organization
-          ? { id: user.organization.id, name: user.organization.name }
+          ? {
+              id: user.organization?.id ?? null,
+              name: user.organization?.name ?? null,
+            }
           : null,
       },
       summary: {

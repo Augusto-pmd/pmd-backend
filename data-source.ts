@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
-import { Role } from './src/roles/roles.entity';
-import { User } from './src/users/users.entity';
+import { Role } from './src/roles/role.entity';
+import { User } from './src/users/user.entity';
 import { Rubric } from './src/rubrics/rubrics.entity';
 import { Supplier } from './src/suppliers/suppliers.entity';
 import { SupplierDocument } from './src/supplier-documents/supplier-documents.entity';

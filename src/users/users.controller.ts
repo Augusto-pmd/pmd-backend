@@ -34,6 +34,12 @@ export class UsersController {
     return this.usersService.findAll(req.user);
   }
 
+  @Get('me')
+  @Roles(UserRole.DIRECTION, UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.OPERATOR)
+  getMe(@Request() req) {
+    return this.usersService.findOne(req.user.id);
+  }
+
   @Get(':id')
   @Roles(UserRole.DIRECTION, UserRole.SUPERVISOR, UserRole.ADMINISTRATION)
   findOne(@Param('id') id: string) {

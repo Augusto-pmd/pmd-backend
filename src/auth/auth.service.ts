@@ -11,6 +11,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 import { getDefaultRole } from '../common/helpers/get-default-role.helper';
+import { normalizeUser } from '../common/helpers/normalize-user.helper';
 
 @Injectable()
 export class AuthService {
@@ -54,96 +55,87 @@ export class AuthService {
     return result;
   }
 
-  async login(loginDto: LoginDto): Promise<{ access_token: string; refresh_token: string; user: any }> {
-    const user = await this.validateUser(loginDto.email, loginDto.password);
+  /**
+   * Ensures user has organization and role assigned
+   * Returns the user entity with relations loaded
+   */
+  private async ensureUserOrganizationAndRole(userId: string): Promise<User> {
+    const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
+    
+    // Load user with all relations
+    let user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['role', 'organization'],
+    });
+
     if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const orgRepository = this.userRepository.manager.getRepository(Organization);
+    let needsSave = false;
+
+    // Ensure organization exists
+    let organizationId = getOrganizationId(user);
+    if (!organizationId || !user.organization) {
+      let defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
+      
+      if (!defaultOrg) {
+        // Create default organization if it doesn't exist
+        defaultOrg = orgRepository.create({
+          id: DEFAULT_ORG_ID,
+          name: 'PMD Arquitectura',
+          description: 'Organización por defecto PMD',
+        });
+        defaultOrg = await orgRepository.save(defaultOrg);
+      }
+      
+      user.organization = defaultOrg;
+      user.organizationId = DEFAULT_ORG_ID;
+      needsSave = true;
+    }
+
+    // Ensure role exists
+    if (!user.role) {
+      const defaultRoleEntity = await this.roleRepository.findOne({
+        where: { id: (await getDefaultRole(this.roleRepository)).id },
+      });
+      
+      if (defaultRoleEntity) {
+        user.role = defaultRoleEntity;
+        needsSave = true;
+      }
+    }
+
+    if (needsSave) {
+      user = await this.userRepository.save(user);
+      // Reload to ensure relations are fresh
+      user = await this.userRepository.findOne({
+        where: { id: userId },
+        relations: ['role', 'organization'],
+      });
+    }
+
+    return user!;
+  }
+
+  async login(loginDto: LoginDto): Promise<{ access_token: string; refresh_token: string; user: any }> {
+    const validatedUser = await this.validateUser(loginDto.email, loginDto.password);
+    if (!validatedUser) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Default organization UUID (same as in seed)
-    const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
+    // Ensure user has organization and role
+    const user = await this.ensureUserOrganizationAndRole(validatedUser.id);
 
-    // Get default role
-    const defaultRole = await getDefaultRole(this.roleRepository);
-
-    // Ensure organizationId is always present in database
-    let organizationId = getOrganizationId(user);
-    if (!organizationId) {
-      // If user doesn't have organizationId, assign default organization
-      const fullUser = await this.userRepository.findOne({
-        where: { id: user.id },
-        relations: ['organization'],
-      });
-      
-      if (fullUser && !fullUser.organization) {
-        // Try to find default organization
-        const orgRepository = this.userRepository.manager.getRepository(Organization);
-        let defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
-        
-        if (!defaultOrg) {
-          // Create default organization if it doesn't exist
-          defaultOrg = orgRepository.create({
-            id: DEFAULT_ORG_ID,
-            name: 'PMD Arquitectura',
-            description: 'Organización por defecto PMD',
-          });
-          defaultOrg = await orgRepository.save(defaultOrg);
-        }
-        
-        fullUser.organization = defaultOrg;
-        await this.userRepository.save(fullUser);
-        organizationId = DEFAULT_ORG_ID;
-        user.organization = defaultOrg;
-      } else if (fullUser?.organization) {
-        organizationId = fullUser.organization.id;
-        user.organization = fullUser.organization;
-      } else {
-        organizationId = DEFAULT_ORG_ID;
-      }
-    } else if (!user.organization) {
-      // If organizationId exists but organization object is not loaded, load it
-      const fullUser = await this.userRepository.findOne({
-        where: { id: user.id },
-        relations: ['organization'],
-      });
-      if (fullUser?.organization) {
-        user.organization = fullUser.organization;
-        organizationId = fullUser.organization.id;
-      } else {
-        // Try to load organization by ID
-        const orgRepository = this.userRepository.manager.getRepository(Organization);
-        const org = await orgRepository.findOne({ where: { id: organizationId } });
-        if (org) {
-          user.organization = org;
-        } else {
-          // Fallback to default if organizationId doesn't exist in DB
-          const defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
-          if (defaultOrg) {
-            user.organization = defaultOrg;
-            organizationId = DEFAULT_ORG_ID;
-          } else {
-            user.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
-          }
-        }
-      }
-    }
-
-    // Ensure organization object is present if frontend expects it
-    if (!user.organization) {
-      user.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
-    }
-
-    // Normalize role - always return as object
-    const role = user.role && user.role.id && user.role.name
-      ? { id: user.role.id, name: user.role.name }
-      : defaultRole;
-
-    const roleId = user.role?.id || defaultRole.id;
+    // Get organizationId for JWT payload
+    const organizationId = getOrganizationId(user) || user.organization?.id || '00000000-0000-0000-0000-000000000001';
+    const roleName = user.role?.name?.toString() || (await getDefaultRole(this.roleRepository)).name;
 
     const payload = { 
       sub: user.id,
       email: user.email, 
-      role: role.name,
+      role: roleName,
       organizationId: organizationId,
     };
     
@@ -155,21 +147,11 @@ export class AuthService {
       expiresIn: '7d',
     });
     
+    // Return normalized user using shared helper
     return {
       access_token,
       refresh_token,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: role,
-        roleId: roleId,
-        organizationId: organizationId,
-        organization: user.organization && {
-          id: user.organization.id,
-          name: user.organization.name,
-        },
-      },
+      user: normalizeUser(user),
     };
   }
 
@@ -204,104 +186,36 @@ export class AuthService {
     // Save user to database
     const savedUser = await this.userRepository.save(user);
     
-    // Reload with role relation to return complete user data
-    const userWithRole = await this.userRepository.findOne({
+    // Reload with all relations to return complete user data
+    const userWithRelations = await this.userRepository.findOne({
       where: { id: savedUser.id },
-      relations: ['role'],
-    });
-
-    if (!userWithRole) {
-      throw new Error('Failed to create user');
-    }
-
-    // Remove password from response
-    const { password: _, ...result } = userWithRole as any;
-    return {
-      id: result.id,
-      fullName: result.fullName,
-      email: result.email,
-      isActive: result.isActive,
-      role: userWithRole.role ? {
-        id: userWithRole.role.id,
-        name: userWithRole.role.name,
-        description: userWithRole.role.description,
-      } : null,
-      created_at: result.created_at,
-      updated_at: result.updated_at,
-    };
-  }
-
-  async refresh(user: any): Promise<{ access_token: string; refresh_token: string; user: any }> {
-    // Reload user with organization relation
-    const fullUser = await this.userRepository.findOne({
-      where: { id: user.id },
       relations: ['role', 'organization'],
     });
 
-    if (!fullUser || !fullUser.isActive) {
-      throw new UnauthorizedException('User not found or inactive');
+    if (!userWithRelations) {
+      throw new Error('Failed to create user');
     }
 
-    // Default organization UUID (same as in seed)
-    const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
+    // Return normalized user using shared helper for consistency
+    return normalizeUser(userWithRelations);
+  }
 
-    // Get default role
-    const defaultRole = await getDefaultRole(this.roleRepository);
+  async refresh(user: any): Promise<{ access_token: string; refresh_token: string; user: any }> {
+    // Ensure user has organization and role
+    const fullUser = await this.ensureUserOrganizationAndRole(user.id);
 
-    // Ensure organizationId is always present in database
-    let organizationId = getOrganizationId(fullUser);
-    if (!organizationId) {
-      // If user doesn't have organizationId, assign default organization
-      const orgRepository = this.userRepository.manager.getRepository(Organization);
-      let defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
-      
-      if (!defaultOrg) {
-        // Create default organization if it doesn't exist
-        defaultOrg = orgRepository.create({
-          id: DEFAULT_ORG_ID,
-          name: 'PMD Arquitectura',
-          description: 'Organización por defecto PMD',
-        });
-        defaultOrg = await orgRepository.save(defaultOrg);
-      }
-      
-      fullUser.organization = defaultOrg;
-      await this.userRepository.save(fullUser);
-      organizationId = DEFAULT_ORG_ID;
-    } else if (!fullUser.organization) {
-      // If organizationId exists but organization object is not loaded, load it
-      const orgRepository = this.userRepository.manager.getRepository(Organization);
-      const org = await orgRepository.findOne({ where: { id: organizationId } });
-      if (org) {
-        fullUser.organization = org;
-      } else {
-        // Fallback to default if organizationId doesn't exist in DB
-        const defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
-        if (defaultOrg) {
-          fullUser.organization = defaultOrg;
-          organizationId = DEFAULT_ORG_ID;
-        } else {
-          fullUser.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
-        }
-      }
+    if (!fullUser.isActive) {
+      throw new UnauthorizedException('User is inactive');
     }
 
-    // Ensure organization object is present if frontend expects it
-    if (!fullUser.organization) {
-      fullUser.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
-    }
-
-    // Normalize role - always return as object
-    const role = fullUser.role && fullUser.role.id && fullUser.role.name
-      ? { id: fullUser.role.id, name: fullUser.role.name }
-      : defaultRole;
-
-    const roleId = fullUser.role?.id || defaultRole.id;
+    // Get organizationId for JWT payload
+    const organizationId = getOrganizationId(fullUser) || fullUser.organization?.id || '00000000-0000-0000-0000-000000000001';
+    const roleName = fullUser.role?.name?.toString() || (await getDefaultRole(this.roleRepository)).name;
 
     const payload = {
       sub: fullUser.id,
       email: fullUser.email,
-      role: role.name,
+      role: roleName,
       organizationId: organizationId,
     };
 
@@ -313,102 +227,23 @@ export class AuthService {
       expiresIn: '7d',
     });
 
+    // Return normalized user using shared helper
     return {
       access_token,
       refresh_token,
-      user: {
-        id: fullUser.id,
-        email: fullUser.email,
-        fullName: fullUser.fullName,
-        role: role,
-        roleId: roleId,
-        organizationId: organizationId,
-        organization: fullUser.organization && {
-          id: fullUser.organization.id,
-          name: fullUser.organization.name,
-        },
-      },
+      user: normalizeUser(fullUser),
     };
   }
 
   async loadMe(user: any): Promise<any> {
-    // Reload user with organization relation
-    const fullUser = await this.userRepository.findOne({
-      where: { id: user.id },
-      relations: ['role', 'organization'],
-    });
+    // Ensure user has organization and role
+    const fullUser = await this.ensureUserOrganizationAndRole(user.id);
 
-    if (!fullUser || !fullUser.isActive) {
-      throw new UnauthorizedException('User not found or inactive');
+    if (!fullUser.isActive) {
+      throw new UnauthorizedException('User is inactive');
     }
 
-    // Default organization UUID (same as in seed)
-    const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
-
-    // Get default role
-    const defaultRole = await getDefaultRole(this.roleRepository);
-
-    // Ensure organizationId is always present
-    let organizationId = getOrganizationId(fullUser);
-    if (!organizationId) {
-      // If user doesn't have organizationId, assign default organization
-      const orgRepository = this.userRepository.manager.getRepository(Organization);
-      let defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
-      
-      if (!defaultOrg) {
-        // Create default organization if it doesn't exist
-        defaultOrg = orgRepository.create({
-          id: DEFAULT_ORG_ID,
-          name: 'PMD Arquitectura',
-          description: 'Organización por defecto PMD',
-        });
-        defaultOrg = await orgRepository.save(defaultOrg);
-      }
-      
-      fullUser.organization = defaultOrg;
-      await this.userRepository.save(fullUser);
-      organizationId = DEFAULT_ORG_ID;
-    } else if (!fullUser.organization) {
-      // If organizationId exists but organization object is not loaded, load it
-      const orgRepository = this.userRepository.manager.getRepository(Organization);
-      const org = await orgRepository.findOne({ where: { id: organizationId } });
-      if (org) {
-        fullUser.organization = org;
-      } else {
-        // Fallback to default if organizationId doesn't exist in DB
-        const defaultOrg = await orgRepository.findOne({ where: { id: DEFAULT_ORG_ID } });
-        if (defaultOrg) {
-          fullUser.organization = defaultOrg;
-          organizationId = DEFAULT_ORG_ID;
-        } else {
-          fullUser.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
-        }
-      }
-    }
-
-    // Ensure organization object is present
-    if (!fullUser.organization) {
-      fullUser.organization = { id: organizationId, name: 'PMD Arquitectura' } as any;
-    }
-
-    // Normalize role - always return as object
-    const role = fullUser.role && fullUser.role.id && fullUser.role.name
-      ? { id: fullUser.role.id, name: fullUser.role.name }
-      : defaultRole;
-
-    const roleId = fullUser.role?.id || defaultRole.id;
-
-    return {
-      id: fullUser.id,
-      email: fullUser.email,
-      fullName: fullUser.fullName,
-      role: role,
-      roleId: roleId,
-      organizationId: organizationId,
-      organization: fullUser.organization && {
-        id: fullUser.organization.id,
-        name: fullUser.organization.name,
-      },
-    };
+    // Return normalized user using shared helper
+    return normalizeUser(fullUser);
   }
 }

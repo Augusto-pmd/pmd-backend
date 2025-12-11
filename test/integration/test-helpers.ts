@@ -10,8 +10,8 @@ import * as request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { TestDatabaseModule, getTestDataSource } from './test-database.module';
 import { UserRole } from '../../src/common/enums/user-role.enum';
-import { Role } from '../../src/roles/roles.entity';
-import { User } from '../../src/users/users.entity';
+import { Role } from '../../src/roles/role.entity';
+import { User } from '../../src/users/user.entity';
 import * as bcrypt from 'bcrypt';
 
 export class TestApp {
@@ -95,18 +95,18 @@ export class TestDataBuilder {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = userRepo.create({
-      name: overrides?.name || 'Test User',
+      fullName: overrides?.fullName || 'Test User',
       email,
       password: hashedPassword,
-      role_id: role.id,
-      is_active: overrides?.is_active !== undefined ? overrides.is_active : true,
+      role: role,
+      isActive: overrides?.isActive !== undefined ? overrides.isActive : true,
       ...overrides,
     });
 
     const savedUser = await userRepo.save(user);
     return await userRepo.findOne({
       where: { id: savedUser.id },
-      relations: ['role'],
+      relations: ['role', 'organization'],
     });
   }
 

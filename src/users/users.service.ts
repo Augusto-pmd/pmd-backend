@@ -8,6 +8,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 import { getDefaultRole } from '../common/helpers/get-default-role.helper';
+import { normalizeUser } from '../common/helpers/normalize-user.helper';
 
 @Injectable()
 export class UsersService {
@@ -18,7 +19,32 @@ export class UsersService {
     private roleRepository: Repository<Role>,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  /**
+   * Normalizes a User entity using the shared helper
+   * This ensures consistency across all endpoints
+   */
+  private normalizeUserEntity(u: User): any {
+    return normalizeUser(u);
+  }
+
+  /**
+   * Reloads a user with fresh relations after save operations
+   * Ensures that role and organization are always up-to-date
+   */
+  private async reloadUserWithRelations(id: string | number): Promise<User> {
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['role', 'organization'],
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with id ${id} not found after save`);
+    }
+
+    return user;
+  }
+
+  async create(createUserDto: CreateUserDto): Promise<any> {
     const role = await this.roleRepository.findOne({
       where: { id: createUserDto.role_id },
     });
@@ -33,7 +59,13 @@ export class UsersService {
       password: hashedPassword,
     });
 
-    return await this.userRepository.save(user);
+    const savedUser = await this.userRepository.save(user);
+
+    // Reload with relations to ensure role and organization are loaded
+    const userWithRelations = await this.reloadUserWithRelations(savedUser.id);
+
+    // Use the same normalizer as all other endpoints for consistency
+    return this.normalizeUserEntity(userWithRelations);
   }
 
   async findAll(user?: User): Promise<any[]> {
@@ -44,66 +76,24 @@ export class UsersService {
       where.organization_id = organizationId;
     }
 
-    // Load users with relations
+    // Load users with relations - ALWAYS load both role and organization
     const users = await this.userRepository.find({
       where,
       relations: ['role', 'organization'],
     });
 
-    // Get default role and organization for fallbacks
-    const defaultRole = await getDefaultRole(this.roleRepository);
-    const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
-
-    // Normalize all users to prevent 500 errors
-    return users.map((u) => {
-      // Normalize role - ensure it's always an object with id and name
-      let role = defaultRole;
-      let roleId = defaultRole.id;
-
-      if (u.role && u.role.id && u.role.name) {
-        role = {
-          id: u.role.id,
-          name: u.role.name,
-        };
-        roleId = u.role.id;
-      }
-
-      // Normalize organizationId
-      const userOrgId = getOrganizationId(u) || DEFAULT_ORG_ID;
-
-      // Normalize organization object
-      let organization = {
-        id: DEFAULT_ORG_ID,
-        name: 'PMD Arquitectura',
-      };
-
-      if (u.organization && u.organization.id && u.organization.name) {
-        organization = {
-          id: u.organization.id,
-          name: u.organization.name,
-        };
-      }
-
-      // Return normalized user object
-      return {
-        id: u.id,
-        email: u.email,
-        fullName: u.fullName,
-        role: role,
-        roleId: roleId,
-        organizationId: userOrgId,
-        organization: organization,
-        isActive: u.isActive,
-        created_at: u.created_at,
-        updated_at: u.updated_at,
-      };
-    });
+    // Normalize all users using consistent normalizer
+    return users.map((u) => this.normalizeUserEntity(u));
   }
 
-  async findOne(id: string): Promise<User> {
+  /**
+   * Internal method to get User entity (not normalized)
+   * Used by update, remove, updateRole methods that need the actual entity
+   */
+  private async findOneEntity(id: string): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['role'],
+      relations: ['role', 'organization'],
     });
 
     if (!user) {
@@ -113,24 +103,36 @@ export class UsersService {
     return user;
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    const user = await this.findOne(id);
+  async findOne(id: string): Promise<any> {
+    const user = await this.findOneEntity(id);
+    // ALWAYS return normalized version for consistency
+    return this.normalizeUserEntity(user);
+  }
+
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<any> {
+    const user = await this.findOneEntity(id);
 
     if (updateUserDto.password) {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
 
     Object.assign(user, updateUserDto);
-    return await this.userRepository.save(user);
+    const savedUser = await this.userRepository.save(user);
+
+    // Reload with fresh relations to ensure role and organization are up-to-date
+    const refreshedUser = await this.reloadUserWithRelations(savedUser.id);
+
+    // Return normalized version for consistency
+    return this.normalizeUserEntity(refreshedUser);
   }
 
   async remove(id: string): Promise<void> {
-    const user = await this.findOne(id);
+    const user = await this.findOneEntity(id);
     await this.userRepository.remove(user);
   }
 
-  async updateRole(id: string, roleId: string): Promise<User> {
-    const user = await this.findOne(id);
+  async updateRole(id: string, roleId: string): Promise<any> {
+    const user = await this.findOneEntity(id);
     const role = await this.roleRepository.findOne({
       where: { id: roleId },
     });
@@ -140,7 +142,13 @@ export class UsersService {
     }
 
     user.role = role;
-    return await this.userRepository.save(user);
+    const savedUser = await this.userRepository.save(user);
+
+    // Reload with fresh relations to ensure role is properly loaded
+    const refreshedUser = await this.reloadUserWithRelations(savedUser.id);
+
+    // Return normalized version for consistency
+    return this.normalizeUserEntity(refreshedUser);
   }
 }
 
