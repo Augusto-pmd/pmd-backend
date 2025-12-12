@@ -9,14 +9,15 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
-  @ApiProperty({
-    description: 'User full name',
+  @ApiPropertyOptional({
+    description: 'User full name (defaults to "Usuario PMD" if not provided)',
     example: 'John Doe',
     maxLength: 255,
   })
   @IsString()
+  @IsOptional()
   @MaxLength(255)
-  name: string;
+  name?: string;
 
   @ApiProperty({
     description: 'User email address',
@@ -46,12 +47,13 @@ export class RegisterDto {
   @MaxLength(50)
   phone?: string;
 
-  @ApiProperty({
-    description: 'Role UUID',
+  @ApiPropertyOptional({
+    description: 'Role UUID (defaults to ADMINISTRATION role if not provided)',
     example: '123e4567-e89b-12d3-a456-426614174000',
     format: 'uuid',
   })
   @IsUUID()
-  role_id: string;
+  @IsOptional()
+  role_id?: string;
 }
 

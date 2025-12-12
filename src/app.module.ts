@@ -25,7 +25,7 @@ import { AuditModule } from './audit/audit.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TasksModule } from './tasks/tasks.module';
 import { StorageModule } from './storage/storage.module';
-import { SeedAdminModule } from './seed/seed-admin.module';
+import { AdminResetModule } from './admin-reset.module';
 import { DebugModule } from './debug/debug.module';
 import { HealthModule } from './health/health.module';
 
@@ -63,7 +63,7 @@ import { HealthModule } from './health/health.module';
     DashboardModule,
     TasksModule,
     StorageModule,
-    SeedAdminModule,
+    AdminResetModule,
     DebugModule,
     HealthModule,
   ],
