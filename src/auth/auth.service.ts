@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../users/user.entity';
 import { Role } from '../roles/role.entity';
 import { Organization } from '../organizations/organization.entity';
+import { UserRole } from '../common/enums/user-role.enum';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { normalizeUser } from '../common/helpers/normalize-user.helper';
@@ -28,10 +29,10 @@ export class AuthService {
       relations: ['role', 'organization'],
     });
 
-    let adminRole = await this.roleRepository.findOne({ where: { name: 'administration' }});
+    let adminRole = await this.roleRepository.findOne({ where: { name: UserRole.ADMINISTRATION }});
     if (!adminRole) {
       adminRole = this.roleRepository.create({
-        name: 'administration',
+        name: UserRole.ADMINISTRATION,
         description: 'Default Admin Role',
       });
       adminRole = await this.roleRepository.save(adminRole);
@@ -131,10 +132,10 @@ export class AuthService {
     }
 
     if (!role) {
-      role = await this.roleRepository.findOne({ where: { name: 'administration' } });
+      role = await this.roleRepository.findOne({ where: { name: UserRole.ADMINISTRATION } });
       if (!role) {
         role = this.roleRepository.create({
-          name: 'administration',
+          name: UserRole.ADMINISTRATION,
           description: 'Default Admin Role',
         });
         role = await this.roleRepository.save(role);
@@ -176,7 +177,7 @@ export class AuthService {
     const payload = {
       sub: fullUser.id,
       email: fullUser.email,
-      role: fullUser.role?.name || 'administration',
+      role: fullUser.role?.name || UserRole.ADMINISTRATION,
     };
 
     return {

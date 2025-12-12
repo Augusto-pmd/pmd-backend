@@ -19,7 +19,7 @@ export async function getDefaultRole(roleRepository: Repository<Role>): Promise<
       (r) => {
         if (!r.name) return false;
         const roleName = r.name.toString().toLowerCase();
-        return roleName === 'admin' || roleName === 'administration' || r.name === UserRole.ADMINISTRATION;
+        return roleName === 'admin' || roleName === UserRole.ADMINISTRATION.toLowerCase() || r.name === UserRole.ADMINISTRATION;
       }
     );
   }
