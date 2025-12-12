@@ -96,10 +96,44 @@ async function bootstrap() {
   // Log de inicio visible para Render
   console.log("🚀 PMD Backend booting on port:", port);
   
-  await app.listen(port, '0.0.0.0');
+  const server = await app.listen(port, '0.0.0.0');
   console.log(`Application is running on: http://localhost:${port}`);
   console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
   console.log(`Health check: http://localhost:${port}/api/health`);
+
+  // ROUTE DEBUG - Print all registered routes
+  const httpServer = app.getHttpServer();
+  const router = (httpServer as any)._events?.request?._router || (httpServer as any)._router;
+  const routes: Array<{ method: string; path: string }> = [];
+  
+  if (router && router.stack) {
+    const scan = (stack: any[], prefix = '') => {
+      stack.forEach((layer: any) => {
+        if (layer.route) {
+          Object.keys(layer.route.methods).forEach((method: string) => {
+            if (layer.route.methods[method]) {
+              routes.push({
+                method: method.toUpperCase(),
+                path: prefix + layer.route.path,
+              });
+            }
+          });
+        } else if (layer.name === 'router' && layer.handle?.stack) {
+          const segment = layer.regexp?.source
+            ?.replace(/\\\/\?/g, '')
+            ?.replace(/\(\?=\\\/\|\$\)/g, '')
+            ?.replace(/\\\//g, '/')
+            ?.replace(/\^|\$|\\/g, '') || '';
+          scan(layer.handle.stack, prefix + segment);
+        }
+      });
+    };
+    scan(router.stack);
+  }
+  
+  console.log("🛣️ ROUTES REGISTERED:", JSON.stringify(routes, null, 2));
+
+  return server;
 }
 
 bootstrap();
