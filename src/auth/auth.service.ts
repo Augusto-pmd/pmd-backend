@@ -97,19 +97,41 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
-    const user = await this.validateUser(loginDto.email, loginDto.password);
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+    // Normalize email (trim + lowercase)
+    const normalizedEmail = loginDto.email.trim().toLowerCase();
 
+    // Find user by email (include relations: role, organization)
+    const user = await this.userRepository.findOne({
+      where: { email: normalizedEmail },
+      relations: ['role', 'organization'],
+    });
+
+    // If user is null, inactive, or has no password, throw UnauthorizedException('USER_NOT_FOUND')
+    if (!user || !user.isActive || !user.password) {
+      throw new UnauthorizedException('USER_NOT_FOUND');
+    }
+
+    // Compare password with bcrypt.compare
+    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
+
+    // If false, throw UnauthorizedException('INVALID_PASSWORD')
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('INVALID_PASSWORD');
+    }
+
+    // If valid, issue JWT and return { accessToken, normalized user }
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role.name,
     };
 
+    const normalizedUser = normalizeUser(user);
+
     return {
-      access_token: await this.jwtService.signAsync(payload, { expiresIn: '1d' }),
+      accessToken: await this.jwtService.signAsync(payload, { expiresIn: '1d' }),
       refresh_token: await this.jwtService.signAsync(payload, { expiresIn: '7d' }),
-      user,
+      user: normalizedUser,
     };
   }
 
