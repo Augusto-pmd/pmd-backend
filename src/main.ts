@@ -10,26 +10,15 @@ async function bootstrap() {
   // Set global prefix for all routes so frontend can call /api/*
   app.setGlobalPrefix('api');
 
-  // CORS - Configure for frontend integration (AL INICIO, antes de cualquier middleware)
+  // CORS - Configure for frontend integration
   app.enableCors({
-    origin: (origin, callback) => {
-      const allowedOrigins = [
-        /^https?:\/\/localhost:3000$/,
-        /^https?:\/\/pmd-frontend-.*\.vercel\.app$/, // todos los subdominios del frontend en Vercel
-        /^https?:\/\/.*\.onrender\.com$/, // todos los subdominios de Render
-      ];
-
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-
-      const isAllowed = allowedOrigins.some(p => p.test(origin));
-      isAllowed
-        ? callback(null, true)
-        : callback(new Error(`CORS blocked for origin: ${origin}`));
-    },
+    origin: [
+      'http://localhost:3000',
+      'https://pmd-frontend-3zxv5l4tv-augustos-projects-de3cbc36.vercel.app',
+    ],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
   });
 
   // Global validation pipe
