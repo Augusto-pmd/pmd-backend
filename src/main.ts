@@ -12,10 +12,25 @@ async function bootstrap() {
 
   // CORS - Configure for frontend integration
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'https://pmd-frontend-3zxv5l4tv-augustos-projects-de3cbc36.vercel.app',
-    ],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g., curl, server-to-server)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Allow localhost:3000 for local development
+      if (origin === 'http://localhost:3000') {
+        return callback(null, true);
+      }
+
+      // Allow any Vercel deployment (*.vercel.app)
+      if (origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+
+      // Reject all other origins
+      callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
