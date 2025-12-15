@@ -2,47 +2,35 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule,
-    new FastifyAdapter(),
-  );
-
-  // Get Fastify instance to register CORS plugin
-  const fastifyInstance = app.getHttpAdapter().getInstance();
+  const app = await NestFactory.create(AppModule);
 
   // CORS origin validation function
-  const validateOrigin = (origin: string | undefined): boolean => {
+  const validateOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     // Allow requests with no origin (e.g., curl, server-to-server)
     if (!origin) {
-      return true;
+      return callback(null, true);
     }
 
     // Allow localhost:3000 for local development (http or https)
     if (origin === 'http://localhost:3000' || origin === 'https://localhost:3000') {
-      return true;
+      return callback(null, true);
     }
 
     // Allow any Vercel deployment (*.vercel.app)
     if (origin.endsWith('.vercel.app')) {
-      return true;
+      return callback(null, true);
     }
 
-    return false;
+    // Reject all other origins
+    callback(new Error(`CORS blocked for origin: ${origin}`), false);
   };
 
-  // Register Fastify CORS plugin using @fastify/cors BEFORE global prefix
-  await fastifyInstance.register(require('@fastify/cors'), {
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      if (validateOrigin(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS blocked for origin: ${origin}`), false);
-      }
-    },
+  // Enable CORS with Express-compatible configuration
+  app.enableCors({
+    origin: validateOrigin,
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
