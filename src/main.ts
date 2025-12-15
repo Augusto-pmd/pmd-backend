@@ -2,34 +2,65 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { Request, Response } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Get Express instance to handle OPTIONS preflight requests
+  const expressApp = app.getHttpAdapter().getInstance();
+
+  // CORS origin validation function
+  const validateOrigin = (origin: string | undefined): boolean => {
+    // Allow requests with no origin (e.g., curl, server-to-server)
+    if (!origin) {
+      return true;
+    }
+
+    // Allow localhost:3000 for local development (http or https)
+    if (origin === 'http://localhost:3000' || origin === 'https://localhost:3000') {
+      return true;
+    }
+
+    // Allow any Vercel deployment (*.vercel.app)
+    if (origin.endsWith('.vercel.app')) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // Register global OPTIONS handler BEFORE global prefix to catch all preflight requests
+  expressApp.options('*', (req: Request, res: Response) => {
+    const origin = req.headers.origin;
+
+    if (validateOrigin(origin)) {
+      // When credentials are enabled, must specify exact origin (not '*')
+      if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+      }
+      res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+      res.status(204).end();
+    } else {
+      res.status(403).end();
+    }
+  });
+
   // Set global prefix for all routes so frontend can call /api/*
   app.setGlobalPrefix('api');
 
-  // CORS - Configure for frontend integration
+  // CORS - Configure for frontend integration (for regular requests)
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g., curl, server-to-server)
-      if (!origin) {
-        return callback(null, true);
+      if (validateOrigin(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked for origin: ${origin}`));
       }
-
-      // Allow localhost:3000 for local development (http or https)
-      if (origin === 'http://localhost:3000' || origin === 'https://localhost:3000') {
-        return callback(null, true);
-      }
-
-      // Allow any Vercel deployment (*.vercel.app)
-      if (origin.endsWith('.vercel.app')) {
-        return callback(null, true);
-      }
-
-      // Reject all other origins
-      callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
