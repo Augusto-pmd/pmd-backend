@@ -2,33 +2,65 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { Request, Response } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // CORS origin validation function
-  const validateOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  // Get Express instance to register global OPTIONS handler
+  const expressApp = app.getHttpAdapter().getInstance();
+
+  // CORS origin validation function (reusable for both handlers)
+  const isOriginAllowed = (origin: string | undefined): boolean => {
     // Allow requests with no origin (e.g., curl, server-to-server)
     if (!origin) {
-      return callback(null, true);
+      return true;
     }
 
     // Allow localhost:3000 for local development (http or https)
     if (origin === 'http://localhost:3000' || origin === 'https://localhost:3000') {
-      return callback(null, true);
+      return true;
     }
 
     // Allow any Vercel deployment (*.vercel.app)
     if (origin.endsWith('.vercel.app')) {
-      return callback(null, true);
+      return true;
     }
 
-    // Reject all other origins
-    callback(new Error(`CORS blocked for origin: ${origin}`), false);
+    return false;
   };
 
-  // Enable CORS with Express-compatible configuration
+  // Register global OPTIONS handler BEFORE routes are matched
+  // This ensures preflight requests always get CORS headers
+  expressApp.options('*', (req: Request, res: Response) => {
+    const origin = req.headers.origin;
+
+    if (isOriginAllowed(origin)) {
+      // Set CORS headers manually
+      if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+      }
+      res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+      res.status(204).end();
+    } else {
+      res.status(403).end();
+    }
+  });
+
+  // CORS origin validation function for app.enableCors() callback
+  const validateOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    if (isOriginAllowed(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked for origin: ${origin}`), false);
+    }
+  };
+
+  // Enable CORS with Express-compatible configuration (secondary protection)
   app.enableCors({
     origin: validateOrigin,
     credentials: true,
