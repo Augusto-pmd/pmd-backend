@@ -2,14 +2,17 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import { Request, Response } from 'express';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter(),
+  );
 
-  // Get Express instance to handle OPTIONS preflight requests
-  const expressApp = app.getHttpAdapter().getInstance();
+  // Get Fastify instance to register CORS plugin
+  const fastifyInstance = app.getHttpAdapter().getInstance();
 
   // CORS origin validation function
   const validateOrigin = (origin: string | undefined): boolean => {
@@ -31,41 +34,22 @@ async function bootstrap() {
     return false;
   };
 
-  // Register global OPTIONS handler BEFORE global prefix to catch all preflight requests
-  expressApp.options('*', (req: Request, res: Response) => {
-    const origin = req.headers.origin;
-
-    if (validateOrigin(origin)) {
-      // When credentials are enabled, must specify exact origin (not '*')
-      if (origin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
+  // Register Fastify CORS plugin using @fastify/cors BEFORE global prefix
+  await fastifyInstance.register(require('@fastify/cors'), {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (validateOrigin(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked for origin: ${origin}`), false);
       }
-      res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
-      res.status(204).end();
-    } else {
-      res.status(403).end();
-    }
+    },
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Set global prefix for all routes so frontend can call /api/*
   app.setGlobalPrefix('api');
-
-  // CORS - Configure for frontend integration (for regular requests)
-  app.enableCors({
-    origin: (origin, callback) => {
-      if (validateOrigin(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS blocked for origin: ${origin}`));
-      }
-    },
-    credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-  });
 
   // Global validation pipe
   app.useGlobalPipes(
