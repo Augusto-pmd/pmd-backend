@@ -18,8 +18,8 @@ async function bootstrap() {
         return callback(null, true);
       }
 
-      // Allow localhost:3000 for local development
-      if (origin === 'http://localhost:3000') {
+      // Allow localhost:3000 for local development (http or https)
+      if (origin === 'http://localhost:3000' || origin === 'https://localhost:3000') {
         return callback(null, true);
       }
 
