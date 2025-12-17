@@ -247,21 +247,26 @@ export class ExpensesService {
   }
 
   async findAll(user: User): Promise<Expense[]> {
-    const queryBuilder = this.expenseRepository
-      .createQueryBuilder('expense')
-      .leftJoinAndSelect('expense.work', 'work')
-      .leftJoinAndSelect('expense.supplier', 'supplier')
-      .leftJoinAndSelect('expense.rubric', 'rubric')
-      .leftJoinAndSelect('expense.created_by', 'created_by')
-      .leftJoinAndSelect('expense.val', 'val')
-      .orderBy('expense.created_at', 'DESC');
+    try {
+      const queryBuilder = this.expenseRepository
+        .createQueryBuilder('expense')
+        .leftJoinAndSelect('expense.work', 'work')
+        .leftJoinAndSelect('expense.supplier', 'supplier')
+        .leftJoinAndSelect('expense.rubric', 'rubric')
+        .leftJoinAndSelect('expense.created_by', 'created_by')
+        .leftJoinAndSelect('expense.val', 'val')
+        .orderBy('expense.created_at', 'DESC');
 
-    // Operators can only see their own expenses
-    if (user.role.name === UserRole.OPERATOR) {
-      queryBuilder.where('expense.created_by_id = :userId', { userId: user.id });
+      // Operators can only see their own expenses
+      if (user?.role?.name === UserRole.OPERATOR) {
+        queryBuilder.where('expense.created_by_id = :userId', { userId: user.id });
+      }
+
+      return await queryBuilder.getMany();
+    } catch (error) {
+      console.error('[ExpensesService.findAll] Error:', error);
+      return [];
     }
-
-    return await queryBuilder.getMany();
   }
 
   async findOne(id: string, user: User): Promise<Expense> {

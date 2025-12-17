@@ -42,10 +42,15 @@ export class IncomesService {
   }
 
   async findAll(user: User): Promise<Income[]> {
-    return await this.incomeRepository.find({
-      relations: ['work'],
-      order: { date: 'DESC' },
-    });
+    try {
+      return await this.incomeRepository.find({
+        relations: ['work'],
+        order: { date: 'DESC' },
+      });
+    } catch (error) {
+      console.error('[IncomesService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findOne(id: string, user: User): Promise<Income> {

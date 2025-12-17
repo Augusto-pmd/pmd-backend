@@ -18,11 +18,16 @@ export class AuditService {
   }
 
   async findAll(): Promise<AuditLog[]> {
-    return await this.auditLogRepository.find({
-      relations: ['user'],
-      order: { created_at: 'DESC' },
-      take: 1000, // Limit to prevent performance issues
-    });
+    try {
+      return await this.auditLogRepository.find({
+        relations: ['user'],
+        order: { created_at: 'DESC' },
+        take: 1000, // Limit to prevent performance issues
+      });
+    } catch (error) {
+      console.error('[AuditService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findOne(id: string): Promise<AuditLog> {

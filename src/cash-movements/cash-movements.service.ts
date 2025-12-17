@@ -19,10 +19,15 @@ export class CashMovementsService {
   }
 
   async findAll(user: User): Promise<CashMovement[]> {
-    return await this.cashMovementRepository.find({
-      relations: ['cashbox', 'expense', 'income'],
-      order: { date: 'DESC' },
-    });
+    try {
+      return await this.cashMovementRepository.find({
+        relations: ['cashbox', 'expense', 'income'],
+        order: { date: 'DESC' },
+      });
+    } catch (error) {
+      console.error('[CashMovementsService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findOne(id: string, user: User): Promise<CashMovement> {

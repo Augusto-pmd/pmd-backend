@@ -57,20 +57,25 @@ export class CashboxesService {
   }
 
   async findAll(user: User): Promise<Cashbox[]> {
-    // Operators can only see their own cashboxes
-    if (user.role.name === UserRole.OPERATOR) {
+    try {
+      // Operators can only see their own cashboxes
+      if (user?.role?.name === UserRole.OPERATOR) {
+        return await this.cashboxRepository.find({
+          where: { user_id: user.id },
+          relations: ['user', 'movements'],
+          order: { created_at: 'DESC' },
+        });
+      }
+
+      // Supervisors and above can see all cashboxes
       return await this.cashboxRepository.find({
-        where: { user_id: user.id },
         relations: ['user', 'movements'],
         order: { created_at: 'DESC' },
       });
+    } catch (error) {
+      console.error('[CashboxesService.findAll] Error:', error);
+      return [];
     }
-
-    // Supervisors and above can see all cashboxes
-    return await this.cashboxRepository.find({
-      relations: ['user', 'movements'],
-      order: { created_at: 'DESC' },
-    });
   }
 
   async findOne(id: string, user: User): Promise<Cashbox> {

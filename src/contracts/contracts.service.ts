@@ -49,10 +49,15 @@ export class ContractsService {
   }
 
   async findAll(user: User): Promise<Contract[]> {
-    return await this.contractRepository.find({
-      relations: ['work', 'supplier', 'rubric'],
-      order: { created_at: 'DESC' },
-    });
+    try {
+      return await this.contractRepository.find({
+        relations: ['work', 'supplier', 'rubric'],
+        order: { created_at: 'DESC' },
+      });
+    } catch (error) {
+      console.error('[ContractsService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findOne(id: string, user: User): Promise<Contract> {

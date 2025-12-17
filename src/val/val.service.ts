@@ -19,10 +19,15 @@ export class ValService {
   }
 
   async findAll(user: User): Promise<Val[]> {
-    return await this.valRepository.find({
-      relations: ['expense'],
-      order: { code: 'ASC' },
-    });
+    try {
+      return await this.valRepository.find({
+        relations: ['expense'],
+        order: { code: 'ASC' },
+      });
+    } catch (error) {
+      console.error('[ValService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findOne(id: string, user: User): Promise<Val> {

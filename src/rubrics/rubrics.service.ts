@@ -18,10 +18,15 @@ export class RubricsService {
   }
 
   async findAll(): Promise<Rubric[]> {
-    return await this.rubricRepository.find({
-      where: { is_active: true },
-      order: { name: 'ASC' },
-    });
+    try {
+      return await this.rubricRepository.find({
+        where: { is_active: true },
+        order: { name: 'ASC' },
+      });
+    } catch (error) {
+      console.error('[RubricsService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findOne(id: string): Promise<Rubric> {

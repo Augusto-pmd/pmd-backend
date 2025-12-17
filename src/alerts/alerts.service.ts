@@ -163,11 +163,16 @@ export class AlertsService {
   }
 
   async findAll(user: User): Promise<Alert[]> {
-    return await this.alertRepository.find({
-      where: user.role.name === 'operator' ? { user_id: user.id } : {},
-      relations: ['user', 'work', 'supplier', 'expense', 'contract', 'cashbox'],
-      order: { created_at: 'DESC' },
-    });
+    try {
+      return await this.alertRepository.find({
+        where: user?.role?.name === 'operator' ? { user_id: user.id } : {},
+        relations: ['user', 'work', 'supplier', 'expense', 'contract', 'cashbox'],
+        order: { created_at: 'DESC' },
+      });
+    } catch (error) {
+      console.error('[AlertsService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findUnread(user: User): Promise<Alert[]> {

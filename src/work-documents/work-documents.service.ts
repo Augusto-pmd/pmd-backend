@@ -36,34 +36,39 @@ export class WorkDocumentsService {
   }
 
   async findAll(workId?: string, user?: User): Promise<WorkDocument[]> {
-    const organizationId = user ? getOrganizationId(user) : null;
-    const where: any = {};
+    try {
+      const organizationId = user ? getOrganizationId(user) : null;
+      const where: any = {};
 
-    if (workId) {
-      where.work_id = workId;
-      if (organizationId) {
-        // Verify work belongs to organization
-        const work = await this.workRepository.findOne({
-          where: { id: workId },
-        });
-        if (work && work.organization_id !== organizationId) {
-          throw new ForbiddenException('Work does not belong to your organization');
+      if (workId) {
+        where.work_id = workId;
+        if (organizationId) {
+          // Verify work belongs to organization
+          const work = await this.workRepository.findOne({
+            where: { id: workId },
+          });
+          if (work && work.organization_id !== organizationId) {
+            throw new ForbiddenException('Work does not belong to your organization');
+          }
         }
+      } else if (organizationId) {
+        // Filter by organization through work
+        const works = await this.workRepository.find({
+          where: { organization_id: organizationId },
+          select: ['id'],
+        });
+        where.work_id = works.map((w) => w.id);
       }
-    } else if (organizationId) {
-      // Filter by organization through work
-      const works = await this.workRepository.find({
-        where: { organization_id: organizationId },
-        select: ['id'],
-      });
-      where.work_id = works.map((w) => w.id);
-    }
 
-    return await this.workDocumentRepository.find({
-      where,
-      relations: ['work'],
-      order: { created_at: 'DESC' },
-    });
+      return await this.workDocumentRepository.find({
+        where,
+        relations: ['work'],
+        order: { created_at: 'DESC' },
+      });
+    } catch (error) {
+      console.error('[WorkDocumentsService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findOne(id: string, user: User): Promise<WorkDocument> {

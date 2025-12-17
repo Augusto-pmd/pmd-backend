@@ -48,18 +48,23 @@ export class AccountingService {
   }
 
   async findAll(user: User): Promise<AccountingRecord[]> {
-    const organizationId = getOrganizationId(user);
-    const where: any = {};
-    
-    if (organizationId) {
-      where.organization_id = organizationId;
-    }
+    try {
+      const organizationId = getOrganizationId(user);
+      const where: any = {};
+      
+      if (organizationId) {
+        where.organization_id = organizationId;
+      }
 
-    return await this.accountingRepository.find({
-      where,
-      relations: ['expense', 'work', 'supplier'],
-      order: { date: 'DESC', created_at: 'DESC' },
-    });
+      return await this.accountingRepository.find({
+        where,
+        relations: ['expense', 'work', 'supplier'],
+        order: { date: 'DESC', created_at: 'DESC' },
+      });
+    } catch (error) {
+      console.error('[AccountingService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findOne(id: string, user: User): Promise<AccountingRecord> {

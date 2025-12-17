@@ -177,18 +177,23 @@ export class SuppliersService {
   }
 
   async findAll(user: User): Promise<Supplier[]> {
-    const organizationId = getOrganizationId(user);
-    const where: any = {};
-    
-    if (organizationId) {
-      where.organization_id = organizationId;
-    }
+    try {
+      const organizationId = getOrganizationId(user);
+      const where: any = {};
+      
+      if (organizationId) {
+        where.organization_id = organizationId;
+      }
 
-    return await this.supplierRepository.find({
-      where,
-      relations: ['documents'],
-      order: { created_at: 'DESC' },
-    });
+      return await this.supplierRepository.find({
+        where,
+        relations: ['documents'],
+        order: { created_at: 'DESC' },
+      });
+    } catch (error) {
+      console.error('[SuppliersService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findOne(id: string, user: User): Promise<Supplier> {

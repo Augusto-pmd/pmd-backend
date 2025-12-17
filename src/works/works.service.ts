@@ -28,32 +28,37 @@ export class WorksService {
   }
 
   async findAll(user: User): Promise<Work[]> {
-    const organizationId = getOrganizationId(user);
-    const queryBuilder = this.workRepository.createQueryBuilder('work');
+    try {
+      const organizationId = getOrganizationId(user);
+      const queryBuilder = this.workRepository.createQueryBuilder('work');
 
-    if (organizationId) {
-      queryBuilder.where('work.organization_id = :organizationId', {
-        organizationId,
-      });
-    }
-
-    if (user.role.name === UserRole.SUPERVISOR) {
       if (organizationId) {
-        queryBuilder.andWhere('work.supervisor_id = :supervisorId', {
-          supervisorId: user.id,
-        });
-      } else {
-        queryBuilder.where('work.supervisor_id = :supervisorId', {
-          supervisorId: user.id,
+        queryBuilder.where('work.organization_id = :organizationId', {
+          organizationId,
         });
       }
-    }
 
-    return await queryBuilder
-      .leftJoinAndSelect('work.supervisor', 'supervisor')
-      .leftJoinAndSelect('work.budgets', 'budgets')
-      .leftJoinAndSelect('work.contracts', 'contracts')
-      .getMany();
+      if (user?.role?.name === UserRole.SUPERVISOR) {
+        if (organizationId) {
+          queryBuilder.andWhere('work.supervisor_id = :supervisorId', {
+            supervisorId: user.id,
+          });
+        } else {
+          queryBuilder.where('work.supervisor_id = :supervisorId', {
+            supervisorId: user.id,
+          });
+        }
+      }
+
+      return await queryBuilder
+        .leftJoinAndSelect('work.supervisor', 'supervisor')
+        .leftJoinAndSelect('work.budgets', 'budgets')
+        .leftJoinAndSelect('work.contracts', 'contracts')
+        .getMany();
+    } catch (error) {
+      console.error('[WorksService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findOne(id: string, user: User): Promise<Work> {

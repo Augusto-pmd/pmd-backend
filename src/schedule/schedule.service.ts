@@ -21,10 +21,15 @@ export class ScheduleService {
   }
 
   async findAll(user: User): Promise<Schedule[]> {
-    return await this.scheduleRepository.find({
-      relations: ['work'],
-      order: { order: 'ASC', start_date: 'ASC' },
-    });
+    try {
+      return await this.scheduleRepository.find({
+        relations: ['work'],
+        order: { order: 'ASC', start_date: 'ASC' },
+      });
+    } catch (error) {
+      console.error('[ScheduleService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findOne(id: string, user: User): Promise<Schedule> {

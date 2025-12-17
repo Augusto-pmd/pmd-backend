@@ -18,7 +18,12 @@ export class RolesService {
   }
 
   async findAll(): Promise<Role[]> {
-    return await this.roleRepository.find();
+    try {
+      return await this.roleRepository.find();
+    } catch (error) {
+      console.error('[RolesService.findAll] Error:', error);
+      return [];
+    }
   }
 
   async findOne(id: string): Promise<Role> {
