@@ -120,6 +120,9 @@ export class AuthService {
     }
 
     // If valid, issue JWT and return { accessToken, normalized user }
+    // Log permissions for audit
+    console.log('[AUTH LOGIN] role.permissions before normalize:', JSON.stringify(user.role?.permissions, null, 2));
+    
     const payload = {
       sub: user.id,
       email: user.email,
@@ -127,6 +130,7 @@ export class AuthService {
     };
 
     const normalizedUser = normalizeUser(user);
+    console.log('[AUTH LOGIN] normalizedUser.role.permissions:', JSON.stringify(normalizedUser.role?.permissions, null, 2));
 
     return {
       accessToken: await this.jwtService.signAsync(payload, { expiresIn: '1d' }),
@@ -196,16 +200,22 @@ export class AuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
+    // Log permissions for audit
+    console.log('[AUTH REFRESH] role.permissions before normalize:', JSON.stringify(fullUser.role?.permissions, null, 2));
+
     const payload = {
       sub: fullUser.id,
       email: fullUser.email,
       role: fullUser.role?.name || UserRole.ADMINISTRATION,
     };
 
+    const normalizedUser = normalizeUser(fullUser);
+    console.log('[AUTH REFRESH] normalizedUser.role.permissions:', JSON.stringify(normalizedUser.role?.permissions, null, 2));
+
     return {
       access_token: await this.jwtService.signAsync(payload, { expiresIn: '1d' }),
       refresh_token: await this.jwtService.signAsync(payload, { expiresIn: '7d' }),
-      user: normalizeUser(fullUser),
+      user: normalizedUser,
     };
   }
 
@@ -219,6 +229,11 @@ export class AuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    return normalizeUser(fullUser);
+    // Log permissions for audit
+    console.log('[AUTH LOADME] role.permissions before normalize:', JSON.stringify(fullUser.role?.permissions, null, 2));
+    const normalizedUser = normalizeUser(fullUser);
+    console.log('[AUTH LOADME] normalizedUser.role.permissions:', JSON.stringify(normalizedUser.role?.permissions, null, 2));
+
+    return normalizedUser;
   }
 }

@@ -18,14 +18,37 @@ import { User } from '../../users/user.entity';
  * }
  */
 export function normalizeUser(u: User): any {
-  // Extract role permissions if available
-  const rolePermissions = u.role?.permissions 
-    ? (Array.isArray(u.role.permissions) 
-        ? u.role.permissions 
-        : typeof u.role.permissions === 'object' 
-          ? Object.keys(u.role.permissions).filter(k => u.role.permissions[k] === true)
-          : [])
-    : undefined;
+  // Extract role permissions and convert to flat array of strings
+  // Permissions structure: { "users": ["create", "read"], "expenses": ["create"] }
+  // Expected output: ["users.create", "users.read", "expenses.create"]
+  let rolePermissions: string[] = [];
+  
+  if (u.role?.permissions) {
+    if (Array.isArray(u.role.permissions)) {
+      // Already an array
+      rolePermissions = u.role.permissions;
+    } else if (typeof u.role.permissions === 'object') {
+      // Convert object to flat array: { "module": ["action1", "action2"] } -> ["module.action1", "module.action2"]
+      rolePermissions = Object.entries(u.role.permissions).reduce((acc: string[], [module, actions]) => {
+        if (Array.isArray(actions)) {
+          // If actions is an array, create "module.action" strings
+          const modulePermissions = actions.map((action: string) => `${module}.${action}`);
+          acc.push(...modulePermissions);
+        } else if (typeof actions === 'boolean' && actions === true) {
+          // Legacy format: { "module": true } -> ["module"]
+          acc.push(module);
+        } else if (typeof actions === 'object' && actions !== null) {
+          // Nested object: { "module": { "action": true } } -> ["module.action"]
+          const nestedPermissions = Object.keys(actions).filter(k => actions[k] === true);
+          nestedPermissions.forEach(action => acc.push(`${module}.${action}`));
+        }
+        return acc;
+      }, []);
+    }
+  }
+  
+  // Log conversion for audit
+  console.log(`[NORMALIZE_USER] Original permissions type: ${typeof u.role?.permissions}, Converted length: ${rolePermissions.length}`);
 
   return {
     id: u.id,
@@ -37,7 +60,7 @@ export function normalizeUser(u: User): any {
           id: u.role.id,
           name: u.role.name,
           ...(u.role.description ? { description: u.role.description } : {}),
-          ...(rolePermissions && rolePermissions.length > 0 ? { permissions: rolePermissions } : {}),
+          permissions: rolePermissions,
         }
       : null,
     roleId: u.role?.id ?? null,
