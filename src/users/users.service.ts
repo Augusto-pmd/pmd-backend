@@ -69,21 +69,26 @@ export class UsersService {
   }
 
   async findAll(user?: User): Promise<any[]> {
-    const organizationId = user ? getOrganizationId(user) : null;
-    const where: any = {};
-    
-    if (organizationId) {
-      where.organization_id = organizationId;
+    try {
+      const organizationId = user ? getOrganizationId(user) : null;
+      const where: any = {};
+      
+      if (organizationId) {
+        where.organization_id = organizationId;
+      }
+
+      // Load users with relations - ALWAYS load both role and organization
+      const users = await this.userRepository.find({
+        where,
+        relations: ['role', 'organization'],
+      });
+
+      // Normalize all users using consistent normalizer
+      return users.map((u) => this.normalizeUserEntity(u));
+    } catch (error) {
+      console.error('[UsersService.findAll] Error:', error);
+      return [];
     }
-
-    // Load users with relations - ALWAYS load both role and organization
-    const users = await this.userRepository.find({
-      where,
-      relations: ['role', 'organization'],
-    });
-
-    // Normalize all users using consistent normalizer
-    return users.map((u) => this.normalizeUserEntity(u));
   }
 
   /**
