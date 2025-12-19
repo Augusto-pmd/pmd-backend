@@ -16,8 +16,16 @@ log_error() { echo "${RED}❌ $1${NC}"; }
 # Configuración de base de datos
 DB_HOST="${DB_HOST:-postgres}"
 DB_PORT="${DB_PORT:-5432}"
-DB_USER="${DB_USERNAME:-postgres}"
+DB_USERNAME="${DB_USERNAME:-postgres}"
 DB_NAME="${DB_DATABASE:-pmd_management}"
+
+# Mostrar configuración de BD (sin mostrar password)
+log_info "Configuración de Base de Datos:"
+log_info "  DB_HOST: ${DB_HOST}"
+log_info "  DB_PORT: ${DB_PORT}"
+log_info "  DB_USERNAME: ${DB_USERNAME}"
+log_info "  DB_DATABASE: ${DB_DATABASE:-pmd_management}"
+log_info "  NODE_ENV: ${NODE_ENV:-development}"
 
 # Función para verificar PostgreSQL
 wait_for_postgres() {
@@ -49,12 +57,19 @@ run_migrations() {
     if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
         log_info "Ejecutando migraciones..."
         
-        # Ejecutar migraciones y capturar el código de salida
-        if npm run migration:run 2>&1; then
+        # Ejecutar migraciones y capturar el código de salida real
+        # Usar set +e temporalmente para capturar el código de salida
+        set +e
+        npm run migration:run 2>&1
+        MIGRATION_EXIT_CODE=$?
+        set -e
+        
+        if [ $MIGRATION_EXIT_CODE -eq 0 ]; then
             log_success "Migraciones completadas exitosamente"
             return 0
         else
-            log_error "Error en migraciones"
+            log_error "Error en migraciones (código de salida: $MIGRATION_EXIT_CODE)"
+            log_error "Verifica los logs anteriores para más detalles"
             exit 1
         fi
     else
@@ -68,10 +83,15 @@ run_seed() {
     if [ "${RUN_SEED:-false}" = "true" ]; then
         log_info "Ejecutando seed..."
         
-        if npm run seed 2>&1; then
+        set +e
+        npm run seed 2>&1
+        SEED_EXIT_CODE=$?
+        set -e
+        
+        if [ $SEED_EXIT_CODE -eq 0 ]; then
             log_success "Seed completado"
         else
-            log_error "Error en seed"
+            log_error "Error en seed (código de salida: $SEED_EXIT_CODE)"
             exit 1
         fi
     else
