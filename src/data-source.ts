@@ -1,5 +1,7 @@
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Role } from './roles/role.entity';
 import { User } from './users/user.entity';
 import { Organization } from './organizations/organization.entity';
@@ -64,9 +66,23 @@ const connectionOptions: any = {
     AccountingRecord,
     AuditLog,
   ],
-  migrations: process.env.NODE_ENV === 'production' 
-    ? ['dist/migrations/*.js']
-    : ['src/migrations/*.ts'],
+  // Determinar qué ruta de migraciones usar
+  // En producción: intentar usar compiladas, si no existen, usar fuente
+  // En desarrollo: siempre usar fuente
+  migrations: (() => {
+    if (process.env.NODE_ENV === 'production') {
+      const distMigrationsPath = path.join(process.cwd(), 'dist', 'migrations');
+      if (fs.existsSync(distMigrationsPath)) {
+        const files = fs.readdirSync(distMigrationsPath);
+        if (files.some(f => f.endsWith('.js'))) {
+          return ['dist/migrations/*.js'];
+        }
+      }
+      // Fallback a fuente si no hay compiladas
+      return ['src/migrations/*.ts'];
+    }
+    return ['src/migrations/*.ts'];
+  })(),
   synchronize: false,
   logging: nodeEnv === 'development',
 };
