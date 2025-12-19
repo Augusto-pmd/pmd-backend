@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pmd_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pmd_management}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - pmd_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-pmd_management}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pmd_api
+    expose:
+      - "5000"
+    environment:
+      # Variables de PostgreSQL
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_DATABASE: ${POSTGRES_DB:-pmd_management}
+      
+      # Variables de aplicación
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 5000
+      JWT_SECRET: ${JWT_SECRET}
+      
+      # Control de migraciones y seed
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      RUN_SEED: ${RUN_SEED:-false}
+      
+      # Indicador de Docker
+      DOCKER_CONTAINER: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pmd_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  pmd_network:
+    driver: bridge

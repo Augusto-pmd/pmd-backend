@@ -129,10 +129,10 @@ async function bootstrap() {
     },
   });
 
-  // Render requires port 8080 or 10000 - use 10000 as default
-  const port = process.env.PORT || 10000;
+  // Puerto por defecto: 5000 (configurado para Docker/Dokploy)
+  const port = process.env.PORT || 5000;
   
-  // Log de inicio visible para Render
+  // Log de inicio
   console.log("🚀 PMD Backend booting on port:", port);
   
   const server = await app.listen(port, '0.0.0.0');
