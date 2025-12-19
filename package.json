@@ -18,10 +18,11 @@
     "test:cov": "echo \"Tests desactivados temporalmente\"",
     "test:debug": "echo \"Tests desactivados temporalmente\"",
     "test:e2e": "echo \"Tests desactivados temporalmente\"",
-    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d data-source.ts",
-    "migration:run": "typeorm-ts-node-commonjs migration:run -d data-source.ts",
-    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d data-source.ts",
-    "migration:show": "typeorm-ts-node-commonjs migration:show -d data-source.ts"
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/data-source.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/data-source.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/data-source.ts",
+    "migration:show": "typeorm-ts-node-commonjs migration:show -d src/data-source.ts",
+    "seed": "ts-node src/seed.ts"
   },
   "dependencies": {
     "@nestjs/cli": "^10.3.2",

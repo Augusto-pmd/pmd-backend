@@ -1,8 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "./dist",
-    "deleteOutDir": true
+    "outDir": "./dist"
   },
   "exclude": [
     "node_modules",
@@ -10,6 +9,9 @@
     "test",
     "**/*.spec.ts",
     "**/*.test.ts",
-    "src/common/test/**/*"
+    "src/common/test/**/*",
+    "src/data-source.ts",
+    "src/seed.ts",
+    "src/check-passwords.ts"
   ]
 }
