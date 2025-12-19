@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { WorkDocument } from './work-documents.entity';
 import { Work } from '../works/works.entity';
 import { CreateWorkDocumentDto } from './dto/create-work-document.dto';
@@ -57,7 +57,12 @@ export class WorkDocumentsService {
           where: { organization_id: organizationId },
           select: ['id'],
         });
-        where.work_id = works.map((w) => w.id);
+        const workIds = works.map((w) => w.id);
+        // If no works found for organization, return empty array
+        if (workIds.length === 0) {
+          return [];
+        }
+        where.work_id = In(workIds);
       }
 
       return await this.workDocumentRepository.find({

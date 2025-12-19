@@ -74,7 +74,7 @@ export class UsersService {
       const where: any = {};
       
       if (organizationId) {
-        where.organization_id = organizationId;
+        where.organizationId = organizationId;
       }
 
       // Load users with relations - ALWAYS load both role and organization

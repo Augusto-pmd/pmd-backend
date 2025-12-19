@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import * as request from 'supertest';
+import request = require('supertest');
 import { AppModule } from '../../src/app.module';
 import { TestApp, TestDataBuilder } from './test-helpers';
 import {
@@ -19,6 +19,7 @@ describe('Expired Insurance Blocking Operator (e2e)', () => {
   let operatorToken: string;
   let adminToken: string;
   let operatorUser: any;
+  let adminUser: any;
   let work: any;
   let rubric: any;
 
@@ -37,7 +38,7 @@ describe('Expired Insurance Blocking Operator (e2e)', () => {
       'password123',
       UserRole.OPERATOR,
     );
-    const adminUser = await dataBuilder.createUser(
+    adminUser = await dataBuilder.createUser(
       'admin@test.com',
       'password123',
       UserRole.ADMINISTRATION,

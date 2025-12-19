@@ -26,8 +26,8 @@ export class RolesGuard implements CanActivate {
 
     const userRole = user.role.name || user.role;
 
-    // Direction has full access
-    if (userRole === UserRole.DIRECTION) {
+    // Direction and Administration (Admin) have full access
+    if (userRole === UserRole.DIRECTION || userRole === UserRole.ADMINISTRATION) {
       return true;
     }
 

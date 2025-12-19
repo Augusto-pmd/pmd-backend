@@ -1,9 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import * as request from 'supertest';
+import request = require('supertest');
 import { AppModule } from '../../src/app.module';
 import { TestApp, TestDataBuilder } from './test-helpers';
-import { UserRole, Currency, SupplierStatus } from '../../src/common/enums';
+import { UserRole, Currency, SupplierStatus, CashboxStatus } from '../../src/common/enums';
 
 describe('Multi-Role Permission Tests (e2e)', () => {
   let app: INestApplication;
@@ -371,7 +371,7 @@ describe('Multi-Role Permission Tests (e2e)', () => {
         'password123',
         UserRole.OPERATOR,
       );
-      await dataBuilder.createCashbox(otherOperator.id, 'open', 10000, 0);
+      await dataBuilder.createCashbox(otherOperator.id, CashboxStatus.OPEN, 10000, 0);
 
       // Current operator should only see their own
       const cashboxes = await request(app.getHttpServer())

@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import * as request from 'supertest';
+import request = require('supertest');
 import { AppModule } from '../../src/app.module';
 import { TestApp, TestDataBuilder } from './test-helpers';
 import { UserRole, Currency, ExpenseState, DocumentType, CashboxStatus } from '../../src/common/enums';

@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import * as request from 'supertest';
+import request = require('supertest');
 import { AppModule } from '../../src/app.module';
 import { TestApp, TestDataBuilder } from './test-helpers';
 import {
@@ -10,6 +10,7 @@ import {
   AccountingType,
   ExpenseState,
   DocumentType,
+  SupplierStatus,
 } from '../../src/common/enums';
 
 describe('Monthly Closure and Direction Override (e2e)', () => {
@@ -76,7 +77,7 @@ describe('Monthly Closure and Direction Override (e2e)', () => {
     work = await dataBuilder.createWork('Closure Test Work', Currency.ARS);
     supplier = await dataBuilder.createSupplier(
       'Test Supplier',
-      'approved',
+      SupplierStatus.APPROVED,
       adminUser.id,
     );
   });

@@ -6,10 +6,14 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import * as request from 'supertest';
+import request = require('supertest');
 import { AppModule } from '../../src/app.module';
 import { TestDatabaseModule, getTestDataSource } from './test-database.module';
 import { UserRole } from '../../src/common/enums/user-role.enum';
+import { SupplierStatus } from '../../src/common/enums/supplier-status.enum';
+import { Currency } from '../../src/common/enums/currency.enum';
+import { SupplierDocumentType } from '../../src/common/enums/supplier-document-type.enum';
+import { CashboxStatus } from '../../src/common/enums/cashbox-status.enum';
 import { Role } from '../../src/roles/role.entity';
 import { User } from '../../src/users/user.entity';
 import * as bcrypt from 'bcrypt';
@@ -147,7 +151,7 @@ export class TestDataBuilder {
 
   async createSupplier(
     name: string,
-    status: string,
+    status: SupplierStatus,
     createdById?: string,
   ): Promise<any> {
     const { Supplier } = await import('../../src/suppliers/suppliers.entity');
@@ -164,17 +168,17 @@ export class TestDataBuilder {
 
   async createSupplierDocument(
     supplierId: string,
-    documentType: string,
+    documentType: SupplierDocumentType,
     expirationDate?: Date,
   ): Promise<any> {
     const { SupplierDocument } = await import('../../src/supplier-documents/supplier-documents.entity');
     const docRepo = this.dataSource.getRepository(SupplierDocument);
     const doc = docRepo.create({
       supplier_id: supplierId,
-      document_type: documentType,
+      document_type: documentType as SupplierDocumentType,
       expiration_date: expirationDate || new Date('2025-12-31'),
       is_valid: true,
-    });
+    } as any);
     return await docRepo.save(doc);
   }
 
@@ -183,7 +187,7 @@ export class TestDataBuilder {
     supplierId: string,
     rubricId: string,
     amountTotal: number,
-    currency: string,
+    currency: Currency,
   ): Promise<any> {
     const { Contract } = await import('../../src/contracts/contracts.entity');
     const contractRepo = this.dataSource.getRepository(Contract);
@@ -201,7 +205,7 @@ export class TestDataBuilder {
 
   async createCashbox(
     userId: string,
-    status: string,
+    status: CashboxStatus,
     openingBalanceArs: number = 0,
     openingBalanceUsd: number = 0,
   ): Promise<any> {
@@ -217,7 +221,7 @@ export class TestDataBuilder {
       difference_ars: 0,
       difference_usd: 0,
       opening_date: new Date(),
-    });
+    } as any);
     return await cashboxRepo.save(cashbox);
   }
 
