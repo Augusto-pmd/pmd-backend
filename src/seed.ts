@@ -20,6 +20,19 @@ async function seed() {
     await AppDataSource.initialize();
     console.log('✅ Conectado a la base de datos\n');
 
+    // Ejecutar migraciones pendientes antes del seed
+    console.log('🔄 Ejecutando migraciones pendientes...\n');
+    const pendingMigrations = await AppDataSource.runMigrations();
+    if (pendingMigrations.length > 0) {
+      console.log(`✅ ${pendingMigrations.length} migración(es) ejecutada(s):`);
+      pendingMigrations.forEach(migration => {
+        console.log(`   - ${migration.name}`);
+      });
+      console.log('');
+    } else {
+      console.log('ℹ️  No hay migraciones pendientes\n');
+    }
+
     const userRepository = AppDataSource.getRepository(User);
     const roleRepository = AppDataSource.getRepository(Role);
     const orgRepository = AppDataSource.getRepository(Organization);
