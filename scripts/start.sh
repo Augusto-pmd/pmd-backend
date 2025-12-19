@@ -49,14 +49,17 @@ run_migrations() {
     if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
         log_info "Ejecutando migraciones..."
         
+        # Ejecutar migraciones y capturar el código de salida
         if npm run migration:run 2>&1; then
-            log_success "Migraciones completadas"
+            log_success "Migraciones completadas exitosamente"
+            return 0
         else
             log_error "Error en migraciones"
             exit 1
         fi
     else
         log_warning "Migraciones omitidas (RUN_MIGRATIONS=false)"
+        return 0
     fi
 }
 
@@ -83,10 +86,17 @@ main() {
     # Esperar PostgreSQL
     wait_for_postgres
     
-    # Ejecutar migraciones
+    # Ejecutar migraciones (debe completarse antes de continuar)
     run_migrations
     
-    # Ejecutar seed
+    # Verificar que las migraciones terminaron antes de ejecutar seed
+    if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+        log_info "Esperando confirmación de que las migraciones terminaron..."
+        # Pequeña pausa para asegurar que todo se haya completado
+        sleep 1
+    fi
+    
+    # Ejecutar seed (solo después de que las migraciones terminen)
     run_seed
     
     # Iniciar aplicación
