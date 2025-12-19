@@ -39,9 +39,14 @@ COPY --from=builder /app/nest-cli.json ./nest-cli.json
 # Crear directorio uploads (si tu app lo usa en runtime)
 RUN mkdir -p /app/dist/uploads
 
-# Copiar script de inicio
+# Copiar scripts de inicio
 COPY start.sh ./start.sh
 RUN chmod +x ./start.sh
+
+# Crear directorio scripts y copiar script de verificación de PostgreSQL
+RUN mkdir -p ./scripts
+COPY scripts/check-postgres.js ./scripts/check-postgres.js
+RUN chmod +x ./scripts/check-postgres.js
 
 # Crear usuario no root
 RUN addgroup -g 1001 -S nodejs && adduser -S appuser -u 1001
