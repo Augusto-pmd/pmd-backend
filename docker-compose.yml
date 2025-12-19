@@ -43,6 +43,8 @@ services:
       - PORT=${PORT}
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
+      - RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
+      - RUN_SEED=${RUN_SEED:-false}
     depends_on:
       postgres:
         condition: service_healthy

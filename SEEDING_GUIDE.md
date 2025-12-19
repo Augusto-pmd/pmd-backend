@@ -83,19 +83,43 @@ npm install
 
 ## Running the Seed Script
 
-### Method 1: Using npm script (Recommended)
+### Method 1: Using npm script (Recommended - Local)
 
 ```bash
 npm run seed
 ```
 
-### Method 2: Using ts-node directly
+**Requisitos:**
+- Variables de entorno configuradas (`.env` o `.env.development`)
+- Base de datos PostgreSQL corriendo y accesible
+- Migraciones ejecutadas previamente
+
+### Method 2: Using Docker Compose (Recomendado - Docker)
+
+```bash
+# Ejecutar seed en un contenedor temporal (sin iniciar la API)
+docker-compose run --rm api npm run seed
+```
+
+**Ventajas:**
+- No necesitas instalar dependencias localmente
+- Usa las mismas variables de entorno que los otros servicios
+- Espera automáticamente a que PostgreSQL esté listo
+
+### Method 3: Inside running container
+
+```bash
+# Si la API ya está corriendo
+docker-compose exec api npm run seed
+```
+
+### Method 4: Using ts-node directly
 
 ```bash
 npx ts-node src/seed.ts
 ```
 
-### Method 3: Using tsx (if installed)
+### Method 5: Using tsx (if installed)
 
 ```bash
 npx tsx src/seed.ts

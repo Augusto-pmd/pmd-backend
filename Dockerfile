@@ -23,14 +23,25 @@ WORKDIR /app
 # Copiar package.json y lock
 COPY package.json package-lock.json* ./
 
-# Instalar solo dependencias de producción
-RUN npm ci --only=production && npm cache clean --force
+# Instalar dependencias (necesitamos ts-node para ejecutar migraciones)
+RUN npm ci --only=production && \
+    npm install --save-dev ts-node typescript @types/node && \
+    npm cache clean --force
 
-# Copiar aplicación compilada desde el builder
+# Copiar aplicación compilada desde el builder (incluye migraciones compiladas)
 COPY --from=builder /app/dist ./dist
+
+# Copiar también el código fuente para migraciones (necesario para typeorm-ts-node-commonjs)
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/nest-cli.json ./nest-cli.json
 
 # Crear directorio uploads (si tu app lo usa en runtime)
 RUN mkdir -p /app/dist/uploads
+
+# Copiar script de inicio
+COPY start.sh ./start.sh
+RUN chmod +x ./start.sh
 
 # Crear usuario no root
 RUN addgroup -g 1001 -S nodejs && adduser -S appuser -u 1001
@@ -39,4 +50,5 @@ USER appuser
 
 EXPOSE 5000
 
-CMD ["node", "dist/main.js"]
+# Usar script de inicio que ejecuta migraciones si RUN_MIGRATIONS=true
+CMD ["./start.sh"]

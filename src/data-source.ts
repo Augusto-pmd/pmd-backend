@@ -64,7 +64,9 @@ const connectionOptions: any = {
     AccountingRecord,
     AuditLog,
   ],
-  migrations: ['src/migrations/*.ts'],
+  migrations: process.env.NODE_ENV === 'production' 
+    ? ['dist/migrations/*.js']
+    : ['src/migrations/*.ts'],
   synchronize: false,
   logging: nodeEnv === 'development',
 };
