@@ -3,10 +3,10 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copiar solo lo necesario primero (mejor cache)
+# Copiar archivos de dependencias
 COPY package.json package-lock.json* ./
 
-# Instalar dependencias (incluyendo dev para build)
+# Instalar todas las dependencias (incluidas dev para build)
 RUN npm ci
 
 # Copiar código fuente
@@ -18,42 +18,41 @@ RUN npm run build
 # Stage 2: Production
 FROM node:22-alpine AS production
 
+# Instalar dumb-init para mejor manejo de señales
+RUN apk add --no-cache dumb-init
+
 WORKDIR /app
 
-# Copiar package.json y lock
+# Copiar package files
 COPY package.json package-lock.json* ./
 
-# Instalar dependencias (necesitamos ts-node para ejecutar migraciones)
+# Instalar solo dependencias de producción + TypeORM CLI
 RUN npm ci --only=production && \
-    npm install --save-dev ts-node typescript @types/node && \
+    npm install --save-dev typeorm ts-node && \
     npm cache clean --force
 
-# Copiar aplicación compilada desde el builder (incluye migraciones compiladas)
+# Copiar build desde stage anterior
 COPY --from=builder /app/dist ./dist
 
-# Copiar también el código fuente para migraciones (necesario para typeorm-ts-node-commonjs)
+# Copiar archivos necesarios para migraciones
 COPY --from=builder /app/src ./src
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/nest-cli.json ./nest-cli.json
+COPY --from=builder /app/tsconfig.json ./
+COPY --from=builder /app/nest-cli.json ./
 
-# Crear directorio uploads (si tu app lo usa en runtime)
-RUN mkdir -p /app/dist/uploads
+# Copiar scripts
+COPY scripts ./scripts
+RUN chmod +x ./scripts/*.sh ./scripts/*.js
 
-# Copiar scripts de inicio
-COPY start.sh ./start.sh
-RUN chmod +x ./start.sh
+# Crear usuario no-root
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S appuser -u 1001 && \
+    chown -R appuser:nodejs /app
 
-# Crear directorio scripts y copiar script de verificación de PostgreSQL
-RUN mkdir -p ./scripts
-COPY scripts/check-postgres.js ./scripts/check-postgres.js
-RUN chmod +x ./scripts/check-postgres.js
-
-# Crear usuario no root
-RUN addgroup -g 1001 -S nodejs && adduser -S appuser -u 1001
-RUN chown -R appuser:nodejs /app
 USER appuser
 
 EXPOSE 5000
 
-# Usar script de inicio que ejecuta migraciones si RUN_MIGRATIONS=true
-CMD ["./start.sh"]
+# Usar dumb-init para mejor manejo de señales
+ENTRYPOINT ["dumb-init", "--"]
+
+CMD ["./scripts/start.sh"]
