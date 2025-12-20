@@ -26,13 +26,47 @@ export class RolesGuard implements CanActivate {
 
     const userRole = user.role.name || user.role;
 
-    // Direction and Administration (Admin) have full access
-    if (userRole === UserRole.DIRECTION || userRole === UserRole.ADMINISTRATION) {
+    // Map new role names to legacy enum values for compatibility
+    // 'admin' is equivalent to DIRECTION/ADMINISTRATION
+    const isAdmin = userRole === 'admin' || 
+                    userRole === UserRole.DIRECTION || 
+                    userRole === UserRole.ADMINISTRATION;
+
+    // Direction/Administration/Admin have full access
+    if (isAdmin) {
       return true;
     }
 
-    // Check if user role is in required roles
-    if (requiredRoles.includes(userRole)) {
+    // Check if this is a GET request (read operation)
+    const isReadOperation = request.method === 'GET';
+    
+    // For read operations, allow 'auditor' role when DIRECTION/ADMINISTRATION is required
+    if (isReadOperation && userRole === 'auditor') {
+      const requiresAdmin = requiredRoles.some(role => 
+        role === UserRole.DIRECTION || role === UserRole.ADMINISTRATION
+      );
+      if (requiresAdmin) {
+        return true;
+      }
+    }
+
+    // Convert required roles to strings for comparison
+    const requiredRoleStrings = requiredRoles.map(role => String(role));
+
+    // Check if user role matches any required role
+    const roleMatches = requiredRoleStrings.some(required => {
+      // Direct match
+      if (required === userRole) {
+        return true;
+      }
+      // Admin matches DIRECTION/ADMINISTRATION
+      if ((required === UserRole.DIRECTION || required === UserRole.ADMINISTRATION) && isAdmin) {
+        return true;
+      }
+      return false;
+    });
+
+    if (roleMatches) {
       return true;
     }
 
