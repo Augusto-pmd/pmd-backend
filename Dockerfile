@@ -26,9 +26,9 @@ WORKDIR /app
 # Copiar package files
 COPY package.json package-lock.json* ./
 
-# Instalar solo dependencias de producción + TypeORM CLI
+# Instalar solo dependencias de producción + herramientas necesarias para migraciones
 RUN npm ci --only=production && \
-    npm install --save-dev typeorm ts-node && \
+    npm install --save-dev typeorm ts-node typescript && \
     npm cache clean --force
 
 # Copiar build desde stage anterior
@@ -39,13 +39,13 @@ COPY --from=builder /app/src ./src
 COPY --from=builder /app/tsconfig.json ./
 COPY --from=builder /app/nest-cli.json ./
 
-# Copiar scripts
-COPY scripts ./scripts
-RUN chmod +x ./scripts/*.sh ./scripts/*.js
+# Copiar scripts desde el builder (asegura consistencia con el build)
+COPY --from=builder /app/scripts ./scripts
 
-# Crear usuario no-root
+# Crear usuario no-root y establecer permisos
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S appuser -u 1001 && \
+    chmod +x ./scripts/*.sh ./scripts/*.js 2>/dev/null || true && \
     chown -R appuser:nodejs /app
 
 USER appuser
