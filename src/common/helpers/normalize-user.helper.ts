@@ -1,4 +1,109 @@
 import { User } from '../../users/user.entity';
+import { UserRole } from '../enums/user-role.enum';
+
+/**
+ * Fallback permissions map by role name
+ * Used when role.permissions is empty or undefined in the database
+ */
+const ROLE_PERMISSIONS_FALLBACK: Record<string, string[]> = {
+  [UserRole.ADMINISTRATION]: [
+    'dashboard.read',
+    'works.read',
+    'works.create',
+    'works.update',
+    'works.delete',
+    'suppliers.read',
+    'suppliers.create',
+    'suppliers.update',
+    'accounting.read',
+    'accounting.create',
+    'accounting.update',
+    'cashbox.read',
+    'cashbox.create',
+    'cashbox.update',
+    'documents.read',
+    'documents.create',
+    'documents.update',
+    'alerts.read',
+    'alerts.create',
+    'alerts.update',
+    'audit.read',
+    'users.read',
+    'users.create',
+    'users.update',
+    'users.delete',
+    'roles.read',
+    'roles.create',
+    'roles.update',
+    'settings.read',
+    'settings.update',
+  ],
+  [UserRole.DIRECTION]: [
+    'dashboard.read',
+    'works.read',
+    'works.create',
+    'works.update',
+    'works.delete',
+    'suppliers.read',
+    'suppliers.create',
+    'suppliers.update',
+    'accounting.read',
+    'accounting.create',
+    'accounting.update',
+    'cashbox.read',
+    'cashbox.create',
+    'cashbox.update',
+    'documents.read',
+    'documents.create',
+    'documents.update',
+    'alerts.read',
+    'alerts.create',
+    'alerts.update',
+    'audit.read',
+    'users.read',
+    'users.create',
+    'users.update',
+    'users.delete',
+    'roles.read',
+    'roles.create',
+    'roles.update',
+    'settings.read',
+    'settings.update',
+  ],
+  [UserRole.SUPERVISOR]: [
+    'dashboard.read',
+    'works.read',
+    'works.create',
+    'works.update',
+    'suppliers.read',
+    'suppliers.create',
+    'suppliers.update',
+    'accounting.read',
+    'accounting.create',
+    'cashbox.read',
+    'cashbox.create',
+    'cashbox.update',
+    'documents.read',
+    'documents.create',
+    'documents.update',
+    'alerts.read',
+    'alerts.create',
+    'alerts.update',
+    'users.read',
+  ],
+  [UserRole.OPERATOR]: [
+    'dashboard.read',
+    'works.read',
+    'works.create',
+    'works.update',
+    'suppliers.read',
+    'accounting.read',
+    'cashbox.read',
+    'documents.read',
+    'documents.create',
+    'alerts.read',
+  ],
+};
 
 /**
  * Normalizes a User entity to the canonical UserAPI contract
@@ -44,6 +149,18 @@ export function normalizeUser(u: User): any {
         }
         return acc;
       }, []);
+    }
+  }
+  
+  // 🔄 FALLBACK: Si permissions está vacío y existe un rol, usar permisos por defecto según el nombre del rol
+  if (rolePermissions.length === 0 && u.role?.name) {
+    const roleName = u.role.name.toLowerCase();
+    const fallbackPermissions = ROLE_PERMISSIONS_FALLBACK[roleName];
+    if (fallbackPermissions) {
+      rolePermissions = fallbackPermissions;
+      console.log(`[NORMALIZE_USER] Using fallback permissions for role "${roleName}": ${rolePermissions.length} permissions`);
+    } else {
+      console.warn(`[NORMALIZE_USER] No fallback permissions found for role "${roleName}"`);
     }
   }
   
