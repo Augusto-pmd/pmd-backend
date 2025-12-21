@@ -32,10 +32,13 @@ export class UsersService {
    * Ensures that role and organization are always up-to-date
    */
   private async reloadUserWithRelations(id: string | number): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { id: String(id) },
-      relations: ['role', 'organization'],
-    });
+    // Use query builder to ensure role (including permissions) is explicitly loaded
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect('user.organization', 'organization')
+      .where('user.id = :id', { id: String(id) })
+      .getOne();
 
     if (!user) {
       throw new NotFoundException(`User with id ${id} not found after save`);
@@ -78,10 +81,17 @@ export class UsersService {
       }
 
       // Load users with relations - ALWAYS load both role and organization
-      const users = await this.userRepository.find({
-        where,
-        relations: ['role', 'organization'],
-      });
+      // Use query builder to ensure role (including permissions) is explicitly loaded
+      let queryBuilder = this.userRepository
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.role', 'role')
+        .leftJoinAndSelect('user.organization', 'organization');
+      
+      if (organizationId) {
+        queryBuilder = queryBuilder.where('user.organization_id = :organizationId', { organizationId });
+      }
+      
+      const users = await queryBuilder.getMany();
 
       // Normalize all users using consistent normalizer
       return users.map((u) => this.normalizeUserEntity(u));
@@ -96,10 +106,13 @@ export class UsersService {
    * Used by update, remove, updateRole methods that need the actual entity
    */
   private async findOneEntity(id: string): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { id: String(id) },
-      relations: ['role', 'organization'],
-    });
+    // Use query builder to ensure role (including permissions) is explicitly loaded
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect('user.organization', 'organization')
+      .where('user.id = :id', { id: String(id) })
+      .getOne();
 
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);

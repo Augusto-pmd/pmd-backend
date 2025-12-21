@@ -1,0 +1,307 @@
+name: CI/CD Pipeline - Backend & Frontend
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20.x'
+  FRONTEND_DIR: './frontend'  # Ajustar si el frontend está en otro directorio
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    
+    outputs:
+      backend-build-status: ${{ steps.backend-build.outcome }}
+      frontend-build-status: ${{ steps.frontend-build.outcome }}
+      backend-deploy-status: ${{ steps.backend-deploy.outcome }}
+      frontend-deploy-status: ${{ steps.frontend-deploy.outcome }}
+    
+    steps:
+      # 1. Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            ${{ env.FRONTEND_DIR }}/package-lock.json
+            ${{ env.FRONTEND_DIR }}/yarn.lock
+            ${{ env.FRONTEND_DIR }}/pnpm-lock.yaml
+
+      # 3. Instalar dependencias Backend
+      - name: Install backend dependencies
+        id: backend-install
+        run: |
+          echo "📦 Installing backend dependencies..."
+          npm ci
+          echo "✅ Backend dependencies installed"
+        continue-on-error: false
+
+      # 4. Type check Backend
+      - name: Type check backend
+        id: backend-typecheck
+        run: |
+          echo "🔍 Running TypeScript type check for backend..."
+          npx tsc --noEmit
+          echo "✅ Backend type check passed"
+        continue-on-error: false
+
+      # 5. Lint Backend
+      - name: Lint backend
+        id: backend-lint
+        run: |
+          echo "🔍 Running ESLint for backend..."
+          npm run lint || (echo "⚠️ Lint issues found but continuing..." && exit 0)
+          echo "✅ Backend lint completed"
+        continue-on-error: true
+
+      # 6. Build Backend
+      - name: Build backend (NestJS)
+        id: backend-build
+        run: |
+          echo "🏗️ Building backend..."
+          npm run build
+          echo "✅ Backend build completed successfully"
+          echo "build_output=dist" >> $GITHUB_OUTPUT
+        continue-on-error: false
+
+      # 7. Detectar Frontend (si existe)
+      - name: Check if frontend exists
+        id: check-frontend
+        run: |
+          FRONTEND_FOUND=false
+          FRONTEND_PATH=""
+          
+          # Verificar si existe en el directorio especificado
+          if [ -f "${{ env.FRONTEND_DIR }}/package.json" ]; then
+            # Verificar si tiene Next.js
+            if grep -q "next" "${{ env.FRONTEND_DIR }}/package.json" || [ -f "${{ env.FRONTEND_DIR }}/next.config.js" ] || [ -f "${{ env.FRONTEND_DIR }}/next.config.ts" ] || [ -f "${{ env.FRONTEND_DIR }}/next.config.mjs" ]; then
+              FRONTEND_FOUND=true
+              FRONTEND_PATH="${{ env.FRONTEND_DIR }}"
+            fi
+          fi
+          
+          # Si no se encontró, verificar en la raíz
+          if [ "$FRONTEND_FOUND" = "false" ]; then
+            if [ -f "./package.json" ]; then
+              if grep -q "next" "./package.json" || [ -f "./next.config.js" ] || [ -f "./next.config.ts" ] || [ -f "./next.config.mjs" ]; then
+                FRONTEND_FOUND=true
+                FRONTEND_PATH="."
+              fi
+            fi
+          fi
+          
+          if [ "$FRONTEND_FOUND" = "true" ]; then
+            echo "frontend_path=$FRONTEND_PATH" >> $GITHUB_OUTPUT
+            echo "frontend_exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Frontend found at: $FRONTEND_PATH"
+          else
+            echo "frontend_exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Frontend not found, skipping frontend steps"
+          fi
+
+      - name: Install frontend dependencies
+        id: frontend-install
+        if: steps.check-frontend.outputs.frontend_exists == 'true'
+        working-directory: ${{ steps.check-frontend.outputs.frontend_path }}
+        run: |
+          echo "📦 Installing frontend dependencies..."
+          if [ -f "package-lock.json" ]; then
+            npm ci
+          elif [ -f "yarn.lock" ]; then
+            yarn install --frozen-lockfile
+          elif [ -f "pnpm-lock.yaml" ]; then
+            npm install -g pnpm
+            pnpm install --frozen-lockfile
+          else
+            npm install
+          fi
+          echo "✅ Frontend dependencies installed"
+        continue-on-error: false
+
+      # 8. Type check Frontend
+      - name: Type check frontend
+        id: frontend-typecheck
+        if: steps.check-frontend.outputs.frontend_exists == 'true'
+        working-directory: ${{ steps.check-frontend.outputs.frontend_path }}
+        run: |
+          echo "🔍 Running TypeScript type check for frontend..."
+          if [ -f "tsconfig.json" ]; then
+            npx tsc --noEmit
+            echo "✅ Frontend type check passed"
+          else
+            echo "⚠️ No tsconfig.json found, skipping type check"
+          fi
+        continue-on-error: false
+
+      # 9. Lint Frontend
+      - name: Lint frontend
+        id: frontend-lint
+        if: steps.check-frontend.outputs.frontend_exists == 'true'
+        working-directory: ${{ steps.check-frontend.outputs.frontend_path }}
+        run: |
+          echo "🔍 Running linter for frontend..."
+          if npm run | grep -q "lint"; then
+            npm run lint || (echo "⚠️ Lint issues found but continuing..." && exit 0)
+          else
+            echo "⚠️ No lint script found, skipping"
+          fi
+          echo "✅ Frontend lint completed"
+        continue-on-error: true
+
+      # 10. Build Frontend
+      - name: Build frontend (Next.js)
+        id: frontend-build
+        if: steps.check-frontend.outputs.frontend_exists == 'true'
+        working-directory: ${{ steps.check-frontend.outputs.frontend_path }}
+        run: |
+          echo "🏗️ Building frontend..."
+          npm run build
+          echo "✅ Frontend build completed successfully"
+          echo "build_output=.next" >> $GITHUB_OUTPUT
+        continue-on-error: false
+
+      # 11. Deploy Backend a Render
+      - name: Deploy backend to Render
+        id: backend-deploy
+        if: github.event_name != 'pull_request' && steps.backend-build.outcome == 'success'
+        env:
+          RENDER_TOKEN: ${{ secrets.RENDER_TOKEN }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: |
+          echo "🚀 Deploying backend to Render..."
+          
+          if [ -z "$RENDER_TOKEN" ]; then
+            echo "❌ RENDER_TOKEN not set, skipping deployment"
+            exit 1
+          fi
+          
+          if [ -z "$RENDER_SERVICE_ID" ]; then
+            echo "❌ RENDER_SERVICE_ID not set, skipping deployment"
+            exit 1
+          fi
+          
+          # Opción 1: Usar Render CLI (método recomendado)
+          echo "📦 Installing Render CLI..."
+          curl -fsSL https://render.com/install.sh | bash
+          export PATH="$HOME/.render/bin:$PATH"
+          
+          # Verificar instalación
+          if ! command -v render &> /dev/null; then
+            echo "⚠️ Render CLI not found, trying API method..."
+            
+            # Opción 2: Usar API REST de Render como fallback
+            echo "🔄 Triggering deployment via Render API..."
+            DEPLOY_RESPONSE=$(curl -X POST "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
+              -H "Authorization: Bearer $RENDER_TOKEN" \
+              -H "Content-Type: application/json" \
+              -w "\n%{http_code}" \
+              -s)
+            
+            HTTP_CODE=$(echo "$DEPLOY_RESPONSE" | tail -n1)
+            DEPLOY_BODY=$(echo "$DEPLOY_RESPONSE" | sed '$d')
+            
+            if [ "$HTTP_CODE" -eq 201 ] || [ "$HTTP_CODE" -eq 200 ]; then
+              echo "✅ Deployment triggered successfully via API"
+              echo "Response: $DEPLOY_BODY"
+            else
+              echo "❌ Failed to trigger deployment via API (HTTP $HTTP_CODE)"
+              echo "Response: $DEPLOY_BODY"
+              exit 1
+            fi
+          else
+            # Usar CLI
+            echo "🔄 Triggering deployment via Render CLI..."
+            render deploy --service $RENDER_SERVICE_ID --token $RENDER_TOKEN || {
+              echo "❌ Backend deployment failed"
+              exit 1
+            }
+            echo "✅ Backend deployed successfully to Render"
+          fi
+        continue-on-error: false
+
+      # 12. Deploy Frontend a Vercel
+      - name: Deploy frontend to Vercel
+        id: frontend-deploy
+        if: |
+          github.event_name != 'pull_request' && 
+          steps.check-frontend.outputs.frontend_exists == 'true' && 
+          steps.frontend-build.outcome == 'success'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        working-directory: ${{ steps.check-frontend.outputs.frontend_path }}
+        run: |
+          echo "🚀 Deploying frontend to Vercel..."
+          
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "❌ VERCEL_TOKEN not set, skipping deployment"
+            exit 1
+          fi
+          
+          # Instalar Vercel CLI
+          npm install -g vercel@latest
+          
+          # Deploy usando Vercel CLI
+          if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
+            vercel deploy --prod --token $VERCEL_TOKEN --yes || {
+              echo "❌ Frontend deployment failed"
+              exit 1
+            }
+          else
+            echo "⚠️ VERCEL_ORG_ID or VERCEL_PROJECT_ID not set, using automatic detection"
+            vercel deploy --prod --token $VERCEL_TOKEN --yes || {
+              echo "❌ Frontend deployment failed"
+              exit 1
+            }
+          fi
+          
+          echo "✅ Frontend deployed successfully to Vercel"
+        continue-on-error: false
+
+      # 13. Summary
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## 📊 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Backend (NestJS)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Status**: ${{ steps.backend-build.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deploy Status**: ${{ steps.backend-deploy.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.check-frontend.outputs.frontend_exists }}" == "true" ]; then
+            echo "### Frontend (Next.js)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Build Status**: ${{ steps.frontend-build.outcome }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Deploy Status**: ${{ steps.frontend-deploy.outcome }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Frontend (Next.js)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: Not found, skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow Run**: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+

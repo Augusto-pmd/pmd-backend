@@ -220,10 +220,13 @@ export class AuthService {
   }
 
   async loadMe(user: any) {
-    const fullUser = await this.userRepository.findOne({
-      where: { id: user.id },
-      relations: ['role', 'organization'],
-    });
+    // Use query builder to ensure role (including permissions) is explicitly loaded
+    const fullUser = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect('user.organization', 'organization')
+      .where('user.id = :id', { id: user.id })
+      .getOne();
 
     if (!fullUser || !fullUser.isActive) {
       throw new UnauthorizedException('User not found or inactive');
