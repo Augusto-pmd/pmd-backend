@@ -24,7 +24,9 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('User role not found');
     }
 
-    const userRole = user.role.name || user.role;
+    // Normalize role to lowercase string for consistent comparison with enum values
+    const userRoleRaw = user.role?.name || user.role;
+    const userRole = String(userRoleRaw).toLowerCase();
 
     // Direction has full access
     if (userRole === UserRole.DIRECTION) {
