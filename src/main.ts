@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -70,6 +71,9 @@ async function bootstrap() {
 
   // Set global prefix for all routes so frontend can call /api/*
   app.setGlobalPrefix('api');
+
+  // Global exception filter - standardize error response format
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   // Global validation pipe
   app.useGlobalPipes(
