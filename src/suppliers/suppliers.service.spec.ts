@@ -11,7 +11,7 @@ import { Supplier } from './suppliers.entity';
 import { SupplierDocument } from '../supplier-documents/supplier-documents.entity';
 import { AlertsService } from '../alerts/alerts.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
-import { SupplierStatus, UserRole, SupplierDocumentType } from '../common/enums';
+import { SupplierStatus, UserRole, SupplierDocumentType, AlertType, AlertSeverity } from '../common/enums';
 import { createMockUser } from '../common/test/test-helpers';
 
 describe('SuppliersService', () => {
@@ -174,9 +174,11 @@ describe('SuppliersService', () => {
   describe('reject', () => {
     it('should reject provisional supplier successfully', async () => {
       const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const operatorId = 'operator-id';
       const provisionalSupplier = {
         ...mockSupplier,
         status: SupplierStatus.PROVISIONAL,
+        created_by_id: operatorId,
       };
 
       mockSupplierRepository.findOne.mockResolvedValue(provisionalSupplier);
@@ -188,7 +190,140 @@ describe('SuppliersService', () => {
       const result = await service.reject('supplier-id', user);
 
       expect(result.status).toBe(SupplierStatus.REJECTED);
-      expect(mockAlertsService.createAlert).toHaveBeenCalled();
+      expect(mockAlertsService.createAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: AlertType.MISSING_VALIDATION,
+          severity: AlertSeverity.WARNING,
+          supplier_id: 'supplier-id',
+          user_id: operatorId, // Alert should be sent to the operator who created the supplier
+        }),
+      );
+    });
+
+    it('should throw ForbiddenException when non-admin tries to reject', async () => {
+      const user = createMockUser({ role: { name: UserRole.OPERATOR } });
+
+      await expect(service.reject('supplier-id', user)).rejects.toThrow(ForbiddenException);
+      await expect(service.reject('supplier-id', user)).rejects.toThrow(
+        'Only Administration and Direction can reject suppliers',
+      );
+    });
+
+    it('should throw BadRequestException when trying to reject non-provisional supplier', async () => {
+      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const approvedSupplier = {
+        ...mockSupplier,
+        status: SupplierStatus.APPROVED,
+      };
+
+      mockSupplierRepository.findOne.mockResolvedValue(approvedSupplier);
+
+      await expect(service.reject('supplier-id', user)).rejects.toThrow(BadRequestException);
+      await expect(service.reject('supplier-id', user)).rejects.toThrow(
+        'Only provisional suppliers can be rejected',
+      );
+    });
+  });
+
+  describe('checkDocumentExpiration', () => {
+    it('should block supplier when ART expires', async () => {
+      const expiredDate = new Date();
+      expiredDate.setDate(expiredDate.getDate() - 1);
+
+      const supplier = {
+        ...mockSupplier,
+        status: SupplierStatus.APPROVED,
+        documents: [],
+      };
+
+      const expiredDoc = {
+        id: 'doc-id',
+        supplier_id: 'supplier-id',
+        document_type: SupplierDocumentType.ART,
+        expiration_date: expiredDate,
+        is_valid: true,
+      };
+
+      mockSupplierRepository.findOne.mockResolvedValue(supplier);
+      mockSupplierDocumentRepository.findOne.mockResolvedValue(expiredDoc);
+      mockSupplierRepository.save.mockResolvedValue({
+        ...supplier,
+        status: SupplierStatus.BLOCKED,
+      });
+      mockSupplierDocumentRepository.save.mockResolvedValue({
+        ...expiredDoc,
+        is_valid: false,
+      });
+
+      const result = await service.checkDocumentExpiration('supplier-id');
+
+      expect(result).toBe(true);
+      expect(mockSupplierRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: SupplierStatus.BLOCKED,
+        }),
+      );
+      expect(mockAlertsService.createAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: AlertType.EXPIRED_DOCUMENTATION,
+          severity: AlertSeverity.CRITICAL,
+        }),
+      );
+    });
+
+    it('should not block supplier when ART is not expired', async () => {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 30);
+
+      const supplier = {
+        ...mockSupplier,
+        status: SupplierStatus.APPROVED,
+        documents: [],
+      };
+
+      const validDoc = {
+        id: 'doc-id',
+        supplier_id: 'supplier-id',
+        document_type: SupplierDocumentType.ART,
+        expiration_date: futureDate,
+        is_valid: true,
+      };
+
+      mockSupplierRepository.findOne.mockResolvedValue(supplier);
+      mockSupplierDocumentRepository.findOne.mockResolvedValue(validDoc);
+
+      const result = await service.checkDocumentExpiration('supplier-id');
+
+      expect(result).toBe(false);
+      expect(mockSupplierRepository.save).not.toHaveBeenCalled();
+      expect(mockAlertsService.createAlert).not.toHaveBeenCalled();
+    });
+
+    it('should not block supplier if already blocked', async () => {
+      const expiredDate = new Date();
+      expiredDate.setDate(expiredDate.getDate() - 1);
+
+      const blockedSupplier = {
+        ...mockSupplier,
+        status: SupplierStatus.BLOCKED,
+        documents: [],
+      };
+
+      const expiredDoc = {
+        id: 'doc-id',
+        supplier_id: 'supplier-id',
+        document_type: SupplierDocumentType.ART,
+        expiration_date: expiredDate,
+        is_valid: true,
+      };
+
+      mockSupplierRepository.findOne.mockResolvedValue(blockedSupplier);
+      mockSupplierDocumentRepository.findOne.mockResolvedValue(expiredDoc);
+
+      const result = await service.checkDocumentExpiration('supplier-id');
+
+      expect(result).toBe(false);
+      expect(mockSupplierRepository.save).not.toHaveBeenCalled();
     });
   });
 
@@ -244,8 +379,64 @@ describe('SuppliersService', () => {
       );
     });
 
-    it('should throw BadRequestException when trying to approve supplier with expired ART', async () => {
+    it('should throw ForbiddenException when non-Direction tries to unblock supplier', async () => {
       const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const blockedSupplier = {
+        ...mockSupplier,
+        status: SupplierStatus.BLOCKED,
+      };
+      const updateDto = {
+        status: SupplierStatus.APPROVED,
+      };
+
+      const validDoc = {
+        supplier_id: 'supplier-id',
+        document_type: SupplierDocumentType.ART,
+        expiration_date: new Date('2030-01-01'),
+      };
+
+      mockSupplierRepository.findOne.mockResolvedValue(blockedSupplier);
+      mockSupplierDocumentRepository.findOne.mockResolvedValue(validDoc);
+
+      await expect(service.update('supplier-id', updateDto, user)).rejects.toThrow(
+        ForbiddenException,
+      );
+      await expect(service.update('supplier-id', updateDto, user)).rejects.toThrow(
+        'Only Direction can unblock suppliers',
+      );
+    });
+
+    it('should allow Direction to unblock supplier with valid ART', async () => {
+      const user = createMockUser({ role: { name: UserRole.DIRECTION } });
+      const blockedSupplier = {
+        ...mockSupplier,
+        status: SupplierStatus.BLOCKED,
+      };
+      const updateDto = {
+        status: SupplierStatus.APPROVED,
+      };
+
+      const validDoc = {
+        supplier_id: 'supplier-id',
+        document_type: SupplierDocumentType.ART,
+        expiration_date: new Date('2030-01-01'),
+      };
+
+      mockSupplierRepository.findOne.mockResolvedValue(blockedSupplier);
+      mockSupplierDocumentRepository.findOne.mockResolvedValue(validDoc);
+      mockSupplierRepository.save.mockResolvedValue({
+        ...blockedSupplier,
+        status: SupplierStatus.APPROVED,
+      });
+      mockSupplierDocumentRepository.findOne.mockResolvedValue(null); // For checkDocumentExpiration
+
+      const result = await service.update('supplier-id', updateDto, user);
+
+      expect(result.status).toBe(SupplierStatus.APPROVED);
+    });
+
+    it('should throw BadRequestException when trying to approve supplier with expired ART', async () => {
+      const user = createMockUser({ role: { name: UserRole.DIRECTION } });
       const blockedSupplier = {
         ...mockSupplier,
         status: SupplierStatus.BLOCKED,

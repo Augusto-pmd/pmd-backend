@@ -100,13 +100,14 @@ export class SuppliersService {
     supplier.status = SupplierStatus.REJECTED;
     const savedSupplier = await this.supplierRepository.save(supplier);
 
-    // Generate alert that expenses need to be reassigned
+    // Generate alert to the operator who created the supplier
     await this.alertsService.createAlert({
       type: AlertType.MISSING_VALIDATION,
       severity: AlertSeverity.WARNING,
       title: 'Supplier rejected - expenses need reassignment',
-      message: `Supplier ${supplier.name} was rejected. Please reassign related expenses.`,
+      message: `Supplier ${supplier.name} was rejected by ${user.name || user.email}. Please reassign related expenses or contact administration.`,
       supplier_id: supplier.id,
+      user_id: supplier.created_by_id, // Alert the operator who created the supplier
     });
 
     return savedSupplier;
@@ -114,12 +115,68 @@ export class SuppliersService {
 
   /**
    * Business Rule: Auto-block supplier when ART expires
+   * Business Rule: Check ART expiration for a specific supplier
+   */
+  async checkDocumentExpiration(supplierId: string): Promise<boolean> {
+    const supplier = await this.supplierRepository.findOne({
+      where: { id: supplierId },
+      relations: ['documents'],
+    });
+
+    if (!supplier) {
+      return false;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Find ART document for this supplier
+    const artDoc = await this.supplierDocumentRepository.findOne({
+      where: {
+        supplier_id: supplierId,
+        document_type: SupplierDocumentType.ART,
+        is_valid: true,
+      },
+    });
+
+    if (artDoc && artDoc.expiration_date) {
+      const expirationDate = new Date(artDoc.expiration_date);
+      expirationDate.setHours(0, 0, 0, 0);
+
+      // If ART is expired, block the supplier
+      if (expirationDate < today && supplier.status !== SupplierStatus.BLOCKED) {
+        supplier.status = SupplierStatus.BLOCKED;
+        await this.supplierRepository.save(supplier);
+
+        // Mark document as invalid
+        artDoc.is_valid = false;
+        await this.supplierDocumentRepository.save(artDoc);
+
+        // Generate critical alert
+        await this.alertsService.createAlert({
+          type: AlertType.EXPIRED_DOCUMENTATION,
+          severity: AlertSeverity.CRITICAL,
+          title: 'Supplier blocked due to expired ART',
+          message: `Supplier ${supplier.name} has been automatically blocked due to expired ART (expired: ${artDoc.expiration_date})`,
+          supplier_id: supplier.id,
+        });
+
+        return true; // Supplier was blocked
+      }
+    }
+
+    return false; // Supplier was not blocked
+  }
+
+  /**
+   * Business Rule: Auto-block supplier when ART expires
+   * Business Rule: Check all suppliers for expired ART documents
    */
   async checkAndBlockExpiredDocuments(): Promise<void> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Find all ART documents that are expired or expiring soon
+    // Find all ART documents that are expired
     const expiredArtDocuments = await this.supplierDocumentRepository.find({
       where: {
         document_type: SupplierDocumentType.ART,
@@ -222,11 +279,17 @@ export class SuppliersService {
       throw new ForbiddenException('Operators cannot change supplier status');
     }
 
-    // Check if trying to use blocked supplier
+    // Only Direction can unblock a supplier
     if (
       updateSupplierDto.status === SupplierStatus.APPROVED &&
       supplier.status === SupplierStatus.BLOCKED
     ) {
+      if (user.role.name !== UserRole.DIRECTION) {
+        throw new ForbiddenException(
+          'Only Direction can unblock suppliers. Please contact Direction to unblock this supplier.',
+        );
+      }
+
       // Check if ART is still expired
       const artDoc = await this.supplierDocumentRepository.findOne({
         where: {
@@ -243,7 +306,12 @@ export class SuppliersService {
     }
 
     Object.assign(supplier, updateSupplierDto);
-    return await this.supplierRepository.save(supplier);
+    const savedSupplier = await this.supplierRepository.save(supplier);
+
+    // Check ART expiration after update (in case document was updated)
+    await this.checkDocumentExpiration(id);
+
+    return savedSupplier;
   }
 
   async remove(id: string, user: User): Promise<void> {

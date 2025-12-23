@@ -5,6 +5,8 @@ import { SupplierDocument } from './supplier-documents.entity';
 import { Supplier } from '../suppliers/suppliers.entity';
 import { CreateSupplierDocumentDto } from './dto/create-supplier-document.dto';
 import { UpdateSupplierDocumentDto } from './dto/update-supplier-document.dto';
+import { SuppliersService } from '../suppliers/suppliers.service';
+import { SupplierDocumentType } from '../common/enums/supplier-document-type.enum';
 
 @Injectable()
 export class SupplierDocumentsService {
@@ -13,6 +15,7 @@ export class SupplierDocumentsService {
     private supplierDocumentRepository: Repository<SupplierDocument>,
     @InjectRepository(Supplier)
     private supplierRepository: Repository<Supplier>,
+    private suppliersService: SuppliersService,
   ) {}
 
   async create(createSupplierDocumentDto: CreateSupplierDocumentDto): Promise<SupplierDocument> {
@@ -25,7 +28,14 @@ export class SupplierDocumentsService {
     }
 
     const document = this.supplierDocumentRepository.create(createSupplierDocumentDto);
-    return await this.supplierDocumentRepository.save(document);
+    const savedDocument = await this.supplierDocumentRepository.save(document);
+
+    // Check ART expiration after creating document (if it's an ART document)
+    if (savedDocument.document_type === SupplierDocumentType.ART) {
+      await this.suppliersService.checkDocumentExpiration(supplier.id);
+    }
+
+    return savedDocument;
   }
 
   async findAll(): Promise<SupplierDocument[]> {
@@ -51,7 +61,14 @@ export class SupplierDocumentsService {
   async update(id: string, updateSupplierDocumentDto: UpdateSupplierDocumentDto): Promise<SupplierDocument> {
     const document = await this.findOne(id);
     Object.assign(document, updateSupplierDocumentDto);
-    return await this.supplierDocumentRepository.save(document);
+    const savedDocument = await this.supplierDocumentRepository.save(document);
+
+    // Check ART expiration after updating document (if it's an ART document)
+    if (savedDocument.document_type === SupplierDocumentType.ART && savedDocument.supplier_id) {
+      await this.suppliersService.checkDocumentExpiration(savedDocument.supplier_id);
+    }
+
+    return savedDocument;
   }
 
   async remove(id: string): Promise<void> {
