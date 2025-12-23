@@ -46,6 +46,12 @@ export class WorksController {
     return this.worksService.update(id, updateWorkDto, req.user);
   }
 
+  @Post(':id/close')
+  @Roles(UserRole.DIRECTION)
+  close(@Param('id') id: string, @Request() req) {
+    return this.worksService.close(id, req.user);
+  }
+
   @Delete(':id')
   @Roles(UserRole.DIRECTION)
   remove(@Param('id') id: string, @Request() req) {
