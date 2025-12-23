@@ -10,6 +10,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { normalizeUser } from '../common/helpers/normalize-user.helper';
+import { JwtUserPayload } from './interfaces/jwt-user-payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -190,7 +191,7 @@ export class AuthService {
     return normalizeUser(userWithRelations);
   }
 
-  async refresh(user: any) {
+  async refresh(user: JwtUserPayload) {
     const fullUser = await this.userRepository.findOne({
       where: { id: user.id },
       relations: ['role', 'organization'],
@@ -219,7 +220,7 @@ export class AuthService {
     };
   }
 
-  async loadMe(user: any) {
+  async loadMe(user: JwtUserPayload) {
     // Use query builder to ensure role (including permissions) is explicitly loaded
     const fullUser = await this.userRepository
       .createQueryBuilder('user')
