@@ -200,6 +200,232 @@ describe('ContractsService', () => {
 
       expect(result.is_blocked).toBe(false);
     });
+
+    it('should allow Direction to modify amount_total', async () => {
+      const user = createMockUser({ role: { name: UserRole.DIRECTION } });
+      const updateDto: UpdateContractDto = {
+        amount_total: 150000,
+      };
+
+      mockContractRepository.findOne.mockResolvedValue(mockContract);
+      mockContractRepository.save.mockResolvedValue({
+        ...mockContract,
+        amount_total: 150000,
+      });
+
+      const result = await service.update('contract-id', updateDto, user);
+
+      expect(result.amount_total).toBe(150000);
+    });
+
+    it('should allow Direction to modify currency', async () => {
+      const user = createMockUser({ role: { name: UserRole.DIRECTION } });
+      const updateDto: UpdateContractDto = {
+        currency: Currency.USD,
+      };
+
+      mockContractRepository.findOne.mockResolvedValue(mockContract);
+      mockContractRepository.save.mockResolvedValue({
+        ...mockContract,
+        currency: Currency.USD,
+      });
+
+      const result = await service.update('contract-id', updateDto, user);
+
+      expect(result.currency).toBe(Currency.USD);
+    });
+
+    it('should throw ForbiddenException when Administration tries to modify amount_total', async () => {
+      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const updateDto: UpdateContractDto = {
+        amount_total: 150000,
+      };
+
+      mockContractRepository.findOne.mockResolvedValue(mockContract);
+
+      await expect(service.update('contract-id', updateDto, user)).rejects.toThrow(
+        ForbiddenException,
+      );
+      await expect(service.update('contract-id', updateDto, user)).rejects.toThrow(
+        'Only Direction can modify amount_total and currency fields',
+      );
+    });
+
+    it('should throw ForbiddenException when Administration tries to modify currency', async () => {
+      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const updateDto: UpdateContractDto = {
+        currency: Currency.USD,
+      };
+
+      mockContractRepository.findOne.mockResolvedValue(mockContract);
+
+      await expect(service.update('contract-id', updateDto, user)).rejects.toThrow(
+        ForbiddenException,
+      );
+      await expect(service.update('contract-id', updateDto, user)).rejects.toThrow(
+        'Only Direction can modify amount_total and currency fields',
+      );
+    });
+
+    it('should allow Administration to modify payment_terms', async () => {
+      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const updateDto: UpdateContractDto = {
+        payment_terms: 'New payment terms',
+      };
+
+      mockContractRepository.findOne.mockResolvedValue(mockContract);
+      mockContractRepository.save.mockResolvedValue({
+        ...mockContract,
+        payment_terms: 'New payment terms',
+      });
+
+      const result = await service.update('contract-id', updateDto, user);
+
+      expect(result.payment_terms).toBe('New payment terms');
+    });
+
+    it('should allow Administration to modify file_url', async () => {
+      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const updateDto: UpdateContractDto = {
+        file_url: 'https://example.com/new-file.pdf',
+      };
+
+      mockContractRepository.findOne.mockResolvedValue(mockContract);
+      mockContractRepository.save.mockResolvedValue({
+        ...mockContract,
+        file_url: 'https://example.com/new-file.pdf',
+      });
+
+      const result = await service.update('contract-id', updateDto, user);
+
+      expect(result.file_url).toBe('https://example.com/new-file.pdf');
+    });
+
+    it('should allow Administration to modify start_date and end_date', async () => {
+      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const updateDto: UpdateContractDto = {
+        start_date: '2024-02-01',
+        end_date: '2024-12-31',
+      };
+
+      mockContractRepository.findOne.mockResolvedValue(mockContract);
+      mockContractRepository.save.mockResolvedValue({
+        ...mockContract,
+        start_date: new Date('2024-02-01'),
+        end_date: new Date('2024-12-31'),
+      });
+
+      const result = await service.update('contract-id', updateDto, user);
+
+      expect(result.start_date).toEqual(new Date('2024-02-01'));
+      expect(result.end_date).toEqual(new Date('2024-12-31'));
+    });
+  });
+
+  describe('updateAmountExecuted', () => {
+    it('should update amount_executed and auto-block when saldo <= 0', async () => {
+      const contract = {
+        ...mockContract,
+        amount_total: 100000,
+        amount_executed: 50000,
+        is_blocked: false,
+      };
+
+      mockContractRepository.findOne.mockResolvedValue(contract);
+      mockContractRepository.save.mockResolvedValue({
+        ...contract,
+        amount_executed: 100000, // amount_executed = amount_total
+        is_blocked: true,
+      });
+
+      const result = await service.updateAmountExecuted('contract-id', 100000);
+
+      expect(result.is_blocked).toBe(true);
+      expect(result.amount_executed).toBe(100000);
+      expect(mockAlertsService.createAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: expect.anything(), // CONTRACT_ZERO_BALANCE
+          severity: expect.anything(), // WARNING
+          contract_id: 'contract-id',
+        }),
+      );
+    });
+
+    it('should update amount_executed and NOT block when saldo > 0', async () => {
+      const contract = {
+        ...mockContract,
+        amount_total: 100000,
+        amount_executed: 50000,
+        is_blocked: false,
+      };
+
+      mockContractRepository.findOne.mockResolvedValue(contract);
+      mockContractRepository.save.mockResolvedValue({
+        ...contract,
+        amount_executed: 80000, // saldo = 20000 > 0
+        is_blocked: false,
+      });
+
+      const result = await service.updateAmountExecuted('contract-id', 80000);
+
+      expect(result.is_blocked).toBe(false);
+      expect(result.amount_executed).toBe(80000);
+      expect(mockAlertsService.createAlert).not.toHaveBeenCalled();
+    });
+
+    it('should NOT generate alert if contract was already blocked', async () => {
+      const contract = {
+        ...mockContract,
+        amount_total: 100000,
+        amount_executed: 100000,
+        is_blocked: true, // Already blocked
+      };
+
+      mockContractRepository.findOne.mockResolvedValue(contract);
+      mockContractRepository.save.mockResolvedValue({
+        ...contract,
+        amount_executed: 100000,
+        is_blocked: true,
+      });
+
+      const result = await service.updateAmountExecuted('contract-id', 100000);
+
+      expect(result.is_blocked).toBe(true);
+      // Should not generate alert if already blocked
+      expect(mockAlertsService.createAlert).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when contract does not exist', async () => {
+      mockContractRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.updateAmountExecuted('non-existent-id', 50000)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.updateAmountExecuted('non-existent-id', 50000)).rejects.toThrow(
+        'Contract with ID non-existent-id not found',
+      );
+    });
+
+    it('should auto-block when amount_executed > amount_total', async () => {
+      const contract = {
+        ...mockContract,
+        amount_total: 100000,
+        amount_executed: 50000,
+        is_blocked: false,
+      };
+
+      mockContractRepository.findOne.mockResolvedValue(contract);
+      mockContractRepository.save.mockResolvedValue({
+        ...contract,
+        amount_executed: 110000, // amount_executed > amount_total
+        is_blocked: true,
+      });
+
+      const result = await service.updateAmountExecuted('contract-id', 110000);
+
+      expect(result.is_blocked).toBe(true);
+      expect(mockAlertsService.createAlert).toHaveBeenCalled();
+    });
   });
 
   describe('checkAndBlockZeroBalanceContracts', () => {
