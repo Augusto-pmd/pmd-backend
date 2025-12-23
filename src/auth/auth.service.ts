@@ -11,6 +11,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { normalizeUser } from '../common/helpers/normalize-user.helper';
 import { JwtUserPayload } from './interfaces/jwt-user-payload.interface';
+import { JwtPayload } from './interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -124,7 +125,7 @@ export class AuthService {
     // Log permissions for audit
     console.log('[AUTH LOGIN] role.permissions before normalize:', JSON.stringify(user.role?.permissions, null, 2));
     
-    const payload = {
+    const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role.name,
@@ -204,7 +205,7 @@ export class AuthService {
     // Log permissions for audit
     console.log('[AUTH REFRESH] role.permissions before normalize:', JSON.stringify(fullUser.role?.permissions, null, 2));
 
-    const payload = {
+    const payload: JwtPayload = {
       sub: fullUser.id,
       email: fullUser.email,
       role: fullUser.role?.name || UserRole.ADMINISTRATION,
