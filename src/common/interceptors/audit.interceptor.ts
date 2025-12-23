@@ -73,15 +73,41 @@ export class AuditInterceptor implements NestInterceptor {
     return 'low';
   }
 
-  private sanitizeData(data: any): any {
+  /**
+   * Sanitize data by removing sensitive fields before storing in audit log
+   * Handles various data types: objects, arrays, primitives, null, undefined
+   * 
+   * @param data - Data to sanitize (can be any type)
+   * @returns Sanitized data with sensitive fields removed, or original value if not an object
+   */
+  private sanitizeData(data: unknown): unknown {
+    // Handle null, undefined, or falsy values
     if (!data) return null;
+    
+    // Handle primitives (string, number, boolean, etc.)
     if (typeof data !== 'object') return data;
-
-    const sanitized = { ...data };
+    
+    // Handle arrays - sanitize each element
+    if (Array.isArray(data)) {
+      return data.map(item => this.sanitizeData(item));
+    }
+    
+    // Handle objects - remove sensitive fields
+    const sanitized = { ...(data as Record<string, unknown>) };
+    
     // Remove sensitive fields
-    if (sanitized.password) delete sanitized.password;
-    if (sanitized.token) delete sanitized.token;
-    if (sanitized.refreshToken) delete sanitized.refreshToken;
+    if ('password' in sanitized) delete sanitized.password;
+    if ('token' in sanitized) delete sanitized.token;
+    if ('refreshToken' in sanitized) delete sanitized.refreshToken;
+    if ('access_token' in sanitized) delete sanitized.access_token;
+    if ('refresh_token' in sanitized) delete sanitized.refresh_token;
+    
+    // Recursively sanitize nested objects
+    for (const key in sanitized) {
+      if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
+        sanitized[key] = this.sanitizeData(sanitized[key]);
+      }
+    }
 
     return sanitized;
   }
