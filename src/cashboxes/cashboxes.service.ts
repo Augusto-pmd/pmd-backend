@@ -16,6 +16,9 @@ import { UserRole } from '../common/enums/user-role.enum';
 import { User } from '../users/user.entity';
 import { AlertsService } from '../alerts/alerts.service';
 import { AlertType, AlertSeverity } from '../common/enums';
+import { CashMovement } from '../cash-movements/cash-movements.entity';
+import { CashMovementType } from '../common/enums/cash-movement-type.enum';
+import { Currency } from '../common/enums/currency.enum';
 
 @Injectable()
 export class CashboxesService {
@@ -24,6 +27,8 @@ export class CashboxesService {
     private cashboxRepository: Repository<Cashbox>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(CashMovement)
+    private cashMovementRepository: Repository<CashMovement>,
     private alertsService: AlertsService,
   ) {}
 
@@ -67,11 +72,20 @@ export class CashboxesService {
         });
       }
 
-      // Supervisors and above can see all cashboxes
-      return await this.cashboxRepository.find({
-        relations: ['user', 'movements'],
-        order: { created_at: 'DESC' },
-      });
+      // Direction, Administration, and Supervisor can see all cashboxes (no filter)
+      if (
+        user?.role?.name === UserRole.DIRECTION ||
+        user?.role?.name === UserRole.ADMINISTRATION ||
+        user?.role?.name === UserRole.SUPERVISOR
+      ) {
+        return await this.cashboxRepository.find({
+          relations: ['user', 'movements'],
+          order: { created_at: 'DESC' },
+        });
+      }
+
+      // Default: return empty array for unknown roles
+      return [];
     } catch (error) {
       console.error('[CashboxesService.findAll] Error:', error);
       return [];
@@ -103,14 +117,48 @@ export class CashboxesService {
       throw new BadRequestException('Cashbox is already closed');
     }
 
-    // Calculate differences
-    const differenceArs =
-      closeCashboxDto.closing_balance_ars - cashbox.opening_balance_ars;
-    const differenceUsd =
-      closeCashboxDto.closing_balance_usd - cashbox.opening_balance_usd;
+    // Get all movements for this cashbox to calculate totals
+    const movements = await this.cashMovementRepository.find({
+      where: { cashbox_id: id },
+    });
 
-    cashbox.closing_balance_ars = closeCashboxDto.closing_balance_ars || 0;
-    cashbox.closing_balance_usd = closeCashboxDto.closing_balance_usd || 0;
+    // Calculate total ingresos (INCOME) and egresos (EXPENSE) by currency
+    let totalIngresosArs = 0;
+    let totalIngresosUsd = 0;
+    let totalEgresosArs = 0;
+    let totalEgresosUsd = 0;
+
+    movements.forEach((movement) => {
+      const amount = Number(movement.amount);
+      if (movement.type === CashMovementType.INCOME) {
+        if (movement.currency === Currency.ARS) {
+          totalIngresosArs += amount;
+        } else if (movement.currency === Currency.USD) {
+          totalIngresosUsd += amount;
+        }
+      } else if (movement.type === CashMovementType.EXPENSE) {
+        if (movement.currency === Currency.ARS) {
+          totalEgresosArs += amount;
+        } else if (movement.currency === Currency.USD) {
+          totalEgresosUsd += amount;
+        }
+      }
+    });
+
+    // Calculate differences according to formula:
+    // Diferencia = closing_balance - (opening_balance + ingresos - egresos)
+    const openingBalanceArs = Number(cashbox.opening_balance_ars);
+    const openingBalanceUsd = Number(cashbox.opening_balance_usd);
+    const closingBalanceArs = closeCashboxDto.closing_balance_ars || 0;
+    const closingBalanceUsd = closeCashboxDto.closing_balance_usd || 0;
+
+    const differenceArs =
+      closingBalanceArs - (openingBalanceArs + totalIngresosArs - totalEgresosArs);
+    const differenceUsd =
+      closingBalanceUsd - (openingBalanceUsd + totalIngresosUsd - totalEgresosUsd);
+
+    cashbox.closing_balance_ars = closingBalanceArs;
+    cashbox.closing_balance_usd = closingBalanceUsd;
     cashbox.difference_ars = differenceArs;
     cashbox.difference_usd = differenceUsd;
     cashbox.closing_date = closeCashboxDto.closing_date
@@ -120,7 +168,7 @@ export class CashboxesService {
 
     const savedCashbox = await this.cashboxRepository.save(cashbox);
 
-    // Generate alert if there's a difference
+    // Generate alert if there's a difference (positive or negative)
     if (differenceArs !== 0 || differenceUsd !== 0) {
       await this.alertsService.createAlert({
         type: AlertType.CASHBOX_DIFFERENCE,
@@ -129,7 +177,7 @@ export class CashboxesService {
             ? AlertSeverity.CRITICAL
             : AlertSeverity.WARNING,
         title: `Cashbox difference detected`,
-        message: `Cashbox ${cashbox.id} has a difference: ARS ${differenceArs}, USD ${differenceUsd}`,
+        message: `Cashbox ${cashbox.id} has a difference: ARS ${differenceArs.toFixed(2)}, USD ${differenceUsd.toFixed(2)}`,
         cashbox_id: cashbox.id,
         user_id: user.id,
       });

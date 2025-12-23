@@ -9,17 +9,21 @@ import {
 import { CashboxesService } from './cashboxes.service';
 import { Cashbox } from './cashboxes.entity';
 import { User } from '../users/user.entity';
+import { CashMovement } from '../cash-movements/cash-movements.entity';
 import { AlertsService } from '../alerts/alerts.service';
 import { CreateCashboxDto } from './dto/create-cashbox.dto';
 import { CloseCashboxDto } from './dto/close-cashbox.dto';
 import { ApproveDifferenceDto } from './dto/approve-difference.dto';
 import { CashboxStatus, UserRole } from '../common/enums';
+import { CashMovementType } from '../common/enums/cash-movement-type.enum';
+import { Currency } from '../common/enums/currency.enum';
 import { createMockUser } from '../common/test/test-helpers';
 
 describe('CashboxesService', () => {
   let service: CashboxesService;
   let cashboxRepository: Repository<Cashbox>;
   let userRepository: Repository<User>;
+  let cashMovementRepository: Repository<CashMovement>;
   let alertsService: AlertsService;
 
   const mockCashboxRepository = {
@@ -32,6 +36,14 @@ describe('CashboxesService', () => {
 
   const mockUserRepository = {
     findOne: jest.fn(),
+  };
+
+  const mockCashMovementRepository = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+    remove: jest.fn(),
   };
 
   const mockAlertsService = {
@@ -72,6 +84,10 @@ describe('CashboxesService', () => {
           useValue: mockUserRepository,
         },
         {
+          provide: getRepositoryToken(CashMovement),
+          useValue: mockCashMovementRepository,
+        },
+        {
           provide: AlertsService,
           useValue: mockAlertsService,
         },
@@ -81,6 +97,9 @@ describe('CashboxesService', () => {
     service = module.get<CashboxesService>(CashboxesService);
     cashboxRepository = module.get<Repository<Cashbox>>(getRepositoryToken(Cashbox));
     userRepository = module.get<Repository<User>>(getRepositoryToken(User));
+    cashMovementRepository = module.get<Repository<CashMovement>>(
+      getRepositoryToken(CashMovement),
+    );
     alertsService = module.get<AlertsService>(AlertsService);
   });
 
@@ -139,18 +158,300 @@ describe('CashboxesService', () => {
   });
 
   describe('close', () => {
-    it('should close cashbox and calculate differences', async () => {
+    it('should close cashbox and calculate differences correctly with formula', async () => {
       const user = createMockUser();
       const closeDto: CloseCashboxDto = {
-        closing_balance_ars: 9500,
-        closing_balance_usd: 95,
+        closing_balance_ars: 12000,
+        closing_balance_usd: 120,
         closing_date: '2024-01-16',
       };
 
-      mockCashboxRepository.findOne.mockResolvedValue(mockCashbox);
-      mockCashboxRepository.save.mockResolvedValue({
+      // Mock cashbox with opening balance
+      const cashboxWithMovements = {
         ...mockCashbox,
+        opening_balance_ars: 10000,
+        opening_balance_usd: 100,
+      };
+
+      // Mock movements: ingresos 3000 ARS, 30 USD; egresos 2000 ARS, 20 USD
+      const mockMovements: CashMovement[] = [
+        {
+          id: 'movement-1',
+          cashbox_id: 'cashbox-id',
+          type: CashMovementType.INCOME,
+          amount: 3000,
+          currency: Currency.ARS,
+          description: 'Ingreso 1',
+          expense_id: null,
+          income_id: 'income-1',
+          date: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          cashbox: null,
+          expense: null,
+          income: null,
+        },
+        {
+          id: 'movement-2',
+          cashbox_id: 'cashbox-id',
+          type: CashMovementType.INCOME,
+          amount: 30,
+          currency: Currency.USD,
+          description: 'Ingreso USD',
+          expense_id: null,
+          income_id: 'income-2',
+          date: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          cashbox: null,
+          expense: null,
+          income: null,
+        },
+        {
+          id: 'movement-3',
+          cashbox_id: 'cashbox-id',
+          type: CashMovementType.EXPENSE,
+          amount: 2000,
+          currency: Currency.ARS,
+          description: 'Egreso 1',
+          expense_id: 'expense-1',
+          income_id: null,
+          date: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          cashbox: null,
+          expense: null,
+          income: null,
+        },
+        {
+          id: 'movement-4',
+          cashbox_id: 'cashbox-id',
+          type: CashMovementType.EXPENSE,
+          amount: 20,
+          currency: Currency.USD,
+          description: 'Egreso USD',
+          expense_id: 'expense-2',
+          income_id: null,
+          date: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          cashbox: null,
+          expense: null,
+          income: null,
+        },
+      ];
+
+      mockCashboxRepository.findOne.mockResolvedValue(cashboxWithMovements);
+      mockCashMovementRepository.find.mockResolvedValue(mockMovements);
+      mockCashboxRepository.save.mockResolvedValue({
+        ...cashboxWithMovements,
         ...closeDto,
+        // Expected difference ARS: 12000 - (10000 + 3000 - 2000) = 12000 - 11000 = 1000
+        // Expected difference USD: 120 - (100 + 30 - 20) = 120 - 110 = 10
+        difference_ars: 1000,
+        difference_usd: 10,
+        status: CashboxStatus.CLOSED,
+      });
+
+      const result = await service.close('cashbox-id', closeDto, user);
+
+      expect(result.status).toBe(CashboxStatus.CLOSED);
+      expect(result.difference_ars).toBe(1000);
+      expect(result.difference_usd).toBe(10);
+      expect(mockCashMovementRepository.find).toHaveBeenCalledWith({
+        where: { cashbox_id: 'cashbox-id' },
+      });
+      expect(mockAlertsService.createAlert).toHaveBeenCalled();
+    });
+
+    it('should calculate zero difference when closing balance matches expected', async () => {
+      const user = createMockUser();
+      const closeDto: CloseCashboxDto = {
+        closing_balance_ars: 11000, // opening (10000) + ingresos (3000) - egresos (2000) = 11000
+        closing_balance_usd: 110, // opening (100) + ingresos (30) - egresos (20) = 110
+        closing_date: '2024-01-16',
+      };
+
+      const cashboxWithMovements = {
+        ...mockCashbox,
+        opening_balance_ars: 10000,
+        opening_balance_usd: 100,
+      };
+
+      const mockMovements: CashMovement[] = [
+        {
+          id: 'movement-1',
+          cashbox_id: 'cashbox-id',
+          type: CashMovementType.INCOME,
+          amount: 3000,
+          currency: Currency.ARS,
+          description: 'Ingreso',
+          expense_id: null,
+          income_id: 'income-1',
+          date: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          cashbox: null,
+          expense: null,
+          income: null,
+        },
+        {
+          id: 'movement-2',
+          cashbox_id: 'cashbox-id',
+          type: CashMovementType.EXPENSE,
+          amount: 2000,
+          currency: Currency.ARS,
+          description: 'Egreso',
+          expense_id: 'expense-1',
+          income_id: null,
+          date: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          cashbox: null,
+          expense: null,
+          income: null,
+        },
+        {
+          id: 'movement-3',
+          cashbox_id: 'cashbox-id',
+          type: CashMovementType.INCOME,
+          amount: 30,
+          currency: Currency.USD,
+          description: 'Ingreso USD',
+          expense_id: null,
+          income_id: 'income-2',
+          date: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          cashbox: null,
+          expense: null,
+          income: null,
+        },
+        {
+          id: 'movement-4',
+          cashbox_id: 'cashbox-id',
+          type: CashMovementType.EXPENSE,
+          amount: 20,
+          currency: Currency.USD,
+          description: 'Egreso USD',
+          expense_id: 'expense-2',
+          income_id: null,
+          date: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          cashbox: null,
+          expense: null,
+          income: null,
+        },
+      ];
+
+      mockCashboxRepository.findOne.mockResolvedValue(cashboxWithMovements);
+      mockCashMovementRepository.find.mockResolvedValue(mockMovements);
+      mockCashboxRepository.save.mockResolvedValue({
+        ...cashboxWithMovements,
+        ...closeDto,
+        difference_ars: 0,
+        difference_usd: 0,
+        status: CashboxStatus.CLOSED,
+      });
+
+      const result = await service.close('cashbox-id', closeDto, user);
+
+      expect(result.status).toBe(CashboxStatus.CLOSED);
+      expect(result.difference_ars).toBe(0);
+      expect(result.difference_usd).toBe(0);
+      // Should not generate alert when difference is zero
+      expect(mockAlertsService.createAlert).not.toHaveBeenCalled();
+    });
+
+    it('should handle negative differences correctly', async () => {
+      const user = createMockUser();
+      const closeDto: CloseCashboxDto = {
+        closing_balance_ars: 10500, // Less than expected (11000)
+        closing_balance_usd: 105, // Less than expected (110)
+        closing_date: '2024-01-16',
+      };
+
+      const cashboxWithMovements = {
+        ...mockCashbox,
+        opening_balance_ars: 10000,
+        opening_balance_usd: 100,
+      };
+
+      const mockMovements: CashMovement[] = [
+        {
+          id: 'movement-1',
+          cashbox_id: 'cashbox-id',
+          type: CashMovementType.INCOME,
+          amount: 3000,
+          currency: Currency.ARS,
+          description: 'Ingreso',
+          expense_id: null,
+          income_id: 'income-1',
+          date: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          cashbox: null,
+          expense: null,
+          income: null,
+        },
+        {
+          id: 'movement-2',
+          cashbox_id: 'cashbox-id',
+          type: CashMovementType.EXPENSE,
+          amount: 2000,
+          currency: Currency.ARS,
+          description: 'Egreso',
+          expense_id: 'expense-1',
+          income_id: null,
+          date: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          cashbox: null,
+          expense: null,
+          income: null,
+        },
+        {
+          id: 'movement-3',
+          cashbox_id: 'cashbox-id',
+          type: CashMovementType.INCOME,
+          amount: 30,
+          currency: Currency.USD,
+          description: 'Ingreso USD',
+          expense_id: null,
+          income_id: 'income-2',
+          date: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          cashbox: null,
+          expense: null,
+          income: null,
+        },
+        {
+          id: 'movement-4',
+          cashbox_id: 'cashbox-id',
+          type: CashMovementType.EXPENSE,
+          amount: 20,
+          currency: Currency.USD,
+          description: 'Egreso USD',
+          expense_id: 'expense-2',
+          income_id: null,
+          date: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          cashbox: null,
+          expense: null,
+          income: null,
+        },
+      ];
+
+      mockCashboxRepository.findOne.mockResolvedValue(cashboxWithMovements);
+      mockCashMovementRepository.find.mockResolvedValue(mockMovements);
+      mockCashboxRepository.save.mockResolvedValue({
+        ...cashboxWithMovements,
+        ...closeDto,
+        // Expected difference ARS: 10500 - (10000 + 3000 - 2000) = 10500 - 11000 = -500
+        // Expected difference USD: 105 - (100 + 30 - 20) = 105 - 110 = -5
         difference_ars: -500,
         difference_usd: -5,
         status: CashboxStatus.CLOSED,
@@ -161,6 +462,7 @@ describe('CashboxesService', () => {
       expect(result.status).toBe(CashboxStatus.CLOSED);
       expect(result.difference_ars).toBe(-500);
       expect(result.difference_usd).toBe(-5);
+      // Should generate alert even for negative differences
       expect(mockAlertsService.createAlert).toHaveBeenCalled();
     });
 
@@ -238,9 +540,9 @@ describe('CashboxesService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all cashboxes for non-operator users', async () => {
-      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
-      const cashboxes = [mockCashbox];
+    it('should return all cashboxes for Direction role (no filter)', async () => {
+      const user = createMockUser({ role: { name: UserRole.DIRECTION } });
+      const cashboxes = [mockCashbox, { ...mockCashbox, id: 'cashbox-id-2', user_id: 'other-user-id' }];
 
       mockCashboxRepository.find.mockResolvedValue(cashboxes);
 
@@ -248,13 +550,51 @@ describe('CashboxesService', () => {
 
       expect(result).toEqual(cashboxes);
       expect(mockCashboxRepository.find).toHaveBeenCalledWith({
-        where: {},
         relations: ['user', 'movements'],
         order: { created_at: 'DESC' },
       });
+      // Verify no where clause is applied - Direction sees all cashboxes
+      const findCall = mockCashboxRepository.find.mock.calls[0][0];
+      expect(findCall.where).toBeUndefined();
     });
 
-    it('should return only user cashboxes for operators', async () => {
+    it('should return all cashboxes for Administration role (no filter)', async () => {
+      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const cashboxes = [mockCashbox, { ...mockCashbox, id: 'cashbox-id-2', user_id: 'other-user-id' }];
+
+      mockCashboxRepository.find.mockResolvedValue(cashboxes);
+
+      const result = await service.findAll(user);
+
+      expect(result).toEqual(cashboxes);
+      expect(mockCashboxRepository.find).toHaveBeenCalledWith({
+        relations: ['user', 'movements'],
+        order: { created_at: 'DESC' },
+      });
+      // Verify no where clause is applied - Administration sees all cashboxes
+      const findCall = mockCashboxRepository.find.mock.calls[0][0];
+      expect(findCall.where).toBeUndefined();
+    });
+
+    it('should return all cashboxes for Supervisor role (no filter)', async () => {
+      const user = createMockUser({ role: { name: UserRole.SUPERVISOR } });
+      const cashboxes = [mockCashbox, { ...mockCashbox, id: 'cashbox-id-2', user_id: 'other-user-id' }];
+
+      mockCashboxRepository.find.mockResolvedValue(cashboxes);
+
+      const result = await service.findAll(user);
+
+      expect(result).toEqual(cashboxes);
+      expect(mockCashboxRepository.find).toHaveBeenCalledWith({
+        relations: ['user', 'movements'],
+        order: { created_at: 'DESC' },
+      });
+      // Verify no where clause is applied - Supervisor sees all cashboxes
+      const findCall = mockCashboxRepository.find.mock.calls[0][0];
+      expect(findCall.where).toBeUndefined();
+    });
+
+    it('should return only user cashboxes for Operator role (with filter)', async () => {
       const user = createMockUser({ role: { name: UserRole.OPERATOR } });
       const cashboxes = [mockCashbox];
 
@@ -268,6 +608,18 @@ describe('CashboxesService', () => {
         relations: ['user', 'movements'],
         order: { created_at: 'DESC' },
       });
+      // Verify where clause is applied - Operator only sees their own cashboxes
+      const findCall = mockCashboxRepository.find.mock.calls[0][0];
+      expect(findCall.where).toEqual({ user_id: user.id });
+    });
+
+    it('should return empty array for unknown role', async () => {
+      const user = createMockUser({ role: { name: 'unknown-role' as any } });
+
+      const result = await service.findAll(user);
+
+      expect(result).toEqual([]);
+      expect(mockCashboxRepository.find).not.toHaveBeenCalled();
     });
   });
 
