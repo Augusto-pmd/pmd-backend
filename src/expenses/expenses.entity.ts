@@ -18,6 +18,7 @@ import { DocumentType } from '../common/enums/document-type.enum';
 import { Val } from '../val/val.entity';
 import { AccountingRecord } from '../accounting/accounting.entity';
 import { CashMovement } from '../cash-movements/cash-movements.entity';
+import { Contract } from '../contracts/contracts.entity';
 
 @Entity('expenses')
 export class Expense {
@@ -37,6 +38,13 @@ export class Expense {
   @ManyToOne(() => Supplier, (supplier) => supplier.expenses)
   @JoinColumn({ name: 'supplier_id' })
   supplier: Supplier;
+
+  @Column({ type: 'uuid', nullable: true })
+  contract_id: string;
+
+  @ManyToOne(() => Contract, { nullable: true })
+  @JoinColumn({ name: 'contract_id' })
+  contract: Contract;
 
   @Column({ type: 'uuid' })
   rubric_id: string;

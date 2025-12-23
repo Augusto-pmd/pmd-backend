@@ -21,6 +21,13 @@ import { AlertsService } from '../alerts/alerts.service';
 import { AlertType, AlertSeverity } from '../common/enums';
 import { AccountingRecord } from '../accounting/accounting.entity';
 import { AccountingType } from '../common/enums/accounting-type.enum';
+import { Contract } from '../contracts/contracts.entity';
+import { ContractsService } from '../contracts/contracts.service';
+import { SupplierDocument } from '../supplier-documents/supplier-documents.entity';
+import { SupplierDocumentType } from '../common/enums/supplier-document-type.enum';
+import { SupplierStatus } from '../common/enums/supplier-status.enum';
+import { WorksService } from '../works/works.service';
+import { WorkStatus } from '../common/enums/work-status.enum';
 
 @Injectable()
 export class ExpensesService {
@@ -33,10 +40,16 @@ export class ExpensesService {
     private workRepository: Repository<Work>,
     @InjectRepository(Supplier)
     private supplierRepository: Repository<Supplier>,
+    @InjectRepository(Contract)
+    private contractRepository: Repository<Contract>,
     @InjectRepository(AccountingRecord)
     private accountingRepository: Repository<AccountingRecord>,
+    @InjectRepository(SupplierDocument)
+    private supplierDocumentRepository: Repository<SupplierDocument>,
     private dataSource: DataSource,
     private alertsService: AlertsService,
+    private contractsService: ContractsService,
+    private worksService: WorksService,
   ) {}
 
   /**
@@ -53,6 +66,19 @@ export class ExpensesService {
       throw new NotFoundException(`Work with ID ${createExpenseDto.work_id} not found`);
     }
 
+    // Check if work is closed (only Direction can create expenses in closed works)
+    if (
+      work.status === WorkStatus.FINISHED ||
+      work.status === WorkStatus.ADMINISTRATIVELY_CLOSED ||
+      work.status === WorkStatus.ARCHIVED
+    ) {
+      if (user.role.name !== UserRole.DIRECTION) {
+        throw new BadRequestException(
+          'Cannot create expense in a closed work. Only Direction can create expenses in closed works.',
+        );
+      }
+    }
+
     // Validate supplier if provided
     if (createExpenseDto.supplier_id) {
       const supplier = await this.supplierRepository.findOne({
@@ -65,8 +91,44 @@ export class ExpensesService {
       }
 
       // Check if supplier is blocked
-      if (supplier.status === 'blocked') {
+      if (supplier.status === SupplierStatus.BLOCKED) {
         throw new BadRequestException('Cannot create expense with blocked supplier');
+      }
+
+      // Check ART expiration before creating expense
+      // This ensures we catch expired ART even if checkAndBlockExpiredDocuments hasn't run yet
+      const artDoc = supplier.documents?.find(
+        (doc) => doc.document_type === SupplierDocumentType.ART && doc.is_valid === true,
+      );
+
+      if (artDoc && artDoc.expiration_date) {
+        const expirationDate = new Date(artDoc.expiration_date);
+        expirationDate.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (expirationDate < today) {
+          // ART is expired, block supplier and prevent expense creation
+          supplier.status = SupplierStatus.BLOCKED;
+          await this.supplierRepository.save(supplier);
+
+          // Mark document as invalid
+          artDoc.is_valid = false;
+          await this.supplierDocumentRepository.save(artDoc);
+
+          // Generate critical alert
+          await this.alertsService.createAlert({
+            type: AlertType.EXPIRED_DOCUMENTATION,
+            severity: AlertSeverity.CRITICAL,
+            title: 'Supplier blocked due to expired ART',
+            message: `Supplier ${supplier.name} has been automatically blocked due to expired ART (expired: ${artDoc.expiration_date}). Cannot create expense.`,
+            supplier_id: supplier.id,
+          });
+
+          throw new BadRequestException(
+            `Cannot create expense with supplier that has expired ART. Supplier has been automatically blocked. Please update ART document first.`,
+          );
+        }
       }
     }
 
@@ -78,11 +140,8 @@ export class ExpensesService {
 
     const savedExpense = await this.expenseRepository.save(expense);
 
-    // Auto-generate VAL if document type is VAL or no formal document
-    if (
-      createExpenseDto.document_type === DocumentType.VAL ||
-      !createExpenseDto.document_number
-    ) {
+    // Auto-generate VAL only if document type is VAL
+    if (createExpenseDto.document_type === DocumentType.VAL) {
       await this.generateVal(savedExpense);
     }
 
@@ -99,9 +158,27 @@ export class ExpensesService {
 
   /**
    * Business Rule: VAL auto-generation with sequential codes (VAL-000001, VAL-000002, ...)
+   * Business Rule: VAL is generated only if document_type === DocumentType.VAL
+   * Business Rule: Numeración is sequential and unique
+   * Business Rule: Format: VAL-XXXXXX (6 digits padded with zeros)
    */
   private async generateVal(expense: Expense): Promise<Val> {
-    // Get the last VAL code
+    // Verify that expense has document_type VAL
+    if (expense.document_type !== DocumentType.VAL) {
+      throw new BadRequestException('VAL can only be generated for expenses with document_type VAL');
+    }
+
+    // Check if VAL already exists for this expense
+    const existingVal = await this.valRepository.findOne({
+      where: { expense_id: expense.id },
+    });
+
+    if (existingVal) {
+      // VAL already exists, return it
+      return existingVal;
+    }
+
+    // Get the last VAL code to ensure sequential numbering
     const lastVal = await this.valRepository
       .createQueryBuilder('val')
       .orderBy('val.code', 'DESC')
@@ -109,16 +186,48 @@ export class ExpensesService {
 
     let nextNumber = 1;
     if (lastVal && lastVal.code) {
-      const match = lastVal.code.match(/VAL-(\d+)/);
+      // Extract number from format VAL-XXXXXX
+      const match = lastVal.code.match(/^VAL-(\d+)$/);
       if (match) {
-        nextNumber = parseInt(match[1], 10) + 1;
+        const lastNumber = parseInt(match[1], 10);
+        if (!isNaN(lastNumber) && lastNumber > 0) {
+          nextNumber = lastNumber + 1;
+        }
       }
     }
 
+    // Generate code with format VAL-XXXXXX (6 digits padded with zeros)
     const code = `VAL-${String(nextNumber).padStart(6, '0')}`;
 
+    // Verify code doesn't already exist (race condition protection)
+    const existingCode = await this.valRepository.findOne({
+      where: { code },
+    });
+
+    if (existingCode) {
+      // If code exists, find the next available number
+      const allVals = await this.valRepository
+        .createQueryBuilder('val')
+        .orderBy('val.code', 'DESC')
+        .getMany();
+
+      let maxNumber = 0;
+      for (const val of allVals) {
+        const match = val.code.match(/^VAL-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNumber) {
+            maxNumber = num;
+          }
+        }
+      }
+      nextNumber = maxNumber + 1;
+    }
+
+    const finalCode = `VAL-${String(nextNumber).padStart(6, '0')}`;
+
     const val = this.valRepository.create({
-      code,
+      code: finalCode,
       expense_id: expense.id,
     });
 
@@ -146,6 +255,8 @@ export class ExpensesService {
 
   /**
    * Business Rule: Administration validation flow
+   * Business Rule: Auto-assign contract if exists for supplier in work
+   * Business Rule: Validate contract balance before validation
    */
   async validate(
     id: string,
@@ -166,37 +277,145 @@ export class ExpensesService {
       throw new BadRequestException('Cannot validate an annulled expense');
     }
 
-    expense.state = validateDto.state;
-    expense.validated_by_id = user.id;
-    expense.validated_at = new Date();
-    if (validateDto.observations) {
-      expense.observations = validateDto.observations;
-    }
+    // Use transaction to ensure atomicity
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    const savedExpense = await this.expenseRepository.save(expense);
+    try {
+      // 1. Buscar contrato del proveedor en la obra
+      let contract: Contract | null = null;
+      if (expense.supplier_id && expense.work_id) {
+        contract = await queryRunner.manager.findOne(Contract, {
+          where: {
+            supplier_id: expense.supplier_id,
+            work_id: expense.work_id,
+            is_blocked: false,
+          },
+        });
 
-    // If validated, create accounting record and update work
-    if (validateDto.state === ExpenseState.VALIDATED) {
-      await this.createAccountingRecord(savedExpense);
-      await this.updateWorkExpenses(expense.work_id);
+        // 2. Si existe contrato, asignar automáticamente contract_id
+        if (contract) {
+          expense.contract_id = contract.id;
 
-      // Check if contract needs to be updated
-      if (expense.supplier_id) {
-        await this.updateContractExecution(expense);
+          // 3. Validar que el contrato tenga saldo disponible
+          const amountTotal = Number(contract.amount_total);
+          const amountExecuted = Number(contract.amount_executed);
+          const expenseAmount = Number(expense.amount);
+          const availableBalance = amountTotal - amountExecuted;
+
+          // 4. Si no hay saldo, bloquear y alertar
+          if (availableBalance < expenseAmount) {
+            await queryRunner.rollbackTransaction();
+            await queryRunner.release();
+
+            // Generate alert
+            await this.alertsService.createAlert({
+              type: AlertType.CONTRACT_INSUFFICIENT_BALANCE,
+              severity: AlertSeverity.CRITICAL,
+              title: 'Insufficient contract balance',
+              message: `Contract ${contract.id} has insufficient balance. Available: ${availableBalance.toFixed(2)}, Required: ${expenseAmount.toFixed(2)}`,
+              contract_id: contract.id,
+              expense_id: expense.id,
+              user_id: user.id,
+            });
+
+            throw new BadRequestException(
+              `Contract has insufficient balance. Available: ${availableBalance.toFixed(2)}, Required: ${expenseAmount.toFixed(2)}`,
+            );
+          }
+        }
       }
-    } else if (validateDto.state === ExpenseState.OBSERVED) {
-      // Generate alert for observed expense
-      await this.alertsService.createAlert({
-        type: AlertType.OBSERVED_EXPENSE,
-        severity: AlertSeverity.WARNING,
-        title: 'Expense observed',
-        message: `Expense ${expense.id} has been observed: ${validateDto.observations || 'No details'}`,
-        expense_id: expense.id,
-        user_id: expense.created_by_id,
-      });
-    }
 
-    return savedExpense;
+      expense.state = validateDto.state;
+      expense.validated_by_id = user.id;
+      expense.validated_at = new Date();
+      if (validateDto.observations) {
+        expense.observations = validateDto.observations;
+      }
+
+      // Check if expense was previously validated and is now being rejected/observed/annulled
+      const wasValidated = expense.state === ExpenseState.VALIDATED;
+      const isBeingRejected =
+        validateDto.state === ExpenseState.OBSERVED ||
+        validateDto.state === ExpenseState.ANNULLED;
+
+      // If expense was validated and is now being rejected, revert contract balance
+      if (wasValidated && isBeingRejected && expense.contract_id) {
+        const existingContract = await queryRunner.manager.findOne(Contract, {
+          where: { id: expense.contract_id },
+        });
+
+        if (existingContract) {
+          // Revert contract balance: subtract expense amount from amount_executed
+          existingContract.amount_executed = Math.max(
+            0,
+            Number(existingContract.amount_executed) - Number(expense.amount),
+          );
+          await queryRunner.manager.save(Contract, existingContract);
+        }
+      }
+
+      const savedExpense = await queryRunner.manager.save(Expense, expense);
+
+      // If validated, create accounting record, update work, and update contract
+      if (validateDto.state === ExpenseState.VALIDATED) {
+        await this.createAccountingRecord(savedExpense);
+        await this.updateWorkExpenses(expense.work_id);
+
+        // 5. Actualizar amount_executed del contrato (only if not already updated above)
+        if (contract && savedExpense.contract_id && !wasValidated) {
+          const newAmountExecuted =
+            Number(contract.amount_executed) + Number(expense.amount);
+          
+          // Update amount_executed
+          contract.amount_executed = newAmountExecuted;
+          
+          // Calculate saldo: amount_total - amount_executed
+          const saldo = Number(contract.amount_total) - newAmountExecuted;
+          
+          // Auto-block if saldo <= 0 (amount_executed >= amount_total)
+          if (saldo <= 0 && !contract.is_blocked) {
+            contract.is_blocked = true;
+            
+            // Generate alert
+            await this.alertsService.createAlert({
+              type: AlertType.CONTRACT_ZERO_BALANCE,
+              severity: AlertSeverity.WARNING,
+              title: 'Contract balance reached zero',
+              message: `Contract ${contract.id} has been automatically blocked. Saldo: ${saldo.toFixed(2)} (amount_total: ${contract.amount_total.toFixed(2)}, amount_executed: ${newAmountExecuted.toFixed(2)})`,
+              contract_id: contract.id,
+              work_id: contract.work_id,
+            });
+          }
+          
+          await queryRunner.manager.save(Contract, contract);
+        }
+      } else if (validateDto.state === ExpenseState.OBSERVED) {
+        // Generate alert for observed expense
+        await this.alertsService.createAlert({
+          type: AlertType.OBSERVED_EXPENSE,
+          severity: AlertSeverity.WARNING,
+          title: 'Expense observed',
+          message: `Expense ${expense.id} has been observed: ${validateDto.observations || 'No details'}`,
+          expense_id: expense.id,
+          user_id: expense.created_by_id,
+        });
+      }
+
+      await queryRunner.commitTransaction();
+      await queryRunner.release();
+
+      // Return expense with relations loaded
+      return await this.expenseRepository.findOne({
+        where: { id: savedExpense.id },
+        relations: ['work', 'supplier', 'rubric', 'created_by', 'val', 'contract'],
+      });
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      await queryRunner.release();
+      throw error;
+    }
   }
 
   private async createAccountingRecord(expense: Expense): Promise<void> {
@@ -226,24 +445,10 @@ export class ExpensesService {
     await this.accountingRepository.save(accountingRecord);
   }
 
-  private async updateContractExecution(expense: Expense): Promise<void> {
-    // This would update contract amount_executed
-    // Implementation depends on contract relationship with expenses
-  }
 
   private async updateWorkExpenses(workId: string): Promise<void> {
-    const work = await this.workRepository.findOne({ where: { id: workId } });
-    if (!work) return;
-
-    const totalExpenses = await this.expenseRepository
-      .createQueryBuilder('expense')
-      .where('expense.work_id = :workId', { workId })
-      .andWhere('expense.state = :state', { state: ExpenseState.VALIDATED })
-      .select('SUM(expense.amount)', 'total')
-      .getRawOne();
-
-    work.total_expenses = parseFloat(totalExpenses?.total || '0');
-    await this.workRepository.save(work);
+    // Use WorksService to update work totals (includes both expenses and incomes)
+    await this.worksService.updateWorkTotals(workId);
   }
 
   async findAll(user: User): Promise<Expense[]> {
