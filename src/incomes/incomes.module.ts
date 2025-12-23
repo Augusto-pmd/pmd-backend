@@ -4,9 +4,10 @@ import { IncomesService } from './incomes.service';
 import { IncomesController } from './incomes.controller';
 import { Income } from './incomes.entity';
 import { Work } from '../works/works.entity';
+import { WorksModule } from '../works/works.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Income, Work])],
+  imports: [TypeOrmModule.forFeature([Income, Work]), WorksModule],
   controllers: [IncomesController],
   providers: [IncomesService],
   exports: [IncomesService],

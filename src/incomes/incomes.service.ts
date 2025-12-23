@@ -7,6 +7,7 @@ import { CreateIncomeDto } from './dto/create-income.dto';
 import { UpdateIncomeDto } from './dto/update-income.dto';
 import { User } from '../users/user.entity';
 import { UserRole } from '../common/enums/user-role.enum';
+import { WorksService } from '../works/works.service';
 
 @Injectable()
 export class IncomesService {
@@ -15,6 +16,7 @@ export class IncomesService {
     private incomeRepository: Repository<Income>,
     @InjectRepository(Work)
     private workRepository: Repository<Work>,
+    private worksService: WorksService,
   ) {}
 
   async create(createIncomeDto: CreateIncomeDto, user: User): Promise<Income> {
@@ -34,9 +36,10 @@ export class IncomesService {
     const income = this.incomeRepository.create(createIncomeDto);
     const savedIncome = await this.incomeRepository.save(income);
 
-    // Update work totals
-    work.total_incomes = (parseFloat(work.total_incomes.toString()) || 0) + parseFloat(createIncomeDto.amount.toString());
-    await this.workRepository.save(work);
+    // Update work totals if income is validated
+    if (createIncomeDto.is_validated) {
+      await this.worksService.updateWorkTotals(work.id);
+    }
 
     return savedIncome;
   }
@@ -68,8 +71,16 @@ export class IncomesService {
 
   async update(id: string, updateIncomeDto: UpdateIncomeDto, user: User): Promise<Income> {
     const income = await this.findOne(id, user);
+    const wasValidated = income.is_validated;
     Object.assign(income, updateIncomeDto);
-    return await this.incomeRepository.save(income);
+    const savedIncome = await this.incomeRepository.save(income);
+
+    // Update work totals if validation status changed
+    if (wasValidated !== savedIncome.is_validated) {
+      await this.worksService.updateWorkTotals(savedIncome.work_id);
+    }
+
+    return savedIncome;
   }
 
   async remove(id: string, user: User): Promise<void> {
