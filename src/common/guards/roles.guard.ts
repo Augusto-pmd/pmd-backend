@@ -38,10 +38,8 @@ export class RolesGuard implements CanActivate {
     // Type assertion is safe here because we validated above
     const userRole: UserRole = userRoleNormalized as UserRole;
 
-    // Map new role names to legacy enum values for compatibility
-    // 'admin' is equivalent to DIRECTION/ADMINISTRATION
-    const isAdmin = userRole === 'admin' || 
-                    userRole === UserRole.DIRECTION || 
+    // Check if user has admin privileges (DIRECTION or ADMINISTRATION)
+    const isAdmin = userRole === UserRole.DIRECTION || 
                     userRole === UserRole.ADMINISTRATION;
 
     // Direction/Administration/Admin have full access
@@ -52,15 +50,8 @@ export class RolesGuard implements CanActivate {
     // Check if this is a GET request (read operation)
     const isReadOperation = request.method === 'GET';
     
-    // For read operations, allow 'auditor' role when DIRECTION/ADMINISTRATION is required
-    if (isReadOperation && userRole === 'auditor') {
-      const requiresAdmin = requiredRoles.some(role => 
-        role === UserRole.DIRECTION || role === UserRole.ADMINISTRATION
-      );
-      if (requiresAdmin) {
-        return true;
-      }
-    }
+    // Note: 'auditor' role is not currently in the UserRole enum
+    // If needed in the future, add it to the enum and uncomment this section
 
     // Convert required roles to strings for comparison
     const requiredRoleStrings = requiredRoles.map(role => String(role));

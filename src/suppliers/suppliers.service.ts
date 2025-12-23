@@ -105,7 +105,7 @@ export class SuppliersService {
       type: AlertType.MISSING_VALIDATION,
       severity: AlertSeverity.WARNING,
       title: 'Supplier rejected - expenses need reassignment',
-      message: `Supplier ${supplier.name} was rejected by ${user.name || user.email}. Please reassign related expenses or contact administration.`,
+      message: `Supplier ${supplier.name} was rejected by ${user.fullName || user.email}. Please reassign related expenses or contact administration.`,
       supplier_id: supplier.id,
       user_id: supplier.created_by_id, // Alert the operator who created the supplier
     });

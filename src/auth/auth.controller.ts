@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { JwtUserPayload } from './interfaces/jwt-user-payload.interface';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -45,7 +46,10 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async loadMe(@Req() req: Request) {
-    const user = await this.authService.loadMe(req.user);
+    if (!req.user) {
+      throw new Error('User not found in request');
+    }
+    const user = await this.authService.loadMe(req.user as JwtUserPayload);
     return { user };
   }
 
@@ -57,7 +61,10 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async refresh(@Req() req: Request, @Res() res: Response) {
-    const result = await this.authService.refresh(req.user);
+    if (!req.user) {
+      throw new Error('User not found in request');
+    }
+    const result = await this.authService.refresh(req.user as JwtUserPayload);
     
     // Set token as cookie with conditional SameSite for production
     const isProduction = process.env.NODE_ENV === 'production';
