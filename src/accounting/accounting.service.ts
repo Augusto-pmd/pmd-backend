@@ -15,6 +15,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 import { AccountingType } from '../common/enums/accounting-type.enum';
 import { User } from '../users/user.entity';
 import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
+import { PerceptionsReport, WithholdingsReport } from './interfaces/accounting-reports.interface';
 
 @Injectable()
 export class AccountingService {
@@ -62,7 +63,9 @@ export class AccountingService {
         order: { date: 'DESC', created_at: 'DESC' },
       });
     } catch (error) {
-      console.error('[AccountingService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[AccountingService.findAll] Error:', error);
+      }
       return [];
     }
   }
@@ -220,7 +223,7 @@ export class AccountingService {
     });
   }
 
-  async getPerceptionsReport(month: number, year: number, user: User): Promise<any> {
+  async getPerceptionsReport(month: number, year: number, user: User): Promise<PerceptionsReport> {
     if (
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
@@ -250,7 +253,7 @@ export class AccountingService {
     };
   }
 
-  async getWithholdingsReport(month: number, year: number, user: User): Promise<any> {
+  async getWithholdingsReport(month: number, year: number, user: User): Promise<WithholdingsReport> {
     if (
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
