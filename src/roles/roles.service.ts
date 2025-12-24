@@ -21,7 +21,9 @@ export class RolesService {
     try {
       return await this.roleRepository.find();
     } catch (error) {
-      console.error('[RolesService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[RolesService.findAll] Error:', error);
+      }
       return [];
     }
   }
@@ -47,9 +49,18 @@ export class RolesService {
     await this.roleRepository.remove(role);
   }
 
-  async getPermissions(id: string): Promise<Record<string, any>> {
+  async getPermissions(id: string): Promise<Record<string, boolean>> {
     const role = await this.findOne(id);
-    return role.permissions || {};
+    // Ensure permissions is always a Record<string, boolean>
+    if (!role.permissions || typeof role.permissions !== 'object' || Array.isArray(role.permissions)) {
+      return {};
+    }
+    // Convert to Record<string, boolean> if needed
+    const permissions: Record<string, boolean> = {};
+    for (const [key, value] of Object.entries(role.permissions)) {
+      permissions[key] = Boolean(value);
+    }
+    return permissions;
   }
 }
 
