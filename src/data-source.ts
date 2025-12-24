@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -43,7 +43,7 @@ if (databaseUrl) {
 }
 
 // For local development without DATABASE_URL, use individual variables
-const connectionOptions: any = {
+const connectionOptions: DataSourceOptions = {
   type: 'postgres' as const,
   entities: [
     Role,
