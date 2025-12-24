@@ -1,5 +1,6 @@
 import { User } from '../../users/user.entity';
 import { UserRole } from '../enums/user-role.enum';
+import { NormalizedUser } from '../interfaces/normalized-user.interface';
 
 /**
  * Fallback permissions map by role name
@@ -122,7 +123,7 @@ const ROLE_PERMISSIONS_FALLBACK: Record<string, string[]> = {
  *   updated_at?: Date | string;
  * }
  */
-export function normalizeUser(u: User): any {
+export function normalizeUser(u: User): NormalizedUser {
   // Extract role permissions and convert to flat array of strings
   // Permissions structure: { "users": ["create", "read"], "expenses": ["create"] }
   // Expected output: ["users.create", "users.read", "expenses.create"]
@@ -158,14 +159,20 @@ export function normalizeUser(u: User): any {
     const fallbackPermissions = ROLE_PERMISSIONS_FALLBACK[roleName];
     if (fallbackPermissions) {
       rolePermissions = fallbackPermissions;
-      console.log(`[NORMALIZE_USER] Using fallback permissions for role "${roleName}": ${rolePermissions.length} permissions`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[NORMALIZE_USER] Using fallback permissions for role "${roleName}": ${rolePermissions.length} permissions`);
+      }
     } else {
-      console.warn(`[NORMALIZE_USER] No fallback permissions found for role "${roleName}"`);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[NORMALIZE_USER] No fallback permissions found for role "${roleName}"`);
+      }
     }
   }
   
-  // Log conversion for audit
-  console.log(`[NORMALIZE_USER] Original permissions type: ${typeof u.role?.permissions}, Converted length: ${rolePermissions.length}`);
+  // Log conversion for audit (only in development)
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[NORMALIZE_USER] Original permissions type: ${typeof u.role?.permissions}, Converted length: ${rolePermissions.length}`);
+  }
 
   return {
     id: u.id,

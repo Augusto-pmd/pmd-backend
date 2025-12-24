@@ -9,6 +9,7 @@ import * as bcrypt from 'bcrypt';
 import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 import { getDefaultRole } from '../common/helpers/get-default-role.helper';
 import { normalizeUser } from '../common/helpers/normalize-user.helper';
+import { NormalizedUser } from '../common/interfaces/normalized-user.interface';
 
 @Injectable()
 export class UsersService {
@@ -23,7 +24,7 @@ export class UsersService {
    * Normalizes a User entity using the shared helper
    * This ensures consistency across all endpoints
    */
-  private normalizeUserEntity(u: User): any {
+  private normalizeUserEntity(u: User): NormalizedUser {
     return normalizeUser(u);
   }
 
@@ -47,7 +48,7 @@ export class UsersService {
     return user;
   }
 
-  async create(createUserDto: CreateUserDto): Promise<any> {
+  async create(createUserDto: CreateUserDto): Promise<NormalizedUser> {
     const role = await this.roleRepository.findOne({
       where: { id: createUserDto.role_id },
     });
@@ -71,7 +72,7 @@ export class UsersService {
     return this.normalizeUserEntity(userWithRelations);
   }
 
-  async findAll(user?: User): Promise<any[]> {
+  async findAll(user?: User): Promise<NormalizedUser[]> {
     try {
       const organizationId = user ? getOrganizationId(user) : null;
       const where: any = {};
@@ -96,7 +97,9 @@ export class UsersService {
       // Normalize all users using consistent normalizer
       return users.map((u) => this.normalizeUserEntity(u));
     } catch (error) {
-      console.error('[UsersService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[UsersService.findAll] Error:', error);
+      }
       return [];
     }
   }
@@ -121,13 +124,13 @@ export class UsersService {
     return user;
   }
 
-  async findOne(id: string): Promise<any> {
+  async findOne(id: string): Promise<NormalizedUser> {
     const user = await this.findOneEntity(id);
     // ALWAYS return normalized version for consistency
     return this.normalizeUserEntity(user);
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<any> {
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<NormalizedUser> {
     const user = await this.findOneEntity(id);
 
     if (updateUserDto.password) {
@@ -149,7 +152,7 @@ export class UsersService {
     await this.userRepository.remove(user);
   }
 
-  async updateRole(id: string, roleId: string): Promise<any> {
+  async updateRole(id: string, roleId: string): Promise<NormalizedUser> {
     const user = await this.findOneEntity(id);
     const role = await this.roleRepository.findOne({
       where: { id: roleId },
