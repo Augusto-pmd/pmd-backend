@@ -90,7 +90,9 @@ export class CashMovementsService {
         order: { date: 'DESC' },
       });
     } catch (error) {
-      console.error('[CashMovementsService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[CashMovementsService.findAll] Error:', error);
+      }
       return [];
     }
   }

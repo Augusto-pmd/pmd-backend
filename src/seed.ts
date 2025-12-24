@@ -133,6 +133,7 @@ async function seed() {
     console.log('\n✅ Seed completado exitosamente!\n');
 
   } catch (error) {
+    // Los errores en seed siempre se muestran ya que es un script de inicialización
     console.error('❌ Error durante el seed:', error);
     throw error;
   } finally {
@@ -150,6 +151,7 @@ seed()
     process.exit(0);
   })
   .catch((error) => {
+    // Los errores fatales en seed siempre se muestran ya que es un script de inicialización
     console.error('💥 Error fatal en seed:', error);
     process.exit(1);
   });

@@ -170,7 +170,9 @@ export class AlertsService {
         order: { created_at: 'DESC' },
       });
     } catch (error) {
-      console.error('[AlertsService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[AlertsService.findAll] Error:', error);
+      }
       return [];
     }
   }

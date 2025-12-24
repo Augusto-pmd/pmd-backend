@@ -53,7 +53,9 @@ export class AuditInterceptor implements NestInterceptor {
           await this.auditLogRepository.save(auditLog);
         } catch (error) {
           // Don't fail the request if audit logging fails
-          console.error('Audit logging failed:', error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Audit logging failed:', error);
+          }
         }
       }),
     );

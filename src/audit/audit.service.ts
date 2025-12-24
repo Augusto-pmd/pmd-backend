@@ -25,7 +25,9 @@ export class AuditService {
         take: 1000, // Limit to prevent performance issues
       });
     } catch (error) {
-      console.error('[AuditService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[AuditService.findAll] Error:', error);
+      }
       return [];
     }
   }

@@ -24,7 +24,9 @@ export class RubricsService {
         order: { name: 'ASC' },
       });
     } catch (error) {
-      console.error('[RubricsService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[RubricsService.findAll] Error:', error);
+      }
       return [];
     }
   }

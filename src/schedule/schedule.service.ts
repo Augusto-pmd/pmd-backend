@@ -27,7 +27,9 @@ export class ScheduleService {
         order: { order: 'ASC', start_date: 'ASC' },
       });
     } catch (error) {
-      console.error('[ScheduleService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[ScheduleService.findAll] Error:', error);
+      }
       return [];
     }
   }

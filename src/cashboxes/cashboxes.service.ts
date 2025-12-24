@@ -87,7 +87,9 @@ export class CashboxesService {
       // Default: return empty array for unknown roles
       return [];
     } catch (error) {
-      console.error('[CashboxesService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[CashboxesService.findAll] Error:', error);
+      }
       return [];
     }
   }

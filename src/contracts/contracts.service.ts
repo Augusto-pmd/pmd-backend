@@ -55,7 +55,9 @@ export class ContractsService {
         order: { created_at: 'DESC' },
       });
     } catch (error) {
-      console.error('[ContractsService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[ContractsService.findAll] Error:', error);
+      }
       return [];
     }
   }

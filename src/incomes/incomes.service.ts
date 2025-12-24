@@ -51,7 +51,9 @@ export class IncomesService {
         order: { date: 'DESC' },
       });
     } catch (error) {
-      console.error('[IncomesService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[IncomesService.findAll] Error:', error);
+      }
       return [];
     }
   }

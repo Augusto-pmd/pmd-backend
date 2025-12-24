@@ -71,7 +71,9 @@ export class WorkDocumentsService {
         order: { created_at: 'DESC' },
       });
     } catch (error) {
-      console.error('[WorkDocumentsService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[WorkDocumentsService.findAll] Error:', error);
+      }
       return [];
     }
   }

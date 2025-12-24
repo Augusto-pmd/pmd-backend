@@ -248,7 +248,9 @@ export class SuppliersService {
         order: { created_at: 'DESC' },
       });
     } catch (error) {
-      console.error('[SuppliersService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[SuppliersService.findAll] Error:', error);
+      }
       return [];
     }
   }

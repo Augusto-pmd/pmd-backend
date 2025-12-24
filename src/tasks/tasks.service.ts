@@ -17,7 +17,9 @@ export class TasksService {
    * Recommended: Run daily at midnight
    */
   async runDailyChecks(): Promise<void> {
-    console.log('Running daily automatic checks...');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Running daily automatic checks...');
+    }
 
     // Check for expired supplier documentation and auto-block
     await this.suppliersService.checkAndBlockExpiredDocuments();
@@ -28,7 +30,9 @@ export class TasksService {
     // Run all automatic alert checks
     await this.alertsService.runAutomaticChecks();
 
-    console.log('Daily checks completed');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Daily checks completed');
+    }
   }
 }
 

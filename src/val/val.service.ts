@@ -25,7 +25,9 @@ export class ValService {
         order: { code: 'ASC' },
       });
     } catch (error) {
-      console.error('[ValService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[ValService.findAll] Error:', error);
+      }
       return [];
     }
   }

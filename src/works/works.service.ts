@@ -69,7 +69,9 @@ export class WorksService {
         .leftJoinAndSelect('work.contracts', 'contracts')
         .getMany();
     } catch (error) {
-      console.error('[WorksService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[WorksService.findAll] Error:', error);
+      }
       return [];
     }
   }

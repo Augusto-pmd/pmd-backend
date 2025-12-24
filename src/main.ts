@@ -136,13 +136,17 @@ async function bootstrap() {
   // Puerto por defecto: 5000 (configurado para Docker/Dokploy)
   const port = process.env.PORT || 5000;
   
-  // Log de inicio
-  console.log("🚀 PMD Backend booting on port:", port);
+  // Log de inicio (solo en desarrollo)
+  if (process.env.NODE_ENV === 'development') {
+    console.log("🚀 PMD Backend booting on port:", port);
+  }
   
   const server = await app.listen(port, '0.0.0.0');
-  console.log(`Application is running on: http://localhost:${port}`);
-  console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
-  console.log(`Health check: http://localhost:${port}/api/health`);
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`Application is running on: http://localhost:${port}`);
+    console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
+    console.log(`Health check: http://localhost:${port}/api/health`);
+  }
 
   // ROUTE DEBUG - Print all registered routes (only in development)
   if (process.env.NODE_ENV === 'development') {

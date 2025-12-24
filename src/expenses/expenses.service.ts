@@ -469,7 +469,9 @@ export class ExpensesService {
 
       return await queryBuilder.getMany();
     } catch (error) {
-      console.error('[ExpensesService.findAll] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[ExpensesService.findAll] Error:', error);
+      }
       return [];
     }
   }
