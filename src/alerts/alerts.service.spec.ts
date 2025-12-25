@@ -109,8 +109,46 @@ describe('AlertsService', () => {
   });
 
   describe('checkExpiredDocumentation', () => {
-    it('should generate alerts for expired documents', async () => {
-      const expiredDate = new Date();
+    it('should generate warning alerts for documents expiring in 5 days', async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const expirationDate = new Date(today);
+      expirationDate.setDate(expirationDate.getDate() + 3); // 3 days from now
+
+      const expiringDoc = {
+        id: 'doc-id',
+        document_type: SupplierDocumentType.INSURANCE,
+        expiration_date: expirationDate,
+        is_valid: true,
+        supplier: {
+          id: 'supplier-id',
+          name: 'Test Supplier',
+        },
+      };
+
+      mockSupplierDocumentRepository.find
+        .mockResolvedValueOnce([expiringDoc]) // expiringSoonDocs
+        .mockResolvedValueOnce([]); // expiredTodayDocs
+      mockAlertRepository.findOne.mockResolvedValue(null); // No existing alert
+      mockAlertRepository.create.mockReturnValue({});
+      mockAlertRepository.save.mockResolvedValue({});
+
+      await service.checkExpiredDocumentation();
+
+      expect(mockAlertRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: AlertType.EXPIRED_DOCUMENTATION,
+          severity: AlertSeverity.WARNING,
+          supplier_id: 'supplier-id',
+        }),
+      );
+      expect(mockAlertRepository.save).toHaveBeenCalled();
+    });
+
+    it('should generate critical alerts for expired ART documents', async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const expiredDate = new Date(today);
       expiredDate.setDate(expiredDate.getDate() - 1);
 
       const expiredDoc = {
@@ -124,36 +162,142 @@ describe('AlertsService', () => {
         },
       };
 
-      mockSupplierDocumentRepository.find.mockResolvedValue([expiredDoc]);
+      mockSupplierDocumentRepository.find
+        .mockResolvedValueOnce([]) // expiringSoonDocs
+        .mockResolvedValueOnce([expiredDoc]); // expiredTodayDocs
+      mockAlertRepository.findOne.mockResolvedValue(null); // No existing alert
       mockAlertRepository.create.mockReturnValue({});
       mockAlertRepository.save.mockResolvedValue({});
 
       await service.checkExpiredDocumentation();
 
-      expect(mockAlertRepository.create).toHaveBeenCalled();
+      expect(mockAlertRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: AlertType.EXPIRED_DOCUMENTATION,
+          severity: AlertSeverity.CRITICAL,
+          supplier_id: 'supplier-id',
+        }),
+      );
       expect(mockAlertRepository.save).toHaveBeenCalled();
+    });
+
+    it('should not generate duplicate alerts for the same document', async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const expirationDate = new Date(today);
+      expirationDate.setDate(expirationDate.getDate() + 3);
+
+      const expiringDoc = {
+        id: 'doc-id',
+        document_type: SupplierDocumentType.INSURANCE,
+        expiration_date: expirationDate,
+        is_valid: true,
+        supplier: {
+          id: 'supplier-id',
+          name: 'Test Supplier',
+        },
+      };
+
+      const existingAlert = {
+        id: 'existing-alert-id',
+        type: AlertType.EXPIRED_DOCUMENTATION,
+        supplier_id: 'supplier-id',
+        is_read: false,
+      };
+
+      mockSupplierDocumentRepository.find
+        .mockResolvedValueOnce([expiringDoc]) // expiringSoonDocs
+        .mockResolvedValueOnce([]); // expiredTodayDocs
+      mockAlertRepository.findOne.mockResolvedValue(existingAlert); // Existing alert found
+
+      await service.checkExpiredDocumentation();
+
+      expect(mockAlertRepository.create).not.toHaveBeenCalled();
+      expect(mockAlertRepository.save).not.toHaveBeenCalled();
     });
   });
 
   describe('checkPendingValidations', () => {
     it('should generate alerts for pending expenses older than 7 days', async () => {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 8);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const eightDaysAgo = new Date(today);
+      eightDaysAgo.setDate(eightDaysAgo.getDate() - 8);
 
       const pendingExpense = {
         id: 'expense-id',
+        document_number: 'FAC-001',
         state: ExpenseState.PENDING,
-        created_at: sevenDaysAgo,
+        created_at: eightDaysAgo,
         created_by_id: 'user-id',
       };
 
       mockExpenseRepository.find.mockResolvedValue([pendingExpense]);
+      mockAlertRepository.findOne.mockResolvedValue(null); // No existing alert
       mockAlertRepository.create.mockReturnValue({});
       mockAlertRepository.save.mockResolvedValue({});
 
       await service.checkPendingValidations();
 
-      expect(mockAlertRepository.create).toHaveBeenCalled();
+      expect(mockAlertRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: AlertType.MISSING_VALIDATION,
+          severity: AlertSeverity.WARNING,
+          expense_id: 'expense-id',
+          user_id: 'user-id',
+        }),
+      );
+      expect(mockAlertRepository.save).toHaveBeenCalled();
+    });
+
+    it('should not generate alerts for expenses less than 7 days old', async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const threeDaysAgo = new Date(today);
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+      const pendingExpense = {
+        id: 'expense-id',
+        state: ExpenseState.PENDING,
+        created_at: threeDaysAgo,
+        created_by_id: 'user-id',
+      };
+
+      mockExpenseRepository.find.mockResolvedValue([pendingExpense]);
+
+      await service.checkPendingValidations();
+
+      expect(mockAlertRepository.create).not.toHaveBeenCalled();
+      expect(mockAlertRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should not generate duplicate alerts for the same expense', async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const eightDaysAgo = new Date(today);
+      eightDaysAgo.setDate(eightDaysAgo.getDate() - 8);
+
+      const pendingExpense = {
+        id: 'expense-id',
+        state: ExpenseState.PENDING,
+        created_at: eightDaysAgo,
+        created_by_id: 'user-id',
+      };
+
+      const existingAlert = {
+        id: 'existing-alert-id',
+        type: AlertType.MISSING_VALIDATION,
+        expense_id: 'expense-id',
+        is_read: false,
+      };
+
+      mockExpenseRepository.find.mockResolvedValue([pendingExpense]);
+      mockAlertRepository.findOne.mockResolvedValue(existingAlert); // Existing alert found
+
+      await service.checkPendingValidations();
+
+      expect(mockAlertRepository.create).not.toHaveBeenCalled();
+      expect(mockAlertRepository.save).not.toHaveBeenCalled();
     });
   });
 

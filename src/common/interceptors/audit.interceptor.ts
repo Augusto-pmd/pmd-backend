@@ -25,24 +25,37 @@ export class AuditInterceptor implements NestInterceptor {
     const module = url.split('/')[1] || 'unknown';
     const entityId = params?.id || body?.id || null;
     const entityType = this.getEntityType(url);
-    const ipAddress = ip || headers['x-forwarded-for'] || 'unknown';
-    const userAgent = headers['user-agent'] || 'unknown';
+    
+    // Extract IP address (handle proxy headers)
+    const ipAddress = this.extractIpAddress(ip, headers);
+    
+    // Extract user agent
+    const userAgent = headers['user-agent'] || headers['useragent'] || 'unknown';
 
     // Determine criticality based on action
     const criticality = this.getCriticality(method, module);
+
+    // Skip logging for GET requests (low criticality, too many logs)
+    if (method === 'GET' && criticality === 'low') {
+      return next.handle();
+    }
 
     return next.handle().pipe(
       tap(async (response) => {
         try {
           const organizationId = user?.organizationId ?? user?.organization?.id ?? null;
+          
+          // Determine previous_value and new_value based on HTTP method
+          const { previousValue, newValue } = this.getAuditValues(method, body, response);
+
           const auditLog = this.auditLogRepository.create({
             user_id: user?.id || null,
             action,
             module,
             entity_id: entityId,
             entity_type: entityType,
-            previous_value: this.sanitizeData(body),
-            new_value: this.sanitizeData(response),
+            previous_value: previousValue,
+            new_value: newValue,
             ip_address: ipAddress,
             user_agent: userAgent,
             criticality,
@@ -66,10 +79,74 @@ export class AuditInterceptor implements NestInterceptor {
     return parts[0] || 'unknown';
   }
 
+  /**
+   * Extract IP address from request, handling proxy headers
+   */
+  private extractIpAddress(ip: string | undefined, headers: Record<string, any>): string {
+    // Check x-forwarded-for header (first IP in chain)
+    const forwardedFor = headers['x-forwarded-for'];
+    if (forwardedFor) {
+      const ips = forwardedFor.split(',').map((ip: string) => ip.trim());
+      return ips[0] || 'unknown';
+    }
+
+    // Check x-real-ip header
+    const realIp = headers['x-real-ip'];
+    if (realIp) {
+      return realIp;
+    }
+
+    // Use direct IP from request
+    return ip || 'unknown';
+  }
+
+  /**
+   * Get previous and new values for audit log based on HTTP method
+   * Business Rule: Capture previous value before update, new value after
+   */
+  private getAuditValues(
+    method: string,
+    body: any,
+    response: any,
+  ): { previousValue: any; newValue: any } {
+    switch (method) {
+      case 'POST':
+        // CREATE: no previous value, new value is the created entity
+        return {
+          previousValue: null,
+          newValue: this.sanitizeData(response),
+        };
+
+      case 'PUT':
+      case 'PATCH':
+        // UPDATE: previous value is the body (data sent), new value is the updated entity
+        // Note: For a complete previous value, we'd need to fetch the entity before update
+        // This is a limitation, but we capture what was sent vs what was saved
+        return {
+          previousValue: this.sanitizeData(body),
+          newValue: this.sanitizeData(response),
+        };
+
+      case 'DELETE':
+        // DELETE: previous value is the deleted entity, new value is null
+        return {
+          previousValue: this.sanitizeData(response),
+          newValue: null,
+        };
+
+      default:
+        // GET and others: minimal logging
+        return {
+          previousValue: null,
+          newValue: this.sanitizeData(response),
+        };
+    }
+  }
+
   private getCriticality(method: string, module: string): string {
     if (method === 'DELETE') return 'high';
     if (['POST', 'PUT', 'PATCH'].includes(method)) {
-      if (['users', 'roles', 'accounting'].includes(module)) return 'high';
+      if (['users', 'roles', 'accounting', 'cashboxes', 'contracts'].includes(module)) return 'high';
       return 'medium';
     }
     return 'low';

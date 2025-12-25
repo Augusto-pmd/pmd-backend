@@ -4,7 +4,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, LessThan, LessThanOrEqual, Between } from 'typeorm';
 import { Alert } from './alerts.entity';
 import { CreateAlertDto } from './dto/create-alert.dto';
 import { UpdateAlertDto } from './dto/update-alert.dto';
@@ -44,33 +44,92 @@ export class AlertsService {
 
   /**
    * Auto-generate alerts for expired documentation
+   * Business Rule: Generate warning alerts 5 days before expiration
+   * Business Rule: Generate critical alerts on expiration day
+   * Business Rule: Avoid duplicate alerts for the same document
    */
   async checkExpiredDocumentation(): Promise<void> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const expiredDocs = await this.supplierDocumentRepository.find({
+    // Calculate dates
+    const fiveDaysFromNow = new Date(today);
+    fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
+    fiveDaysFromNow.setHours(23, 59, 59, 999);
+
+    // Find documents expiring in 5 days (warning alerts)
+    const expiringSoonDocs = await this.supplierDocumentRepository.find({
       where: {
-        expiration_date: LessThan(today),
+        expiration_date: Between(today, fiveDaysFromNow),
         is_valid: true,
       },
       relations: ['supplier'],
     });
 
-    for (const doc of expiredDocs) {
-      if (doc.supplier) {
-        const severity =
-          doc.document_type === SupplierDocumentType.ART
-            ? AlertSeverity.CRITICAL
-            : AlertSeverity.WARNING;
+    // Find documents expired today (critical alerts)
+    const expiredTodayDocs = await this.supplierDocumentRepository.find({
+      where: {
+        expiration_date: LessThanOrEqual(today),
+        is_valid: true,
+      },
+      relations: ['supplier'],
+    });
 
-        await this.createAlert({
-          type: AlertType.EXPIRED_DOCUMENTATION,
-          severity,
-          title: `Expired ${doc.document_type} documentation`,
-          message: `Supplier ${doc.supplier.name} has expired ${doc.document_type} (expired: ${doc.expiration_date})`,
-          supplier_id: doc.supplier.id,
+    // Generate warning alerts for documents expiring in 5 days
+    for (const doc of expiringSoonDocs) {
+      if (doc.supplier) {
+        // Check if alert already exists for this document
+        const existingAlert = await this.alertRepository.findOne({
+          where: {
+            type: AlertType.EXPIRED_DOCUMENTATION,
+            supplier_id: doc.supplier.id,
+            is_read: false,
+          },
         });
+
+        if (!existingAlert) {
+          const daysUntilExpiration = Math.ceil(
+            (doc.expiration_date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+          );
+
+          await this.createAlert({
+            type: AlertType.EXPIRED_DOCUMENTATION,
+            severity: AlertSeverity.WARNING,
+            title: `Documentation expiring soon: ${doc.document_type}`,
+            message: `Supplier ${doc.supplier.name} has ${doc.document_type} expiring in ${daysUntilExpiration} day(s) (expires: ${doc.expiration_date.toLocaleDateString()})`,
+            supplier_id: doc.supplier.id,
+          });
+        }
+      }
+    }
+
+    // Generate critical alerts for documents expired today
+    for (const doc of expiredTodayDocs) {
+      if (doc.supplier) {
+        // Check if critical alert already exists for this document
+        const existingCriticalAlert = await this.alertRepository.findOne({
+          where: {
+            type: AlertType.EXPIRED_DOCUMENTATION,
+            supplier_id: doc.supplier.id,
+            severity: AlertSeverity.CRITICAL,
+            is_read: false,
+          },
+        });
+
+        if (!existingCriticalAlert) {
+          const severity =
+            doc.document_type === SupplierDocumentType.ART
+              ? AlertSeverity.CRITICAL
+              : AlertSeverity.WARNING;
+
+          await this.createAlert({
+            type: AlertType.EXPIRED_DOCUMENTATION,
+            severity,
+            title: `Expired ${doc.document_type} documentation`,
+            message: `Supplier ${doc.supplier.name} has expired ${doc.document_type} (expired: ${doc.expiration_date.toLocaleDateString()})`,
+            supplier_id: doc.supplier.id,
+          });
+        }
       }
     }
   }
@@ -97,11 +156,14 @@ export class AlertsService {
 
   /**
    * Auto-generate alerts for pending validations
+   * Business Rule: Alert for expenses pending validation for more than 7 days
+   * Business Rule: Avoid duplicate alerts for the same expense
    */
   async checkPendingValidations(): Promise<void> {
     // Check pending expenses older than 7 days
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
 
     const pendingExpenses = await this.expenseRepository.find({
       where: {
@@ -110,20 +172,35 @@ export class AlertsService {
     });
 
     for (const expense of pendingExpenses) {
-      if (new Date(expense.created_at) < sevenDaysAgo) {
-        await this.createAlert({
-          type: AlertType.MISSING_VALIDATION,
-          severity: AlertSeverity.WARNING,
-          title: 'Pending expense validation',
-          message: `Expense ${expense.id} has been pending validation for more than 7 days`,
-          expense_id: expense.id,
-          user_id: expense.created_by_id,
+      const expenseCreatedDate = new Date(expense.created_at);
+      expenseCreatedDate.setHours(0, 0, 0, 0);
+
+      if (expenseCreatedDate < sevenDaysAgo) {
+        // Check if alert already exists for this expense
+        const existingAlert = await this.alertRepository.findOne({
+          where: {
+            type: AlertType.MISSING_VALIDATION,
+            expense_id: expense.id,
+            is_read: false,
+          },
         });
+
+        if (!existingAlert) {
+          const daysPending = Math.ceil(
+            (today.getTime() - expenseCreatedDate.getTime()) / (1000 * 60 * 60 * 24),
+          );
+
+          await this.createAlert({
+            type: AlertType.MISSING_VALIDATION,
+            severity: AlertSeverity.WARNING,
+            title: 'Pending expense validation',
+            message: `Expense ${expense.document_number || expense.id} has been pending validation for ${daysPending} day(s)`,
+            expense_id: expense.id,
+            user_id: expense.created_by_id,
+          });
+        }
       }
     }
-
-    // Check provisional suppliers older than 3 days
-    // This would require supplier repository injection
   }
 
   /**
