@@ -160,6 +160,9 @@ export class AlertsService {
    * Business Rule: Avoid duplicate alerts for the same expense
    */
   async checkPendingValidations(): Promise<void> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     // Check pending expenses older than 7 days
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
