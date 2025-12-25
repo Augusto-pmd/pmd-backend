@@ -8,6 +8,7 @@ import {
   IsDateString,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { Currency } from '../../common/enums/currency.enum';
 
@@ -48,6 +49,7 @@ export class CreateContractDto {
 
   @IsDateString()
   @IsOptional()
+  @ValidateIf((o) => o.end_date && o.start_date)
   end_date?: string;
 }
 

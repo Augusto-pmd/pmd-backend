@@ -136,6 +136,133 @@ describe('ContractsService', () => {
       await expect(service.create(createDto, user)).rejects.toThrow(BadRequestException);
       await expect(service.create(createDto, user)).rejects.toThrow('blocked supplier');
     });
+
+    it('should throw BadRequestException when end_date is before or equal to start_date', async () => {
+      const user = createMockUser();
+      const createDto: CreateContractDto = {
+        work_id: 'work-id',
+        supplier_id: 'supplier-id',
+        rubric_id: 'rubric-id',
+        amount_total: 100000,
+        currency: Currency.ARS,
+        start_date: '2024-12-31',
+        end_date: '2024-12-30', // Before start_date
+      };
+
+      const approvedSupplier = {
+        id: 'supplier-id',
+        status: SupplierStatus.APPROVED,
+      };
+
+      mockSupplierRepository.findOne.mockResolvedValue(approvedSupplier);
+
+      await expect(service.create(createDto, user)).rejects.toThrow(BadRequestException);
+      await expect(service.create(createDto, user)).rejects.toThrow('end_date must be after start_date');
+    });
+
+    it('should throw BadRequestException when end_date equals start_date', async () => {
+      const user = createMockUser();
+      const createDto: CreateContractDto = {
+        work_id: 'work-id',
+        supplier_id: 'supplier-id',
+        rubric_id: 'rubric-id',
+        amount_total: 100000,
+        currency: Currency.ARS,
+        start_date: '2024-12-31',
+        end_date: '2024-12-31', // Equal to start_date
+      };
+
+      const approvedSupplier = {
+        id: 'supplier-id',
+        status: SupplierStatus.APPROVED,
+      };
+
+      mockSupplierRepository.findOne.mockResolvedValue(approvedSupplier);
+
+      await expect(service.create(createDto, user)).rejects.toThrow(BadRequestException);
+      await expect(service.create(createDto, user)).rejects.toThrow('end_date must be after start_date');
+    });
+
+    it('should throw BadRequestException when amount_executed exceeds amount_total', async () => {
+      const user = createMockUser();
+      const createDto: CreateContractDto = {
+        work_id: 'work-id',
+        supplier_id: 'supplier-id',
+        rubric_id: 'rubric-id',
+        amount_total: 100000,
+        amount_executed: 150000, // Exceeds amount_total
+        currency: Currency.ARS,
+      };
+
+      const approvedSupplier = {
+        id: 'supplier-id',
+        status: SupplierStatus.APPROVED,
+      };
+
+      mockSupplierRepository.findOne.mockResolvedValue(approvedSupplier);
+
+      await expect(service.create(createDto, user)).rejects.toThrow(BadRequestException);
+      await expect(service.create(createDto, user)).rejects.toThrow('amount_executed cannot exceed amount_total');
+    });
+
+    it('should throw BadRequestException when amount_executed is negative', async () => {
+      const user = createMockUser();
+      const createDto: CreateContractDto = {
+        work_id: 'work-id',
+        supplier_id: 'supplier-id',
+        rubric_id: 'rubric-id',
+        amount_total: 100000,
+        amount_executed: -1000, // Negative
+        currency: Currency.ARS,
+      };
+
+      const approvedSupplier = {
+        id: 'supplier-id',
+        status: SupplierStatus.APPROVED,
+      };
+
+      mockSupplierRepository.findOne.mockResolvedValue(approvedSupplier);
+
+      await expect(service.create(createDto, user)).rejects.toThrow(BadRequestException);
+      await expect(service.create(createDto, user)).rejects.toThrow('amount_executed must be greater than or equal to 0');
+    });
+
+    it('should create contract successfully with valid date range', async () => {
+      const user = createMockUser();
+      const createDto: CreateContractDto = {
+        work_id: 'work-id',
+        supplier_id: 'supplier-id',
+        rubric_id: 'rubric-id',
+        amount_total: 100000,
+        currency: Currency.ARS,
+        start_date: '2024-01-01',
+        end_date: '2024-12-31', // After start_date
+      };
+
+      const approvedSupplier = {
+        id: 'supplier-id',
+        status: SupplierStatus.APPROVED,
+      };
+
+      mockSupplierRepository.findOne.mockResolvedValue(approvedSupplier);
+      mockContractRepository.create.mockReturnValue({
+        ...createDto,
+        id: 'contract-id',
+        amount_executed: 0,
+        is_blocked: false,
+      });
+      mockContractRepository.save.mockResolvedValue({
+        id: 'contract-id',
+        ...createDto,
+        amount_executed: 0,
+        is_blocked: false,
+      });
+
+      const result = await service.create(createDto, user);
+
+      expect(result).toBeDefined();
+      expect(result.is_blocked).toBe(false);
+    });
   });
 
   describe('update', () => {

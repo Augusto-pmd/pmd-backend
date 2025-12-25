@@ -26,6 +26,25 @@ export class ContractsService {
   ) {}
 
   async create(createContractDto: CreateContractDto, user: User): Promise<Contract> {
+    // Validate date range: end_date must be after start_date
+    if (createContractDto.start_date && createContractDto.end_date) {
+      const startDate = new Date(createContractDto.start_date);
+      const endDate = new Date(createContractDto.end_date);
+      if (endDate <= startDate) {
+        throw new BadRequestException('end_date must be after start_date');
+      }
+    }
+
+    // Validate amount_executed <= amount_total
+    if (createContractDto.amount_executed !== undefined) {
+      if (createContractDto.amount_executed < 0) {
+        throw new BadRequestException('amount_executed must be greater than or equal to 0');
+      }
+      if (createContractDto.amount_executed > createContractDto.amount_total) {
+        throw new BadRequestException('amount_executed cannot exceed amount_total');
+      }
+    }
+
     // Check if supplier is blocked
     const supplier = await this.supplierRepository.findOne({
       where: { id: createContractDto.supplier_id },
