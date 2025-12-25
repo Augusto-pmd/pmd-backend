@@ -28,6 +28,7 @@ import { SupplierDocumentType } from '../common/enums/supplier-document-type.enu
 import { SupplierStatus } from '../common/enums/supplier-status.enum';
 import { WorksService } from '../works/works.service';
 import { WorkStatus } from '../common/enums/work-status.enum';
+import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 
 @Injectable()
 export class ExpensesService {
@@ -360,7 +361,7 @@ export class ExpensesService {
 
       // If validated, create accounting record, update work, and update contract
       if (validateDto.state === ExpenseState.VALIDATED) {
-        await this.createAccountingRecord(savedExpense);
+        await this.createAccountingRecord(savedExpense, user);
         await this.updateWorkExpenses(expense.work_id);
 
         // 5. Actualizar amount_executed del contrato (only if not already updated above)
@@ -418,31 +419,68 @@ export class ExpensesService {
     }
   }
 
-  private async createAccountingRecord(expense: Expense): Promise<void> {
+  /**
+   * Business Rule: Create accounting record automatically when expense is validated
+   * Business Rule: Only create if expense is validated
+   * Business Rule: Avoid duplicates - check if record already exists
+   * Business Rule: Copy all relevant data from expense (amount, IVA, perceptions, etc.)
+   */
+  private async createAccountingRecord(expense: Expense, user: User): Promise<AccountingRecord | null> {
+    // Verify that expense is validated
+    if (expense.state !== ExpenseState.VALIDATED) {
+      return null;
+    }
+
+    // Check if accounting record already exists for this expense (avoid duplicates)
+    const existingRecord = await this.accountingRepository.findOne({
+      where: { expense_id: expense.id },
+    });
+
+    if (existingRecord) {
+      // Record already exists, return it
+      return existingRecord;
+    }
+
+    // Get organization_id from user
+    const organizationId = getOrganizationId(user);
+    if (!organizationId) {
+      throw new BadRequestException('Cannot create accounting record: user organization not found');
+    }
+
     const purchaseDate = new Date(expense.purchase_date);
+    
+    // Build description from expense data
+    const description = expense.observations 
+      ? expense.observations 
+      : expense.supplier_id 
+        ? `Gasto validado - ${expense.document_number || 'Sin número de documento'}`
+        : `Gasto validado para obra ${expense.work_id}`;
+
     const accountingRecord = this.accountingRepository.create({
       accounting_type: expense.document_type === DocumentType.VAL
         ? AccountingType.CASH
         : AccountingType.FISCAL,
       expense_id: expense.id,
       work_id: expense.work_id,
-      supplier_id: expense.supplier_id,
+      supplier_id: expense.supplier_id || null,
+      organization_id: organizationId,
       date: purchaseDate,
       month: purchaseDate.getMonth() + 1,
       year: purchaseDate.getFullYear(),
-      document_number: expense.document_number,
-      description: `Expense for work ${expense.work_id}`,
+      document_number: expense.document_number || null,
+      description: description,
       amount: expense.amount,
       currency: expense.currency,
-      vat_amount: expense.vat_amount,
-      vat_rate: expense.vat_rate,
-      vat_perception: expense.vat_perception,
-      vat_withholding: expense.vat_withholding,
-      iibb_perception: expense.iibb_perception,
-      income_tax_withholding: expense.income_tax_withholding,
+      vat_amount: expense.vat_amount || null,
+      vat_rate: expense.vat_rate || null,
+      vat_perception: expense.vat_perception || null,
+      vat_withholding: expense.vat_withholding || null,
+      iibb_perception: expense.iibb_perception || null,
+      income_tax_withholding: expense.income_tax_withholding || null,
+      file_url: expense.file_url || null,
     });
 
-    await this.accountingRepository.save(accountingRecord);
+    return await this.accountingRepository.save(accountingRecord);
   }
 
 

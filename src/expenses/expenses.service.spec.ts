@@ -84,6 +84,7 @@ describe('ExpensesService', () => {
   };
 
   const mockAccountingRepository = {
+    findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
   };
@@ -977,6 +978,239 @@ describe('ExpensesService', () => {
       );
       expect(contractFindCalls.length).toBe(0); // No contract find calls
       expect(mockAlertsService.createAlert).toHaveBeenCalled();
+    });
+
+    it('should create accounting record automatically when expense is validated', async () => {
+      const user = createMockUser({ 
+        role: { name: UserRole.ADMINISTRATION },
+        organizationId: 'org-id',
+      });
+      const expense: Expense = {
+        id: 'expense-id',
+        work_id: 'work-id',
+        supplier_id: 'supplier-id',
+        rubric_id: 'rubric-id',
+        amount: 15000,
+        currency: Currency.ARS,
+        purchase_date: new Date('2024-01-15'),
+        document_type: DocumentType.INVOICE_A,
+        document_number: 'FAC-001',
+        state: ExpenseState.VALIDATED,
+        vat_amount: 3150,
+        vat_rate: 21,
+        vat_perception: 500,
+        vat_withholding: 0,
+        iibb_perception: 300,
+        income_tax_withholding: 0,
+        file_url: 'https://example.com/file.pdf',
+        observations: 'Test expense',
+        created_by_id: 'user-id',
+        created_at: new Date(),
+        updated_at: new Date(),
+      } as Expense;
+
+      const validateDto: ValidateExpenseDto = {
+        state: ExpenseState.VALIDATED,
+      };
+
+      mockExpenseRepository.findOne
+        .mockResolvedValueOnce(expense) // findOne in validate
+        .mockResolvedValueOnce({ ...expense }); // findOne at end
+      mockQueryRunner.manager.findOne.mockResolvedValue(null); // No contract
+      mockQueryRunner.manager.save.mockResolvedValueOnce({ ...expense }); // Save expense
+      mockAccountingRepository.findOne.mockResolvedValue(null); // No existing accounting record
+      mockAccountingRepository.create.mockReturnValue({
+        id: 'accounting-record-id',
+        expense_id: expense.id,
+        organization_id: 'org-id',
+      });
+      mockAccountingRepository.save.mockResolvedValue({
+        id: 'accounting-record-id',
+        expense_id: expense.id,
+        work_id: expense.work_id,
+        supplier_id: expense.supplier_id,
+        organization_id: 'org-id',
+        accounting_type: 'fiscal',
+        date: expense.purchase_date,
+        month: 1,
+        year: 2024,
+        document_number: expense.document_number,
+        description: expense.observations,
+        amount: expense.amount,
+        currency: expense.currency,
+        vat_amount: expense.vat_amount,
+        vat_rate: expense.vat_rate,
+        vat_perception: expense.vat_perception,
+        vat_withholding: expense.vat_withholding,
+        iibb_perception: expense.iibb_perception,
+        income_tax_withholding: expense.income_tax_withholding,
+        file_url: expense.file_url,
+      });
+      mockExpenseRepository.createQueryBuilder().getRawOne.mockResolvedValue({ total: '15000' });
+      mockWorkRepository.findOne.mockResolvedValue(mockWork);
+      mockWorkRepository.save.mockResolvedValue(mockWork);
+
+      await service.validate('expense-id', validateDto, user);
+
+      // Verify accounting record was created with correct data
+      expect(mockAccountingRepository.findOne).toHaveBeenCalledWith({
+        where: { expense_id: expense.id },
+      });
+      expect(mockAccountingRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          expense_id: expense.id,
+          work_id: expense.work_id,
+          supplier_id: expense.supplier_id,
+          organization_id: 'org-id',
+          accounting_type: 'fiscal',
+          date: expense.purchase_date,
+          month: 1,
+          year: 2024,
+          document_number: expense.document_number,
+          description: expense.observations,
+          amount: expense.amount,
+          currency: expense.currency,
+          vat_amount: expense.vat_amount,
+          vat_rate: expense.vat_rate,
+          vat_perception: expense.vat_perception,
+          vat_withholding: expense.vat_withholding,
+          iibb_perception: expense.iibb_perception,
+          income_tax_withholding: expense.income_tax_withholding,
+          file_url: expense.file_url,
+        }),
+      );
+      expect(mockAccountingRepository.save).toHaveBeenCalled();
+    });
+
+    it('should not create duplicate accounting record if one already exists', async () => {
+      const user = createMockUser({ 
+        role: { name: UserRole.ADMINISTRATION },
+        organizationId: 'org-id',
+      });
+      const expense: Expense = {
+        id: 'expense-id',
+        work_id: 'work-id',
+        supplier_id: 'supplier-id',
+        rubric_id: 'rubric-id',
+        amount: 15000,
+        currency: Currency.ARS,
+        purchase_date: new Date('2024-01-15'),
+        document_type: DocumentType.INVOICE_A,
+        state: ExpenseState.VALIDATED,
+        created_by_id: 'user-id',
+        created_at: new Date(),
+        updated_at: new Date(),
+      } as Expense;
+
+      const existingAccountingRecord = {
+        id: 'existing-record-id',
+        expense_id: expense.id,
+      };
+
+      const validateDto: ValidateExpenseDto = {
+        state: ExpenseState.VALIDATED,
+      };
+
+      mockExpenseRepository.findOne
+        .mockResolvedValueOnce(expense) // findOne in validate
+        .mockResolvedValueOnce({ ...expense }); // findOne at end
+      mockQueryRunner.manager.findOne.mockResolvedValue(null); // No contract
+      mockQueryRunner.manager.save.mockResolvedValueOnce({ ...expense }); // Save expense
+      mockAccountingRepository.findOne.mockResolvedValue(existingAccountingRecord); // Existing record
+      mockExpenseRepository.createQueryBuilder().getRawOne.mockResolvedValue({ total: '15000' });
+      mockWorkRepository.findOne.mockResolvedValue(mockWork);
+      mockWorkRepository.save.mockResolvedValue(mockWork);
+
+      await service.validate('expense-id', validateDto, user);
+
+      // Verify accounting record was checked but not created again
+      expect(mockAccountingRepository.findOne).toHaveBeenCalledWith({
+        where: { expense_id: expense.id },
+      });
+      expect(mockAccountingRepository.create).not.toHaveBeenCalled();
+      expect(mockAccountingRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should create accounting record with CASH type for VAL documents', async () => {
+      const user = createMockUser({ 
+        role: { name: UserRole.ADMINISTRATION },
+        organizationId: 'org-id',
+      });
+      const expense: Expense = {
+        id: 'expense-id',
+        work_id: 'work-id',
+        supplier_id: 'supplier-id',
+        rubric_id: 'rubric-id',
+        amount: 10000,
+        currency: Currency.ARS,
+        purchase_date: new Date('2024-01-15'),
+        document_type: DocumentType.VAL,
+        state: ExpenseState.VALIDATED,
+        created_by_id: 'user-id',
+        created_at: new Date(),
+        updated_at: new Date(),
+      } as Expense;
+
+      const validateDto: ValidateExpenseDto = {
+        state: ExpenseState.VALIDATED,
+      };
+
+      mockExpenseRepository.findOne
+        .mockResolvedValueOnce(expense) // findOne in validate
+        .mockResolvedValueOnce({ ...expense }); // findOne at end
+      mockQueryRunner.manager.findOne.mockResolvedValue(null); // No contract
+      mockQueryRunner.manager.save.mockResolvedValueOnce({ ...expense }); // Save expense
+      mockAccountingRepository.findOne.mockResolvedValue(null); // No existing record
+      mockAccountingRepository.create.mockReturnValue({});
+      mockAccountingRepository.save.mockResolvedValue({});
+      mockExpenseRepository.createQueryBuilder().getRawOne.mockResolvedValue({ total: '10000' });
+      mockWorkRepository.findOne.mockResolvedValue(mockWork);
+      mockWorkRepository.save.mockResolvedValue(mockWork);
+
+      await service.validate('expense-id', validateDto, user);
+
+      // Verify accounting record was created with CASH type
+      expect(mockAccountingRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accounting_type: 'cash',
+        }),
+      );
+    });
+
+    it('should not create accounting record when expense is not validated', async () => {
+      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const expense: Expense = {
+        id: 'expense-id',
+        work_id: 'work-id',
+        supplier_id: 'supplier-id',
+        rubric_id: 'rubric-id',
+        amount: 15000,
+        currency: Currency.ARS,
+        purchase_date: new Date('2024-01-15'),
+        document_type: DocumentType.INVOICE_A,
+        state: ExpenseState.PENDING,
+        created_by_id: 'user-id',
+        created_at: new Date(),
+        updated_at: new Date(),
+      } as Expense;
+
+      const validateDto: ValidateExpenseDto = {
+        state: ExpenseState.OBSERVED, // Not validated
+      };
+
+      mockExpenseRepository.findOne
+        .mockResolvedValueOnce(expense) // findOne in validate
+        .mockResolvedValueOnce({ ...expense, state: ExpenseState.OBSERVED }); // findOne at end
+      mockQueryRunner.manager.save.mockResolvedValueOnce({ ...expense, state: ExpenseState.OBSERVED });
+      mockWorkRepository.findOne.mockResolvedValue(mockWork);
+      mockWorkRepository.save.mockResolvedValue(mockWork);
+
+      await service.validate('expense-id', validateDto, user);
+
+      // Verify accounting record was NOT created
+      expect(mockAccountingRepository.findOne).not.toHaveBeenCalled();
+      expect(mockAccountingRepository.create).not.toHaveBeenCalled();
+      expect(mockAccountingRepository.save).not.toHaveBeenCalled();
     });
   });
 

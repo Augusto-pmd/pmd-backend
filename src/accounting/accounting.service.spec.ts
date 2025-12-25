@@ -8,14 +8,20 @@ import {
 } from '@nestjs/common';
 import { AccountingService } from './accounting.service';
 import { AccountingRecord } from './accounting.entity';
+import { Expense } from '../expenses/expenses.entity';
+import { Cashbox } from '../cashboxes/cashboxes.entity';
+import { Contract } from '../contracts/contracts.entity';
 import { CreateAccountingRecordDto } from './dto/create-accounting-record.dto';
 import { CloseMonthDto } from './dto/close-month.dto';
-import { AccountingType, Currency, MonthStatus, UserRole } from '../common/enums';
+import { AccountingType, Currency, MonthStatus, UserRole, ExpenseState, CashboxStatus } from '../common/enums';
 import { createMockUser } from '../common/test/test-helpers';
 
 describe('AccountingService', () => {
   let service: AccountingService;
   let accountingRepository: Repository<AccountingRecord>;
+  let expenseRepository: Repository<Expense>;
+  let cashboxRepository: Repository<Cashbox>;
+  let contractRepository: Repository<Contract>;
 
   const mockAccountingRepository = {
     find: jest.fn(),
@@ -24,6 +30,18 @@ describe('AccountingService', () => {
     save: jest.fn(),
     remove: jest.fn(),
     update: jest.fn(),
+  };
+
+  const mockExpenseRepository = {
+    find: jest.fn(),
+  };
+
+  const mockCashboxRepository = {
+    find: jest.fn(),
+  };
+
+  const mockContractRepository = {
+    find: jest.fn(),
   };
 
   const mockRecord: AccountingRecord = {
@@ -47,6 +65,18 @@ describe('AccountingService', () => {
           provide: getRepositoryToken(AccountingRecord),
           useValue: mockAccountingRepository,
         },
+        {
+          provide: getRepositoryToken(Expense),
+          useValue: mockExpenseRepository,
+        },
+        {
+          provide: getRepositoryToken(Cashbox),
+          useValue: mockCashboxRepository,
+        },
+        {
+          provide: getRepositoryToken(Contract),
+          useValue: mockContractRepository,
+        },
       ],
     }).compile();
 
@@ -54,10 +84,22 @@ describe('AccountingService', () => {
     accountingRepository = module.get<Repository<AccountingRecord>>(
       getRepositoryToken(AccountingRecord),
     );
+    expenseRepository = module.get<Repository<Expense>>(
+      getRepositoryToken(Expense),
+    );
+    cashboxRepository = module.get<Repository<Cashbox>>(
+      getRepositoryToken(Cashbox),
+    );
+    contractRepository = module.get<Repository<Contract>>(
+      getRepositoryToken(Contract),
+    );
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    mockExpenseRepository.find.mockClear();
+    mockCashboxRepository.find.mockClear();
+    mockContractRepository.find.mockClear();
   });
 
   describe('create', () => {
@@ -145,7 +187,7 @@ describe('AccountingService', () => {
   });
 
   describe('closeMonth', () => {
-    it('should close month successfully', async () => {
+    it('should close month successfully when all validations pass', async () => {
       const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
       const closeDto: CloseMonthDto = {
         month: 1,
@@ -156,6 +198,10 @@ describe('AccountingService', () => {
       const records = [mockRecord];
 
       mockAccountingRepository.find.mockResolvedValue(records);
+      mockAccountingRepository.findOne.mockResolvedValue(mockRecord); // For getMonthStatus
+      mockExpenseRepository.find.mockResolvedValue([]); // No pending expenses
+      mockCashboxRepository.find.mockResolvedValue([]); // No unapproved differences
+      mockContractRepository.find.mockResolvedValue([]); // No problematic contracts
       mockAccountingRepository.update.mockResolvedValue({ affected: 1 });
 
       await service.closeMonth(closeDto, user);
@@ -196,6 +242,103 @@ describe('AccountingService', () => {
       await expect(service.closeMonth(closeDto, user)).rejects.toThrow(
         'No accounting records found',
       );
+    });
+
+    it('should throw BadRequestException when month is already closed', async () => {
+      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const closeDto: CloseMonthDto = {
+        month: 1,
+        year: 2024,
+        status: MonthStatus.CLOSED,
+      };
+
+      const closedRecord = {
+        ...mockRecord,
+        month_status: MonthStatus.CLOSED,
+      };
+
+      mockAccountingRepository.find.mockResolvedValue([closedRecord]);
+      mockAccountingRepository.findOne.mockResolvedValue(closedRecord); // getMonthStatus returns CLOSED
+
+      await expect(service.closeMonth(closeDto, user)).rejects.toThrow(BadRequestException);
+      await expect(service.closeMonth(closeDto, user)).rejects.toThrow('already closed');
+    });
+
+    it('should throw BadRequestException when there are pending expenses', async () => {
+      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const closeDto: CloseMonthDto = {
+        month: 1,
+        year: 2024,
+        status: MonthStatus.CLOSED,
+      };
+
+      const pendingExpense: Expense = {
+        id: 'expense-id',
+        purchase_date: new Date('2024-01-15'),
+        state: ExpenseState.PENDING,
+      } as Expense;
+
+      mockAccountingRepository.find.mockResolvedValue([mockRecord]);
+      mockAccountingRepository.findOne.mockResolvedValue(mockRecord); // getMonthStatus returns OPEN
+      mockExpenseRepository.find.mockResolvedValue([pendingExpense]); // Has pending expenses
+
+      await expect(service.closeMonth(closeDto, user)).rejects.toThrow(BadRequestException);
+      await expect(service.closeMonth(closeDto, user)).rejects.toThrow('pending expenses');
+    });
+
+    it('should throw BadRequestException when there are unapproved cashbox differences', async () => {
+      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const closeDto: CloseMonthDto = {
+        month: 1,
+        year: 2024,
+        status: MonthStatus.CLOSED,
+      };
+
+      const cashboxWithDifference: Cashbox = {
+        id: 'cashbox-id',
+        status: CashboxStatus.CLOSED,
+        difference_approved: false,
+        difference_ars: 1000,
+        difference_usd: 0,
+        closing_date: new Date('2024-01-20'),
+      } as Cashbox;
+
+      mockAccountingRepository.find.mockResolvedValue([mockRecord]);
+      mockAccountingRepository.findOne.mockResolvedValue(mockRecord); // getMonthStatus returns OPEN
+      mockExpenseRepository.find.mockResolvedValue([]); // No pending expenses
+      mockCashboxRepository.find.mockResolvedValue([cashboxWithDifference]); // Has unapproved differences
+
+      await expect(service.closeMonth(closeDto, user)).rejects.toThrow(BadRequestException);
+      await expect(service.closeMonth(closeDto, user)).rejects.toThrow('unapproved differences');
+    });
+
+    it('should allow closing when cashbox differences are zero even if not approved', async () => {
+      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const closeDto: CloseMonthDto = {
+        month: 1,
+        year: 2024,
+        status: MonthStatus.CLOSED,
+      };
+
+      const cashboxWithZeroDifference: Cashbox = {
+        id: 'cashbox-id',
+        status: CashboxStatus.CLOSED,
+        difference_approved: false,
+        difference_ars: 0,
+        difference_usd: 0,
+        closing_date: new Date('2024-01-20'),
+      } as Cashbox;
+
+      mockAccountingRepository.find.mockResolvedValue([mockRecord]);
+      mockAccountingRepository.findOne.mockResolvedValue(mockRecord); // getMonthStatus returns OPEN
+      mockExpenseRepository.find.mockResolvedValue([]); // No pending expenses
+      mockCashboxRepository.find.mockResolvedValue([cashboxWithZeroDifference]); // Zero differences
+      mockContractRepository.find.mockResolvedValue([]); // No problematic contracts
+      mockAccountingRepository.update.mockResolvedValue({ affected: 1 });
+
+      await service.closeMonth(closeDto, user);
+
+      expect(mockAccountingRepository.update).toHaveBeenCalled();
     });
   });
 
