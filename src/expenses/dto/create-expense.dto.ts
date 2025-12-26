@@ -30,7 +30,7 @@ export class CreateExpenseDto {
     format: 'uuid',
   })
   @ValidateIf((o) => o.document_type !== DocumentType.VAL)
-  @IsUUID({ message: 'supplier_id is required when document_type is not VAL' })
+  @IsUUID()
   @IsOptional()
   supplier_id?: string;
 

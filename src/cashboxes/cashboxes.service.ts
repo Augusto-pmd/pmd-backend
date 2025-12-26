@@ -536,5 +536,105 @@ export class CashboxesService {
       await queryRunner.release();
     }
   }
+
+  async getHistory(
+    id: string,
+    filters: GetHistoryDto,
+    user: User,
+  ): Promise<{
+    data: CashMovement[];
+    total: number;
+    page: number;
+    limit: number;
+    summary: {
+      totalRefills: number;
+      totalExpenses: number;
+      totalIncomes: number;
+      totalRefillsAmount: number;
+      totalExpensesAmount: number;
+      totalIncomesAmount: number;
+    };
+  }> {
+    // Verify cashbox exists and user has access
+    const cashbox = await this.findOne(id, user);
+
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const skip = (page - 1) * limit;
+
+    // Build query for movements
+    const queryBuilder = this.cashMovementRepository
+      .createQueryBuilder('movement')
+      .where('movement.cashbox_id = :cashboxId', { cashboxId: id });
+
+    // Apply filters
+    if (filters.type) {
+      queryBuilder.andWhere('movement.type = :type', { type: filters.type });
+    }
+
+    if (filters.currency) {
+      queryBuilder.andWhere('movement.currency = :currency', { currency: filters.currency });
+    }
+
+    if (filters.startDate) {
+      queryBuilder.andWhere('movement.date >= :startDate', { startDate: filters.startDate });
+    }
+
+    if (filters.endDate) {
+      queryBuilder.andWhere('movement.date <= :endDate', { endDate: filters.endDate });
+    }
+
+    // Get total count
+    const total = await queryBuilder.getCount();
+
+    // Get paginated data
+    const movements = await queryBuilder
+      .orderBy('movement.date', 'DESC')
+      .addOrderBy('movement.created_at', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getMany();
+
+    // Calculate summary (all movements for this cashbox, ignoring pagination)
+    const allMovements = await this.cashMovementRepository.find({
+      where: { cashbox_id: id },
+    });
+
+    let totalRefills = 0;
+    let totalExpenses = 0;
+    let totalIncomes = 0;
+    let totalRefillsAmount = 0;
+    let totalExpensesAmount = 0;
+    let totalIncomesAmount = 0;
+
+    allMovements.forEach((movement) => {
+      const amount = Number(movement.amount);
+      if (movement.type === CashMovementType.REFILL) {
+        totalRefills++;
+        totalRefillsAmount += amount;
+      } else if (movement.type === CashMovementType.EXPENSE) {
+        totalExpenses++;
+        totalExpensesAmount += amount;
+      } else if (movement.type === CashMovementType.INCOME) {
+        totalIncomes++;
+        totalIncomesAmount += amount;
+      }
+    });
+
+    return {
+      data: movements,
+      total,
+      page,
+      limit,
+      summary: {
+        totalRefills,
+        totalExpenses,
+        totalIncomes,
+        totalRefillsAmount,
+        totalExpensesAmount,
+        totalIncomesAmount,
+      },
+    };
+  }
 }
 

@@ -40,19 +40,11 @@ import { HealthModule } from './health/health.module';
       imports: [ConfigModule],
       useFactory: databaseConfig,
       inject: [ConfigService],
+    }),
     ThrottlerModule.forRoot([{
       ttl: 60000, // 1 minute
       limit: 10, // 10 requests per minute
     }]),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      url: process.env.DATABASE_URL,
-      autoLoadEntities: true,
-      synchronize: false,
-      ssl: {
-        rejectUnauthorized: false
-      }
-    }),
     CommonModule,
     AuthModule,
     UsersModule,

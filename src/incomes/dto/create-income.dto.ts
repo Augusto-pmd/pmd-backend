@@ -25,7 +25,7 @@ export class CreateIncomeDto {
   @ApiProperty({
     description: 'Income type',
     enum: IncomeType,
-    example: IncomeType.PROGRESS_PAYMENT,
+    example: IncomeType.ADVANCE,
   })
   @IsEnum(IncomeType)
   type: IncomeType;
