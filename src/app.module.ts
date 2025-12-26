@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { databaseConfig } from './config/database.config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -38,6 +40,18 @@ import { HealthModule } from './health/health.module';
       imports: [ConfigModule],
       useFactory: databaseConfig,
       inject: [ConfigService],
+    ThrottlerModule.forRoot([{
+      ttl: 60000, // 1 minute
+      limit: 10, // 10 requests per minute
+    }]),
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
+      autoLoadEntities: true,
+      synchronize: false,
+      ssl: {
+        rejectUnauthorized: false
+      }
     }),
     CommonModule,
     AuthModule,
@@ -65,6 +79,12 @@ import { HealthModule } from './health/health.module';
     AdminResetModule,
     ...(process.env.NODE_ENV !== 'production' ? [DebugModule] : []),
     HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

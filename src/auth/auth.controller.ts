@@ -1,4 +1,5 @@
 import { Controller, Post, Get, HttpCode, HttpStatus, Body, Res, Req, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
@@ -13,18 +14,20 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute for login
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User login' })
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
   async login(@Body() dto: LoginDto, @Res() res: Response) {
     const { accessToken, refresh_token, user } = await this.authService.login(dto);
 
     const isProd = process.env.NODE_ENV === 'production';
 
     res.cookie('token', accessToken, {
-      httpOnly: false,
+      httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
       path: '/',
@@ -70,7 +73,7 @@ export class AuthController {
     const isProduction = process.env.NODE_ENV === 'production';
     
     res.cookie('token', result.access_token, {
-      httpOnly: false, // Allow frontend to read cookie if needed
+      httpOnly: true,
       secure: isProduction, // Only in production (HTTPS required)
       sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-site in production, 'lax' for dev
       path: '/',

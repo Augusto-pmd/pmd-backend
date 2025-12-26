@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -22,6 +23,7 @@ export class AuthService {
     @InjectRepository(Role) private readonly roleRepository: Repository<Role>,
     @InjectRepository(Organization) private readonly orgRepository: Repository<Organization>,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async ensureAdminUser(): Promise<void> {
@@ -135,9 +137,12 @@ export class AuthService {
 
     const normalizedUser = normalizeUser(user);
 
+    const accessTokenExpiration = process.env.JWT_EXPIRATION || '1d';
+    const refreshTokenExpiration = process.env.JWT_REFRESH_EXPIRATION || '7d';
+
     return {
-      accessToken: await this.jwtService.signAsync(payload, { expiresIn: '1d' }),
-      refresh_token: await this.jwtService.signAsync(payload, { expiresIn: '7d' }),
+      accessToken: await this.jwtService.signAsync(payload, { expiresIn: accessTokenExpiration }),
+      refresh_token: await this.jwtService.signAsync(payload, { expiresIn: refreshTokenExpiration }),
       user: normalizedUser,
     };
   }
@@ -214,9 +219,12 @@ export class AuthService {
 
     const normalizedUser = normalizeUser(fullUser);
 
+    const accessTokenExpiration = process.env.JWT_EXPIRATION || '1d';
+    const refreshTokenExpiration = process.env.JWT_REFRESH_EXPIRATION || '7d';
+
     return {
-      access_token: await this.jwtService.signAsync(payload, { expiresIn: '1d' }),
-      refresh_token: await this.jwtService.signAsync(payload, { expiresIn: '7d' }),
+      access_token: await this.jwtService.signAsync(payload, { expiresIn: accessTokenExpiration }),
+      refresh_token: await this.jwtService.signAsync(payload, { expiresIn: refreshTokenExpiration }),
       user: normalizedUser,
     };
   }
