@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditLog } from './audit.entity';
@@ -7,6 +7,8 @@ import { UpdateAuditLogDto } from './dto/update-audit-log.dto';
 
 @Injectable()
 export class AuditService {
+  private readonly logger = new Logger(AuditService.name);
+
   constructor(
     @InjectRepository(AuditLog)
     private auditLogRepository: Repository<AuditLog>,
@@ -17,18 +19,34 @@ export class AuditService {
     return await this.auditLogRepository.save(auditLog);
   }
 
-  async findAll(): Promise<AuditLog[]> {
+  async findAll(page: number = 1, limit: number = 50): Promise<{ data: AuditLog[]; total: number; page: number; limit: number }> {
     try {
-      return await this.auditLogRepository.find({
-        relations: ['user'],
-        order: { created_at: 'DESC' },
-        take: 1000, // Limit to prevent performance issues
-      });
+      const skip = (page - 1) * limit;
+      
+      // Use QueryBuilder to load relations efficiently and get total count
+      const queryBuilder = this.auditLogRepository
+        .createQueryBuilder('audit')
+        .leftJoinAndSelect('audit.user', 'user')
+        .orderBy('audit.created_at', 'DESC')
+        .skip(skip)
+        .take(limit);
+
+      const [data, total] = await queryBuilder.getManyAndCount();
+
+      return {
+        data,
+        total,
+        page,
+        limit,
+      };
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[AuditService.findAll] Error:', error);
-      }
-      return [];
+      this.logger.error('Error fetching audit logs', error);
+      return {
+        data: [],
+        total: 0,
+        page,
+        limit,
+      };
     }
   }
 
@@ -45,22 +63,46 @@ export class AuditService {
     return auditLog;
   }
 
-  async findByModule(module: string): Promise<AuditLog[]> {
-    return await this.auditLogRepository.find({
-      where: { module },
-      relations: ['user'],
-      order: { created_at: 'DESC' },
-      take: 500,
-    });
+  async findByModule(module: string, page: number = 1, limit: number = 50): Promise<{ data: AuditLog[]; total: number; page: number; limit: number }> {
+    const skip = (page - 1) * limit;
+    
+    const queryBuilder = this.auditLogRepository
+      .createQueryBuilder('audit')
+      .leftJoinAndSelect('audit.user', 'user')
+      .where('audit.module = :module', { module })
+      .orderBy('audit.created_at', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [data, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+    };
   }
 
-  async findByUser(userId: string): Promise<AuditLog[]> {
-    return await this.auditLogRepository.find({
-      where: { user_id: userId },
-      relations: ['user'],
-      order: { created_at: 'DESC' },
-      take: 500,
-    });
+  async findByUser(userId: string, page: number = 1, limit: number = 50): Promise<{ data: AuditLog[]; total: number; page: number; limit: number }> {
+    const skip = (page - 1) * limit;
+    
+    const queryBuilder = this.auditLogRepository
+      .createQueryBuilder('audit')
+      .leftJoinAndSelect('audit.user', 'user')
+      .where('audit.user_id = :userId', { userId })
+      .orderBy('audit.created_at', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [data, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+    };
   }
 
   async remove(id: string): Promise<void> {
