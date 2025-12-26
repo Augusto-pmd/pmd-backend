@@ -63,7 +63,7 @@ import { HealthModule } from './health/health.module';
     TasksModule,
     StorageModule,
     AdminResetModule,
-    DebugModule,
+    ...(process.env.NODE_ENV !== 'production' ? [DebugModule] : []),
     HealthModule,
   ],
 })
