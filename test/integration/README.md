@@ -36,7 +36,11 @@ This directory contains comprehensive integration tests (E2E) for the PMD Manage
    - Tests: Monthly closure and Direction override
    - Covers: Month closing, record restrictions, Direction override, month reopening
 
-8. **`multi-role-permissions.e2e-spec.ts`**
+8. **`cashbox-closure-alerts.e2e-spec.ts`**
+   - Tests: Cashbox closure → Alerts generation
+   - Covers: Cashbox closing, difference calculation, alert generation for differences, difference approval by Direction, permission restrictions
+
+9. **`multi-role-permissions.e2e-spec.ts`**
    - Tests: Multi-role permission verification
    - Covers: All roles (Direction, Supervisor, Administration, Operator) and their specific permissions
 
