@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
@@ -20,6 +21,8 @@ import { getOrganizationId } from '../common/helpers/get-organization-id.helper'
 
 @Injectable()
 export class SuppliersService {
+  private readonly logger = new Logger(SuppliersService.name);
+
   constructor(
     @InjectRepository(Supplier)
     private supplierRepository: Repository<Supplier>,
@@ -32,6 +35,19 @@ export class SuppliersService {
    * Business Rule: Operators can create provisional suppliers
    */
   async create(createSupplierDto: CreateSupplierDto, user: User): Promise<Supplier> {
+    // Validate CUIT uniqueness if provided
+    if (createSupplierDto.cuit) {
+      const existingSupplier = await this.supplierRepository.findOne({
+        where: { cuit: createSupplierDto.cuit },
+      });
+
+      if (existingSupplier) {
+        throw new BadRequestException(
+          `A supplier with CUIT ${createSupplierDto.cuit} already exists`,
+        );
+      }
+    }
+
     // Operators can only create provisional suppliers
     if (user.role.name === UserRole.OPERATOR) {
       createSupplierDto.status = SupplierStatus.PROVISIONAL;
@@ -248,9 +264,7 @@ export class SuppliersService {
         order: { created_at: 'DESC' },
       });
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[SuppliersService.findAll] Error:', error);
-      }
+      this.logger.error('Error fetching suppliers', error);
       return [];
     }
   }
@@ -275,6 +289,19 @@ export class SuppliersService {
 
   async update(id: string, updateSupplierDto: UpdateSupplierDto, user: User): Promise<Supplier> {
     const supplier = await this.findOne(id, user);
+
+    // Validate CUIT uniqueness if provided and different from current
+    if (updateSupplierDto.cuit && updateSupplierDto.cuit !== supplier.cuit) {
+      const existingSupplier = await this.supplierRepository.findOne({
+        where: { cuit: updateSupplierDto.cuit },
+      });
+
+      if (existingSupplier) {
+        throw new BadRequestException(
+          `A supplier with CUIT ${updateSupplierDto.cuit} already exists`,
+        );
+      }
+    }
 
     // Operators cannot change status
     if (user.role.name === UserRole.OPERATOR && updateSupplierDto.status) {

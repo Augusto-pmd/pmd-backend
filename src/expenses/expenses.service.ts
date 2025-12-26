@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -32,6 +33,8 @@ import { getOrganizationId } from '../common/helpers/get-organization-id.helper'
 
 @Injectable()
 export class ExpensesService {
+  private readonly logger = new Logger(ExpensesService.name);
+
   constructor(
     @InjectRepository(Expense)
     private expenseRepository: Repository<Expense>,
@@ -507,14 +510,13 @@ export class ExpensesService {
 
       return await queryBuilder.getMany();
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[ExpensesService.findAll] Error:', error);
-      }
+      this.logger.error('Error fetching expenses', error);
       return [];
     }
   }
 
   async findOne(id: string, user: User): Promise<Expense> {
+    const organizationId = getOrganizationId(user);
     const expense = await this.expenseRepository.findOne({
       where: { id },
       relations: ['work', 'supplier', 'rubric', 'created_by', 'val'],
@@ -522,6 +524,11 @@ export class ExpensesService {
 
     if (!expense) {
       throw new NotFoundException(`Expense with ID ${id} not found`);
+    }
+
+    // Validate ownership through work.organization_id
+    if (organizationId && expense.work?.organization_id !== organizationId) {
+      throw new ForbiddenException('Expense does not belong to your organization');
     }
 
     // Operators can only access their own expenses
@@ -542,6 +549,26 @@ export class ExpensesService {
       user.role.name !== UserRole.DIRECTION
     ) {
       throw new ForbiddenException('Only Administration and Direction can edit validated expenses');
+    }
+
+    // Validate amounts are not negative
+    if (updateExpenseDto.amount !== undefined && updateExpenseDto.amount < 0) {
+      throw new BadRequestException('Amount cannot be negative');
+    }
+    if (updateExpenseDto.vat_amount !== undefined && updateExpenseDto.vat_amount < 0) {
+      throw new BadRequestException('VAT amount cannot be negative');
+    }
+    if (updateExpenseDto.vat_perception !== undefined && updateExpenseDto.vat_perception < 0) {
+      throw new BadRequestException('VAT perception cannot be negative');
+    }
+    if (updateExpenseDto.vat_withholding !== undefined && updateExpenseDto.vat_withholding < 0) {
+      throw new BadRequestException('VAT withholding cannot be negative');
+    }
+    if (updateExpenseDto.iibb_perception !== undefined && updateExpenseDto.iibb_perception < 0) {
+      throw new BadRequestException('IIBB perception cannot be negative');
+    }
+    if (updateExpenseDto.income_tax_withholding !== undefined && updateExpenseDto.income_tax_withholding < 0) {
+      throw new BadRequestException('Income tax withholding cannot be negative');
     }
 
     Object.assign(expense, updateExpenseDto);

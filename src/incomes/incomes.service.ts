@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Income } from './incomes.entity';
@@ -8,9 +8,12 @@ import { UpdateIncomeDto } from './dto/update-income.dto';
 import { User } from '../users/user.entity';
 import { UserRole } from '../common/enums/user-role.enum';
 import { WorksService } from '../works/works.service';
+import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 
 @Injectable()
 export class IncomesService {
+  private readonly logger = new Logger(IncomesService.name);
+
   constructor(
     @InjectRepository(Income)
     private incomeRepository: Repository<Income>,
@@ -46,19 +49,25 @@ export class IncomesService {
 
   async findAll(user: User): Promise<Income[]> {
     try {
-      return await this.incomeRepository.find({
-        relations: ['work'],
-        order: { date: 'DESC' },
-      });
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[IncomesService.findAll] Error:', error);
+      const organizationId = getOrganizationId(user);
+      const queryBuilder = this.incomeRepository
+        .createQueryBuilder('income')
+        .leftJoinAndSelect('income.work', 'work');
+
+      // Filter by organization_id through work
+      if (organizationId) {
+        queryBuilder.where('work.organization_id = :organizationId', { organizationId });
       }
+
+      return await queryBuilder.orderBy('income.date', 'DESC').getMany();
+    } catch (error) {
+      this.logger.error('Error fetching incomes', error);
       return [];
     }
   }
 
   async findOne(id: string, user: User): Promise<Income> {
+    const organizationId = getOrganizationId(user);
     const income = await this.incomeRepository.findOne({
       where: { id },
       relations: ['work'],
@@ -68,11 +77,22 @@ export class IncomesService {
       throw new NotFoundException(`Income with ID ${id} not found`);
     }
 
+    // Validate ownership through work.organization_id
+    if (organizationId && income.work?.organization_id !== organizationId) {
+      throw new ForbiddenException('Income does not belong to your organization');
+    }
+
     return income;
   }
 
   async update(id: string, updateIncomeDto: UpdateIncomeDto, user: User): Promise<Income> {
     const income = await this.findOne(id, user);
+    
+    // Validate amount is not negative
+    if (updateIncomeDto.amount !== undefined && updateIncomeDto.amount < 0) {
+      throw new BadRequestException('Amount cannot be negative');
+    }
+    
     const wasValidated = income.is_validated;
     Object.assign(income, updateIncomeDto);
     const savedIncome = await this.incomeRepository.save(income);

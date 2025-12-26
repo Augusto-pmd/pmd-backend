@@ -3,9 +3,10 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { Repository, Between, LessThanOrEqual, MoreThanOrEqual, DataSource } from 'typeorm';
 import { AccountingRecord } from './accounting.entity';
 import { CreateAccountingRecordDto } from './dto/create-accounting-record.dto';
 import { UpdateAccountingRecordDto } from './dto/update-accounting-record.dto';
@@ -24,6 +25,8 @@ import { Contract } from '../contracts/contracts.entity';
 
 @Injectable()
 export class AccountingService {
+  private readonly logger = new Logger(AccountingService.name);
+
   constructor(
     @InjectRepository(AccountingRecord)
     private accountingRepository: Repository<AccountingRecord>,
@@ -33,6 +36,7 @@ export class AccountingService {
     private cashboxRepository: Repository<Cashbox>,
     @InjectRepository(Contract)
     private contractRepository: Repository<Contract>,
+    private dataSource: DataSource,
   ) {}
 
   async create(
@@ -74,9 +78,7 @@ export class AccountingService {
         order: { date: 'DESC', created_at: 'DESC' },
       });
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[AccountingService.findAll] Error:', error);
-      }
+      this.logger.error('Error fetching accounting records', error);
       return [];
     }
   }
@@ -100,11 +102,18 @@ export class AccountingService {
   }
 
   async findByMonth(month: number, year: number, user: User): Promise<AccountingRecord[]> {
+    const organizationId = getOrganizationId(user);
+    const where: any = {
+      month,
+      year,
+    };
+    
+    if (organizationId) {
+      where.organization_id = organizationId;
+    }
+
     return await this.accountingRepository.find({
-      where: {
-        month,
-        year,
-      },
+      where,
       relations: ['expense', 'work', 'supplier'],
       order: { date: 'ASC' },
     });
@@ -202,16 +211,31 @@ export class AccountingService {
       // For now, we'll allow closing but this could be made stricter
     }
 
-    // All validations passed, close the month
-    await this.accountingRepository.update(
-      {
-        month: closeMonthDto.month,
-        year: closeMonthDto.year,
-      },
-      {
-        month_status: MonthStatus.CLOSED,
-      },
-    );
+    // All validations passed, close the month using transaction
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      await queryRunner.manager.update(
+        AccountingRecord,
+        {
+          month: closeMonthDto.month,
+          year: closeMonthDto.year,
+        },
+        {
+          month_status: MonthStatus.CLOSED,
+        },
+      );
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error('Error closing month', error);
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   /**
@@ -265,6 +289,26 @@ export class AccountingService {
       throw new ForbiddenException(
         'Cannot update accounting records for closed month. Only Direction can override.',
       );
+    }
+
+    // Validate amounts are not negative
+    if (updateAccountingRecordDto.amount !== undefined && updateAccountingRecordDto.amount < 0) {
+      throw new BadRequestException('Amount cannot be negative');
+    }
+    if (updateAccountingRecordDto.vat_amount !== undefined && updateAccountingRecordDto.vat_amount < 0) {
+      throw new BadRequestException('VAT amount cannot be negative');
+    }
+    if (updateAccountingRecordDto.vat_perception !== undefined && updateAccountingRecordDto.vat_perception < 0) {
+      throw new BadRequestException('VAT perception cannot be negative');
+    }
+    if (updateAccountingRecordDto.vat_withholding !== undefined && updateAccountingRecordDto.vat_withholding < 0) {
+      throw new BadRequestException('VAT withholding cannot be negative');
+    }
+    if (updateAccountingRecordDto.iibb_perception !== undefined && updateAccountingRecordDto.iibb_perception < 0) {
+      throw new BadRequestException('IIBB perception cannot be negative');
+    }
+    if (updateAccountingRecordDto.income_tax_withholding !== undefined && updateAccountingRecordDto.income_tax_withholding < 0) {
+      throw new BadRequestException('Income tax withholding cannot be negative');
     }
 
     Object.assign(record, updateAccountingRecordDto);

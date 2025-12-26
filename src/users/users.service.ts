@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
@@ -10,9 +10,12 @@ import { getOrganizationId } from '../common/helpers/get-organization-id.helper'
 import { getDefaultRole } from '../common/helpers/get-default-role.helper';
 import { normalizeUser } from '../common/helpers/normalize-user.helper';
 import { NormalizedUser } from '../common/interfaces/normalized-user.interface';
+import { UserRole } from '../common/enums/user-role.enum';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
@@ -48,7 +51,12 @@ export class UsersService {
     return user;
   }
 
-  async create(createUserDto: CreateUserDto): Promise<NormalizedUser> {
+  async create(createUserDto: CreateUserDto, currentUser?: User): Promise<NormalizedUser> {
+    // Validate permissions at service level (double check)
+    if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
+      throw new ForbiddenException('Only Direction can create users');
+    }
+
     const role = await this.roleRepository.findOne({
       where: { id: createUserDto.role_id },
     });
@@ -97,9 +105,7 @@ export class UsersService {
       // Normalize all users using consistent normalizer
       return users.map((u) => this.normalizeUserEntity(u));
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[UsersService.findAll] Error:', error);
-      }
+      this.logger.error('Error fetching users', error);
       return [];
     }
   }
@@ -130,7 +136,12 @@ export class UsersService {
     return this.normalizeUserEntity(user);
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<NormalizedUser> {
+  async update(id: string, updateUserDto: UpdateUserDto, currentUser?: User): Promise<NormalizedUser> {
+    // Validate permissions at service level (double check)
+    if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
+      throw new ForbiddenException('Only Direction can update users');
+    }
+
     const user = await this.findOneEntity(id);
 
     if (updateUserDto.password) {
@@ -147,12 +158,22 @@ export class UsersService {
     return this.normalizeUserEntity(refreshedUser);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, currentUser?: User): Promise<void> {
+    // Validate permissions at service level (double check)
+    if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
+      throw new ForbiddenException('Only Direction can delete users');
+    }
+
     const user = await this.findOneEntity(id);
     await this.userRepository.remove(user);
   }
 
-  async updateRole(id: string, roleId: string): Promise<NormalizedUser> {
+  async updateRole(id: string, roleId: string, currentUser?: User): Promise<NormalizedUser> {
+    // Validate permissions at service level (double check)
+    if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
+      throw new ForbiddenException('Only Direction can update user roles');
+    }
+
     const user = await this.findOneEntity(id);
     const role = await this.roleRepository.findOne({
       where: { id: roleId },

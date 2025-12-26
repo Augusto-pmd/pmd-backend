@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -19,6 +20,8 @@ import { getOrganizationId } from '../common/helpers/get-organization-id.helper'
 
 @Injectable()
 export class WorksService {
+  private readonly logger = new Logger(WorksService.name);
+
   constructor(
     @InjectRepository(Work)
     private workRepository: Repository<Work>,
@@ -69,9 +72,7 @@ export class WorksService {
         .leftJoinAndSelect('work.contracts', 'contracts')
         .getMany();
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[WorksService.findAll] Error:', error);
-      }
+      this.logger.error('Error fetching works', error);
       return [];
     }
   }

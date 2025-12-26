@@ -1,34 +1,68 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Role } from './role.entity';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { User } from '../users/user.entity';
+import { UserRole } from '../common/enums/user-role.enum';
 
 @Injectable()
 export class RolesService {
+  private readonly logger = new Logger(RolesService.name);
+
   constructor(
     @InjectRepository(Role)
     private roleRepository: Repository<Role>,
   ) {}
 
-  async create(createRoleDto: CreateRoleDto): Promise<Role> {
+  async create(createRoleDto: CreateRoleDto, currentUser?: User): Promise<Role> {
+    // Validate permissions at service level (double check)
+    if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
+      throw new ForbiddenException('Only Direction can create roles');
+    }
+
     const role = this.roleRepository.create(createRoleDto);
     return await this.roleRepository.save(role);
   }
 
-  async findAll(): Promise<Role[]> {
+  async findAll(currentUser?: User): Promise<Role[]> {
     try {
+      // Validate permissions at service level (double check)
+      if (currentUser) {
+        const allowedRoles = [
+          UserRole.DIRECTION,
+          UserRole.SUPERVISOR,
+          UserRole.ADMINISTRATION,
+        ];
+        if (!allowedRoles.includes(currentUser.role.name)) {
+          throw new ForbiddenException('You do not have permission to view roles');
+        }
+      }
+
       return await this.roleRepository.find();
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[RolesService.findAll] Error:', error);
+      if (error instanceof ForbiddenException) {
+        throw error;
       }
+      this.logger.error('Error fetching roles', error);
       return [];
     }
   }
 
-  async findOne(id: string): Promise<Role> {
+  async findOne(id: string, currentUser?: User): Promise<Role> {
+    // Validate permissions at service level (double check)
+    if (currentUser) {
+      const allowedRoles = [
+        UserRole.DIRECTION,
+        UserRole.SUPERVISOR,
+        UserRole.ADMINISTRATION,
+      ];
+      if (!allowedRoles.includes(currentUser.role.name)) {
+        throw new ForbiddenException('You do not have permission to view roles');
+      }
+    }
+
     const role = await this.roleRepository.findOne({ where: { id } });
 
     if (!role) {
@@ -38,19 +72,41 @@ export class RolesService {
     return role;
   }
 
-  async update(id: string, updateRoleDto: UpdateRoleDto): Promise<Role> {
-    const role = await this.findOne(id);
+  async update(id: string, updateRoleDto: UpdateRoleDto, currentUser?: User): Promise<Role> {
+    // Validate permissions at service level (double check)
+    if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
+      throw new ForbiddenException('Only Direction can update roles');
+    }
+
+    const role = await this.findOne(id, currentUser);
     Object.assign(role, updateRoleDto);
     return await this.roleRepository.save(role);
   }
 
-  async remove(id: string): Promise<void> {
-    const role = await this.findOne(id);
+  async remove(id: string, currentUser?: User): Promise<void> {
+    // Validate permissions at service level (double check)
+    if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
+      throw new ForbiddenException('Only Direction can delete roles');
+    }
+
+    const role = await this.findOne(id, currentUser);
     await this.roleRepository.remove(role);
   }
 
-  async getPermissions(id: string): Promise<Record<string, boolean>> {
-    const role = await this.findOne(id);
+  async getPermissions(id: string, currentUser?: User): Promise<Record<string, boolean>> {
+    // Validate permissions at service level (double check)
+    if (currentUser) {
+      const allowedRoles = [
+        UserRole.DIRECTION,
+        UserRole.SUPERVISOR,
+        UserRole.ADMINISTRATION,
+      ];
+      if (!allowedRoles.includes(currentUser.role.name)) {
+        throw new ForbiddenException('You do not have permission to view role permissions');
+      }
+    }
+
+    const role = await this.findOne(id, currentUser);
     // Ensure permissions is always a Record<string, boolean>
     if (!role.permissions || typeof role.permissions !== 'object' || Array.isArray(role.permissions)) {
       return {};
