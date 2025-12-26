@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,6 +15,8 @@ import { JwtPayload } from './interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     @InjectRepository(Role) private readonly roleRepository: Repository<Role>,
@@ -62,9 +64,7 @@ export class AuthService {
         isActive: true,
       });
       await this.userRepository.save(admin);
-      if (process.env.NODE_ENV === 'development') {
-        console.log('✅ Admin user created');
-      }
+      this.logger.log('Admin user created');
       return;
     }
 
@@ -82,9 +82,7 @@ export class AuthService {
 
     if (updated) {
       await this.userRepository.save(admin);
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔧 Admin user repaired');
-      }
+      this.logger.log('Admin user repaired');
     }
   }
 
@@ -126,10 +124,8 @@ export class AuthService {
     }
 
     // If valid, issue JWT and return { accessToken, normalized user }
-    // Log permissions for audit (only in development)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[AUTH LOGIN] role.permissions before normalize:', JSON.stringify(user.role?.permissions, null, 2));
-    }
+    // Log only basic info (no sensitive permissions data)
+    this.logger.debug(`User login: ${user.email} (role: ${user.role?.name})`);
     
     const payload: JwtPayload = {
       sub: user.id,
@@ -138,9 +134,6 @@ export class AuthService {
     };
 
     const normalizedUser = normalizeUser(user);
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[AUTH LOGIN] normalizedUser.role.permissions:', JSON.stringify(normalizedUser.role?.permissions, null, 2));
-    }
 
     return {
       accessToken: await this.jwtService.signAsync(payload, { expiresIn: '1d' }),
@@ -210,10 +203,8 @@ export class AuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    // Log permissions for audit (only in development)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[AUTH REFRESH] role.permissions before normalize:', JSON.stringify(fullUser.role?.permissions, null, 2));
-    }
+    // Log only basic info (no sensitive permissions data)
+    this.logger.debug(`Token refresh: ${fullUser.email} (role: ${fullUser.role?.name})`);
 
     const payload: JwtPayload = {
       sub: fullUser.id,
@@ -222,9 +213,6 @@ export class AuthService {
     };
 
     const normalizedUser = normalizeUser(fullUser);
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[AUTH REFRESH] normalizedUser.role.permissions:', JSON.stringify(normalizedUser.role?.permissions, null, 2));
-    }
 
     return {
       access_token: await this.jwtService.signAsync(payload, { expiresIn: '1d' }),
@@ -246,14 +234,10 @@ export class AuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    // Log permissions for audit (only in development)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[AUTH LOADME] role.permissions before normalize:', JSON.stringify(fullUser.role?.permissions, null, 2));
-    }
+    // Log only basic info (no sensitive permissions data)
+    this.logger.debug(`Load me: ${fullUser.email} (role: ${fullUser.role?.name})`);
+    
     const normalizedUser = normalizeUser(fullUser);
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[AUTH LOADME] normalizedUser.role.permissions:', JSON.stringify(normalizedUser.role?.permissions, null, 2));
-    }
 
     return normalizedUser;
   }
