@@ -45,6 +45,15 @@ import { HealthModule } from './health/health.module';
       ttl: 60000, // 1 minute
       limit: 10, // 10 requests per minute
     }]),
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
+      autoLoadEntities: true,
+      synchronize: false,
+      ssl: process.env.NODE_ENV === 'production' || process.env.DATABASE_URL
+        ? { rejectUnauthorized: false }
+        : false,
+    }),
     CommonModule,
     AuthModule,
     UsersModule,
