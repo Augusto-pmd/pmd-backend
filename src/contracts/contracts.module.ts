@@ -4,10 +4,11 @@ import { ContractsService } from './contracts.service';
 import { ContractsController } from './contracts.controller';
 import { Contract } from './contracts.entity';
 import { Supplier } from '../suppliers/suppliers.entity';
+import { Work } from '../works/works.entity';
 import { AlertsModule } from '../alerts/alerts.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Contract, Supplier]), AlertsModule],
+  imports: [TypeOrmModule.forFeature([Contract, Supplier, Work]), AlertsModule],
   controllers: [ContractsController],
   providers: [ContractsService],
   exports: [ContractsService],
