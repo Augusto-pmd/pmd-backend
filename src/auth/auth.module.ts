@@ -22,7 +22,8 @@ import { Organization } from '../organizations/organization.entity';
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET', 'supersecret123'),
         signOptions: { 
-          expiresIn: configService.get<string>('JWT_EXPIRATION', '1d'),
+          algorithm: 'HS256',
+          expiresIn: process.env.JWT_EXPIRATION || '1d',
         },
       }),
       inject: [ConfigService],
