@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -26,6 +27,11 @@ import { CreateCashboxDto } from './dto/create-cashbox.dto';
 import { UpdateCashboxDto } from './dto/update-cashbox.dto';
 import { CloseCashboxDto } from './dto/close-cashbox.dto';
 import { ApproveDifferenceDto } from './dto/approve-difference.dto';
+import { RefillCashboxDto } from './dto/refill-cashbox.dto';
+import { RequestExplanationDto } from './dto/request-explanation.dto';
+import { RejectDifferenceDto } from './dto/reject-difference.dto';
+import { ManualAdjustmentDto } from './dto/manual-adjustment.dto';
+import { GetHistoryDto } from './dto/get-history.dto';
 
 @ApiTags('Cashboxes')
 @ApiBearerAuth('JWT-auth')
@@ -93,6 +99,26 @@ export class CashboxesController {
     return this.cashboxesService.close(id, closeCashboxDto, req.user);
   }
 
+  @Post(':id/refill')
+  @Roles(UserRole.OPERATOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Refill cashbox',
+    description: 'Add money to an open cashbox. The opening balance will be automatically updated. Only open cashboxes can receive refills.',
+  })
+  @ApiParam({ name: 'id', description: 'Cashbox UUID', type: String, format: 'uuid' })
+  @ApiBody({ type: RefillCashboxDto })
+  @ApiResponse({ status: 201, description: 'Cashbox refilled successfully' })
+  @ApiResponse({ status: 400, description: 'Cashbox is closed or validation error' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Cashbox not found' })
+  refill(
+    @Param('id') id: string,
+    @Body() refillDto: RefillCashboxDto,
+    @Request() req,
+  ) {
+    return this.cashboxesService.refill(id, refillDto, req.user);
+  }
+
   @Post(':id/approve-difference')
   @Roles(UserRole.ADMINISTRATION, UserRole.DIRECTION)
   @ApiOperation({
@@ -109,6 +135,101 @@ export class CashboxesController {
     @Request() req,
   ) {
     return this.cashboxesService.approveDifference(id, approveDto, req.user);
+  }
+
+  @Post(':id/request-explanation')
+  @Roles(UserRole.OPERATOR, UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Request explanation for cashbox difference',
+    description: 'Request an explanation for a cashbox difference. Generates an alert. Available to all roles.',
+  })
+  @ApiParam({ name: 'id', description: 'Cashbox UUID', type: String, format: 'uuid' })
+  @ApiBody({ type: RequestExplanationDto })
+  @ApiResponse({ status: 200, description: 'Explanation requested successfully' })
+  @ApiResponse({ status: 400, description: 'Cashbox is not closed or has no difference' })
+  requestExplanation(
+    @Param('id') id: string,
+    @Body() requestDto: RequestExplanationDto,
+    @Request() req,
+  ) {
+    return this.cashboxesService.requestExplanation(id, requestDto, req.user);
+  }
+
+  @Post(':id/reject-difference')
+  @Roles(UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Reject cashbox difference',
+    description: 'Reject a cashbox difference. Only Direction can reject differences. Resets approval status.',
+  })
+  @ApiParam({ name: 'id', description: 'Cashbox UUID', type: String, format: 'uuid' })
+  @ApiBody({ type: RejectDifferenceDto })
+  @ApiResponse({ status: 200, description: 'Difference rejected successfully' })
+  @ApiResponse({ status: 400, description: 'Cashbox is not closed or has no difference' })
+  @ApiResponse({ status: 403, description: 'Only Direction can reject differences' })
+  rejectDifference(
+    @Param('id') id: string,
+    @Body() rejectDto: RejectDifferenceDto,
+    @Request() req,
+  ) {
+    return this.cashboxesService.rejectDifference(id, rejectDto, req.user);
+  }
+
+  @Post(':id/manual-adjustment')
+  @Roles(UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Make manual adjustment to cashbox',
+    description: 'Make a manual adjustment to a closed cashbox. Only Direction can make adjustments. Creates a movement and recalculates differences.',
+  })
+  @ApiParam({ name: 'id', description: 'Cashbox UUID', type: String, format: 'uuid' })
+  @ApiBody({ type: ManualAdjustmentDto })
+  @ApiResponse({ status: 200, description: 'Manual adjustment made successfully' })
+  @ApiResponse({ status: 400, description: 'Cashbox is not closed' })
+  @ApiResponse({ status: 403, description: 'Only Direction can make manual adjustments' })
+  manualAdjustment(
+    @Param('id') id: string,
+    @Body() adjustmentDto: ManualAdjustmentDto,
+    @Request() req,
+  ) {
+    return this.cashboxesService.manualAdjustment(id, adjustmentDto, req.user);
+  }
+
+  @Get(':id/history')
+  @Roles(UserRole.OPERATOR, UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Get cashbox history',
+    description: 'Get detailed history of cashbox movements with filters and pagination. Includes summary of totals by type.',
+  })
+  @ApiParam({ name: 'id', description: 'Cashbox UUID', type: String, format: 'uuid' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cashbox history with pagination and summary',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { type: 'array', items: { type: 'object' } },
+        total: { type: 'number' },
+        page: { type: 'number' },
+        limit: { type: 'number' },
+        summary: {
+          type: 'object',
+          properties: {
+            totalRefills: { type: 'number' },
+            totalExpenses: { type: 'number' },
+            totalIncomes: { type: 'number' },
+            totalRefillsAmount: { type: 'number' },
+            totalExpensesAmount: { type: 'number' },
+            totalIncomesAmount: { type: 'number' },
+          },
+        },
+      },
+    },
+  })
+  getHistory(
+    @Param('id') id: string,
+    @Request() req,
+    @Query() filters: GetHistoryDto,
+  ) {
+    return this.cashboxesService.getHistory(id, filters, req.user);
   }
 
   @Delete(':id')
