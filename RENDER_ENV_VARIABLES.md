@@ -36,8 +36,15 @@ Render requiere las siguientes variables de entorno configuradas en el Dashboard
 
 ### JWT_EXPIRATION
 - **Valor:** `1d` (default)
-- **Descripción:** Tiempo de expiración del token JWT
-- **Estado:** ✅ Usado en `src/auth/auth.service.ts`
+- **Descripción:** Tiempo de expiración del access token JWT
+- **Estado:** ✅ Usado en `src/auth/auth.service.ts` (login y refresh)
+- **Recomendado:** Configurar en Render Dashboard
+
+### JWT_REFRESH_EXPIRATION
+- **Valor:** `7d` (default)
+- **Descripción:** Tiempo de expiración del refresh token JWT
+- **Estado:** ✅ Usado en `src/auth/auth.service.ts` (login y refresh)
+- **Recomendado:** Configurar en Render Dashboard
 
 ### COOKIE_DOMAIN
 - **Valor:** (opcional, para subdominios)
@@ -55,6 +62,8 @@ PORT=8080
 NODE_ENV=production
 DATABASE_URL=[Render lo proporciona automáticamente si usas PostgreSQL de Render]
 JWT_SECRET=[genera un secret seguro de al menos 32 caracteres]
+JWT_EXPIRATION=1d
+JWT_REFRESH_EXPIRATION=7d
 ```
 
 ## ✅ Verificación

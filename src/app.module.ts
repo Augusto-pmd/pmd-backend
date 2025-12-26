@@ -44,9 +44,9 @@ import { HealthModule } from './health/health.module';
       url: process.env.DATABASE_URL,
       autoLoadEntities: true,
       synchronize: false,
-      ssl: {
-        rejectUnauthorized: false
-      }
+      ssl: process.env.NODE_ENV === 'production' || process.env.DATABASE_URL
+        ? { rejectUnauthorized: false }
+        : false,
     }),
     CommonModule,
     AuthModule,
