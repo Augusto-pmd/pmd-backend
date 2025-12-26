@@ -8,6 +8,7 @@ import {
   MaxLength,
   Min,
   Max,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Currency } from '../../common/enums/currency.enum';
@@ -24,11 +25,12 @@ export class CreateExpenseDto {
   work_id: string;
 
   @ApiPropertyOptional({
-    description: 'Supplier UUID (optional, can be provisional)',
+    description: 'Supplier UUID (required if document_type is not VAL)',
     example: '123e4567-e89b-12d3-a456-426614174000',
     format: 'uuid',
   })
-  @IsUUID()
+  @ValidateIf((o) => o.document_type !== DocumentType.VAL)
+  @IsUUID({ message: 'supplier_id is required when document_type is not VAL' })
   @IsOptional()
   supplier_id?: string;
 
@@ -76,13 +78,18 @@ export class CreateExpenseDto {
   document_type: DocumentType;
 
   @ApiPropertyOptional({
-    description: 'Document number (invoice number, etc.)',
+    description: 'Document number (required for fiscal invoices: INVOICE_A, INVOICE_B, INVOICE_C)',
     example: '0001-00001234',
     maxLength: 100,
   })
-  @IsString()
-  @IsOptional()
+  @ValidateIf((o) => 
+    o.document_type === DocumentType.INVOICE_A ||
+    o.document_type === DocumentType.INVOICE_B ||
+    o.document_type === DocumentType.INVOICE_C
+  )
+  @IsString({ message: 'document_number is required for fiscal invoices' })
   @MaxLength(100)
+  @IsOptional()
   document_number?: string;
 
   @ApiPropertyOptional({
