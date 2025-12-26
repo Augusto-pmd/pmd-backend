@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,14 +15,20 @@ import { User } from '../users/user.entity';
 import { AlertsService } from '../alerts/alerts.service';
 import { AlertType, AlertSeverity } from '../common/enums';
 import { Supplier } from '../suppliers/suppliers.entity';
+import { Work } from '../works/works.entity';
+import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 
 @Injectable()
 export class ContractsService {
+  private readonly logger = new Logger(ContractsService.name);
+
   constructor(
     @InjectRepository(Contract)
     private contractRepository: Repository<Contract>,
     @InjectRepository(Supplier)
     private supplierRepository: Repository<Supplier>,
+    @InjectRepository(Work)
+    private workRepository: Repository<Work>,
     private alertsService: AlertsService,
   ) {}
 
@@ -69,19 +76,27 @@ export class ContractsService {
 
   async findAll(user: User): Promise<Contract[]> {
     try {
-      return await this.contractRepository.find({
-        relations: ['work', 'supplier', 'rubric'],
-        order: { created_at: 'DESC' },
-      });
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[ContractsService.findAll] Error:', error);
+      const organizationId = getOrganizationId(user);
+      const queryBuilder = this.contractRepository
+        .createQueryBuilder('contract')
+        .leftJoinAndSelect('contract.work', 'work')
+        .leftJoinAndSelect('contract.supplier', 'supplier')
+        .leftJoinAndSelect('contract.rubric', 'rubric');
+
+      // Filter by organization_id through work
+      if (organizationId) {
+        queryBuilder.where('work.organization_id = :organizationId', { organizationId });
       }
+
+      return await queryBuilder.orderBy('contract.created_at', 'DESC').getMany();
+    } catch (error) {
+      this.logger.error('Error fetching contracts', error);
       return [];
     }
   }
 
   async findOne(id: string, user: User): Promise<Contract> {
+    const organizationId = getOrganizationId(user);
     const contract = await this.contractRepository.findOne({
       where: { id },
       relations: ['work', 'supplier', 'rubric'],
@@ -89,6 +104,11 @@ export class ContractsService {
 
     if (!contract) {
       throw new NotFoundException(`Contract with ID ${id} not found`);
+    }
+
+    // Validate ownership through work.organization_id
+    if (organizationId && contract.work?.organization_id !== organizationId) {
+      throw new ForbiddenException('Contract does not belong to your organization');
     }
 
     return contract;
@@ -124,11 +144,26 @@ export class ContractsService {
       );
     }
 
+    // Validate amount_executed is not negative
+    if (updateContractDto.amount_executed !== undefined && updateContractDto.amount_executed < 0) {
+      throw new BadRequestException('amount_executed cannot be negative');
+    }
+
+    // Validate amount_total is not negative
+    if (updateContractDto.amount_total !== undefined && updateContractDto.amount_total < 0) {
+      throw new BadRequestException('amount_total cannot be negative');
+    }
+
     // Update amount_executed
     if (updateContractDto.amount_executed !== undefined) {
       const previousAmountExecuted = Number(contract.amount_executed);
       const newAmountExecuted = updateContractDto.amount_executed;
       const amountTotal = Number(contract.amount_total);
+      
+      // Validate amount_executed <= amount_total
+      if (newAmountExecuted > amountTotal) {
+        throw new BadRequestException('amount_executed cannot exceed amount_total');
+      }
       
       contract.amount_executed = newAmountExecuted;
 
@@ -178,15 +213,26 @@ export class ContractsService {
     if (updateContractDto.file_url !== undefined) {
       contract.file_url = updateContractDto.file_url;
     }
+    
+    // Validate date range: end_date must be after start_date
+    const newStartDate = updateContractDto.start_date
+      ? new Date(updateContractDto.start_date)
+      : contract.start_date;
+    const newEndDate = updateContractDto.end_date
+      ? new Date(updateContractDto.end_date)
+      : contract.end_date;
+    
+    if (newStartDate && newEndDate) {
+      if (newEndDate <= newStartDate) {
+        throw new BadRequestException('end_date must be after start_date');
+      }
+    }
+    
     if (updateContractDto.start_date !== undefined) {
-      contract.start_date = updateContractDto.start_date
-        ? new Date(updateContractDto.start_date)
-        : null;
+      contract.start_date = newStartDate;
     }
     if (updateContractDto.end_date !== undefined) {
-      contract.end_date = updateContractDto.end_date
-        ? new Date(updateContractDto.end_date)
-        : null;
+      contract.end_date = newEndDate;
     }
 
     return await this.contractRepository.save(contract);
