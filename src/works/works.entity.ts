@@ -12,6 +12,7 @@ import { User } from '../users/user.entity';
 import { Organization } from '../organizations/organization.entity';
 import { Currency } from '../common/enums/currency.enum';
 import { WorkStatus } from '../common/enums/work-status.enum';
+import { WorkType } from '../common/enums/work-type.enum';
 import { WorkBudget } from '../work-budgets/work-budgets.entity';
 import { Contract } from '../contracts/contracts.entity';
 import { Expense } from '../expenses/expenses.entity';
@@ -52,6 +53,13 @@ export class Work {
   })
   currency: Currency;
 
+  @Column({
+    type: 'enum',
+    enum: WorkType,
+    nullable: true,
+  })
+  work_type: WorkType;
+
   @Column({ type: 'uuid', nullable: true })
   supervisor_id: string;
 
@@ -83,6 +91,19 @@ export class Work {
 
   @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
   financial_progress: number;
+
+  @Column({ type: 'boolean', default: false })
+  allow_post_closure_expenses: boolean;
+
+  @Column({ type: 'uuid', nullable: true })
+  post_closure_enabled_by_id: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'post_closure_enabled_by_id' })
+  post_closure_enabled_by: User;
+
+  @Column({ type: 'timestamp', nullable: true })
+  post_closure_enabled_at: Date;
 
   @CreateDateColumn()
   created_at: Date;

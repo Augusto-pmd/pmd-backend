@@ -12,6 +12,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Currency } from '../../common/enums/currency.enum';
 import { WorkStatus } from '../../common/enums/work-status.enum';
+import { WorkType } from '../../common/enums/work-type.enum';
 
 export class CreateWorkDto {
   @ApiProperty({
@@ -74,6 +75,15 @@ export class CreateWorkDto {
   })
   @IsEnum(Currency)
   currency: Currency;
+
+  @ApiPropertyOptional({
+    description: 'Work type',
+    enum: WorkType,
+    example: WorkType.HOUSE,
+  })
+  @IsEnum(WorkType)
+  @IsOptional()
+  work_type?: WorkType;
 
   @ApiPropertyOptional({
     description: 'Supervisor user UUID (optional)',
