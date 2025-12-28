@@ -7,10 +7,11 @@ import { SupplierDocument } from '../supplier-documents/supplier-documents.entit
 import { Expense } from '../expenses/expenses.entity';
 import { Contract } from '../contracts/contracts.entity';
 import { Schedule } from '../schedule/schedule.entity';
+import { User } from '../users/user.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Alert, SupplierDocument, Expense, Contract, Schedule]),
+    TypeOrmModule.forFeature([Alert, SupplierDocument, Expense, Contract, Schedule, User]),
   ],
   controllers: [AlertsController],
   providers: [AlertsService],

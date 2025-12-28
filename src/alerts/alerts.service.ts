@@ -6,11 +6,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, LessThanOrEqual, Between } from 'typeorm';
 import { Alert } from './alerts.entity';
+import { User } from '../users/user.entity';
 import { CreateAlertDto } from './dto/create-alert.dto';
 import { UpdateAlertDto } from './dto/update-alert.dto';
 import { MarkReadAlertDto } from './dto/mark-read-alert.dto';
-import { AlertType, AlertSeverity } from '../common/enums';
-import { User } from '../users/user.entity';
+import { AssignAlertDto } from './dto/assign-alert.dto';
+import { ResolveAlertDto } from './dto/resolve-alert.dto';
+import { AlertType, AlertSeverity, AlertStatus } from '../common/enums';
 import { SupplierDocument } from '../supplier-documents/supplier-documents.entity';
 import { Expense } from '../expenses/expenses.entity';
 import { Contract } from '../contracts/contracts.entity';
@@ -32,6 +34,8 @@ export class AlertsService {
     private contractRepository: Repository<Contract>,
     @InjectRepository(Schedule)
     private scheduleRepository: Repository<Schedule>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {}
 
   /**
@@ -246,7 +250,7 @@ export class AlertsService {
     try {
       return await this.alertRepository.find({
         where: user?.role?.name === 'operator' ? { user_id: user.id } : {},
-        relations: ['user', 'work', 'supplier', 'expense', 'contract', 'cashbox'],
+        relations: ['user', 'work', 'supplier', 'expense', 'contract', 'cashbox', 'assigned_to', 'resolved_by'],
         order: { created_at: 'DESC' },
       });
     } catch (error) {
@@ -263,7 +267,7 @@ export class AlertsService {
         is_read: false,
         ...(user.role.name === 'operator' ? { user_id: user.id } : {}),
       },
-      relations: ['user', 'work', 'supplier', 'expense', 'contract', 'cashbox'],
+      relations: ['user', 'work', 'supplier', 'expense', 'contract', 'cashbox', 'assigned_to', 'resolved_by'],
       order: { created_at: 'DESC' },
     });
   }
@@ -271,7 +275,7 @@ export class AlertsService {
   async findOne(id: string, user: User): Promise<Alert> {
     const alert = await this.alertRepository.findOne({
       where: { id },
-      relations: ['user', 'work', 'supplier', 'expense', 'contract', 'cashbox'],
+      relations: ['user', 'work', 'supplier', 'expense', 'contract', 'cashbox', 'assigned_to', 'resolved_by'],
     });
 
     if (!alert) {
@@ -306,6 +310,70 @@ export class AlertsService {
 
     const alert = await this.findOne(id, user);
     await this.alertRepository.remove(alert);
+  }
+
+  /**
+   * Assign alert to a user
+   * Business Rule: Only Administration and Direction can assign alerts
+   * Business Rule: When assigned, status changes to IN_REVIEW
+   */
+  async assign(id: string, assignDto: AssignAlertDto, user: User): Promise<Alert> {
+    // Only Administration and Direction can assign alerts
+    if (user.role.name !== 'administration' && user.role.name !== 'direction') {
+      throw new ForbiddenException('Only Administration and Direction can assign alerts');
+    }
+
+    // Verify that the assigned user exists
+    const assignedUser = await this.userRepository.findOne({
+      where: { id: assignDto.assigned_to_id },
+    });
+
+    if (!assignedUser) {
+      throw new NotFoundException(`User with ID ${assignDto.assigned_to_id} not found`);
+    }
+
+    const alert = await this.findOne(id, user);
+
+    // Update alert with assignment
+    alert.assigned_to_id = assignDto.assigned_to_id;
+    alert.status = AlertStatus.IN_REVIEW;
+
+    return await this.alertRepository.save(alert);
+  }
+
+  /**
+   * Resolve alert
+   * Business Rule: Only assigned user, Administration, or Direction can resolve
+   * Business Rule: When resolved, status changes to RESOLVED and records who resolved and when
+   */
+  async resolve(id: string, resolveDto: ResolveAlertDto, user: User): Promise<Alert> {
+    const alert = await this.findOne(id, user);
+
+    // Check permissions: assigned user, Administration, or Direction can resolve
+    const canResolve =
+      alert.assigned_to_id === user.id ||
+      user.role.name === 'administration' ||
+      user.role.name === 'direction';
+
+    if (!canResolve) {
+      throw new ForbiddenException('You do not have permission to resolve this alert');
+    }
+
+    // Update alert with resolution
+    alert.status = AlertStatus.RESOLVED;
+    alert.resolved_by_id = user.id;
+    alert.resolved_at = new Date();
+
+    // Store resolution notes in metadata if provided
+    if (resolveDto.resolution_notes) {
+      alert.metadata = {
+        ...alert.metadata,
+        resolution_notes: resolveDto.resolution_notes,
+        resolved_at: alert.resolved_at.toISOString(),
+      };
+    }
+
+    return await this.alertRepository.save(alert);
   }
 }
 

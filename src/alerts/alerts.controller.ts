@@ -25,6 +25,8 @@ import { AlertsService } from './alerts.service';
 import { CreateAlertDto } from './dto/create-alert.dto';
 import { UpdateAlertDto } from './dto/update-alert.dto';
 import { MarkReadAlertDto } from './dto/mark-read-alert.dto';
+import { AssignAlertDto } from './dto/assign-alert.dto';
+import { ResolveAlertDto } from './dto/resolve-alert.dto';
 
 @ApiTags('Alerts')
 @ApiBearerAuth('JWT-auth')
@@ -92,6 +94,36 @@ export class AlertsController {
   @ApiResponse({ status: 200, description: 'Alert marked as read' })
   markAsRead(@Param('id') id: string, @Body() markReadDto: MarkReadAlertDto, @Request() req) {
     return this.alertsService.markAsRead(id, markReadDto, req.user);
+  }
+
+  @Post(':id/assign')
+  @Roles(UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Assign alert to a user',
+    description: 'Assign an alert to a user. Status will change to IN_REVIEW. Only Administration and Direction can assign alerts.',
+  })
+  @ApiParam({ name: 'id', description: 'Alert UUID', type: String, format: 'uuid' })
+  @ApiBody({ type: AssignAlertDto })
+  @ApiResponse({ status: 200, description: 'Alert assigned successfully' })
+  @ApiResponse({ status: 403, description: 'Only Administration and Direction can assign alerts' })
+  @ApiResponse({ status: 404, description: 'Alert not found' })
+  assign(@Param('id') id: string, @Body() assignDto: AssignAlertDto, @Request() req) {
+    return this.alertsService.assign(id, assignDto, req.user);
+  }
+
+  @Post(':id/resolve')
+  @Roles(UserRole.OPERATOR, UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Resolve alert',
+    description: 'Resolve an alert. Status will change to RESOLVED. Assigned user, Administration, or Direction can resolve.',
+  })
+  @ApiParam({ name: 'id', description: 'Alert UUID', type: String, format: 'uuid' })
+  @ApiBody({ type: ResolveAlertDto })
+  @ApiResponse({ status: 200, description: 'Alert resolved successfully' })
+  @ApiResponse({ status: 403, description: 'You do not have permission to resolve this alert' })
+  @ApiResponse({ status: 404, description: 'Alert not found' })
+  resolve(@Param('id') id: string, @Body() resolveDto: ResolveAlertDto, @Request() req) {
+    return this.alertsService.resolve(id, resolveDto, req.user);
   }
 
   @Delete(':id')
