@@ -71,9 +71,17 @@ export class AccountingController {
   @ApiOperation({ summary: 'Get IVA Purchases Book report' })
   @ApiQuery({ name: 'month', description: 'Month (1-12)', type: Number })
   @ApiQuery({ name: 'year', description: 'Year', type: Number })
+  @ApiQuery({ name: 'workId', description: 'Work ID (optional)', type: String, required: false })
+  @ApiQuery({ name: 'supplierId', description: 'Supplier ID (optional)', type: String, required: false })
   @ApiResponse({ status: 200, description: 'Purchases book report' })
-  getPurchasesBook(@Query('month') month: number, @Query('year') year: number, @Request() req) {
-    return this.accountingService.getPurchasesBook(month, year, req.user);
+  getPurchasesBook(
+    @Query('month') month: number,
+    @Query('year') year: number,
+    @Query('workId') workId?: string,
+    @Query('supplierId') supplierId?: string,
+    @Request() req?,
+  ) {
+    return this.accountingService.getPurchasesBook(month, year, req.user, workId, supplierId);
   }
 
   @Get('perceptions')
@@ -81,9 +89,17 @@ export class AccountingController {
   @ApiOperation({ summary: 'Get perceptions report' })
   @ApiQuery({ name: 'month', description: 'Month (1-12)', type: Number })
   @ApiQuery({ name: 'year', description: 'Year', type: Number })
+  @ApiQuery({ name: 'workId', description: 'Work ID (optional)', type: String, required: false })
+  @ApiQuery({ name: 'supplierId', description: 'Supplier ID (optional)', type: String, required: false })
   @ApiResponse({ status: 200, description: 'Perceptions report' })
-  getPerceptionsReport(@Query('month') month: number, @Query('year') year: number, @Request() req) {
-    return this.accountingService.getPerceptionsReport(month, year, req.user);
+  getPerceptionsReport(
+    @Query('month') month: number,
+    @Query('year') year: number,
+    @Query('workId') workId?: string,
+    @Query('supplierId') supplierId?: string,
+    @Request() req?,
+  ) {
+    return this.accountingService.getPerceptionsReport(month, year, req.user, workId, supplierId);
   }
 
   @Get('withholdings')
@@ -91,9 +107,17 @@ export class AccountingController {
   @ApiOperation({ summary: 'Get withholdings report' })
   @ApiQuery({ name: 'month', description: 'Month (1-12)', type: Number })
   @ApiQuery({ name: 'year', description: 'Year', type: Number })
+  @ApiQuery({ name: 'workId', description: 'Work ID (optional)', type: String, required: false })
+  @ApiQuery({ name: 'supplierId', description: 'Supplier ID (optional)', type: String, required: false })
   @ApiResponse({ status: 200, description: 'Withholdings report' })
-  getWithholdingsReport(@Query('month') month: number, @Query('year') year: number, @Request() req) {
-    return this.accountingService.getWithholdingsReport(month, year, req.user);
+  getWithholdingsReport(
+    @Query('month') month: number,
+    @Query('year') year: number,
+    @Query('workId') workId?: string,
+    @Query('supplierId') supplierId?: string,
+    @Request() req?,
+  ) {
+    return this.accountingService.getWithholdingsReport(month, year, req.user, workId, supplierId);
   }
 
   @Get(':id')
