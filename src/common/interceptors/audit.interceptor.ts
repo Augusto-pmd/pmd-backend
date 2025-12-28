@@ -126,8 +126,9 @@ export class AuditInterceptor implements NestInterceptor {
       case 'PATCH':
         // UPDATE: previous value includes what was sent, new value is the updated entity
         // Enhanced: Include more context in previous_value
-        const previousData = body ? {
-          ...this.sanitizeData(body),
+        const sanitizedBody = this.sanitizeData(body);
+        const previousData = body && typeof sanitizedBody === 'object' && !Array.isArray(sanitizedBody) ? {
+          ...(sanitizedBody as Record<string, any>),
           _audit_note: 'Data sent in request (may not include all fields)',
         } : null;
         

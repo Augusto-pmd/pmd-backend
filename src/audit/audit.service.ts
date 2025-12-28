@@ -127,6 +127,12 @@ export class AuditService {
     deviceInfo?: Record<string, any>,
     metadata?: Record<string, any>,
   ): Promise<AuditLog> {
+    // Build device_info with metadata if provided
+    const finalDeviceInfo = deviceInfo || this.extractDeviceInfo(userAgent);
+    if (metadata) {
+      finalDeviceInfo.metadata = metadata;
+    }
+
     const auditLog = this.auditLogRepository.create({
       user_id: userId,
       action,
@@ -136,12 +142,11 @@ export class AuditService {
       previous_value: action === 'login' ? { status: 'logged_out' } : null,
       new_value: action === 'login' ? { status: 'logged_in', timestamp: new Date().toISOString() } : 
                  action === 'logout' ? { status: 'logged_out', timestamp: new Date().toISOString() } :
-                 { status: 'login_failed', timestamp: new Date().toISOString(), ...metadata },
+                 { status: 'login_failed', timestamp: new Date().toISOString(), ...(metadata || {}) },
       ip_address: ipAddress,
       user_agent: userAgent,
-      device_info: deviceInfo || this.extractDeviceInfo(userAgent),
+      device_info: finalDeviceInfo,
       criticality: action === 'login_failed' ? 'medium' : 'high',
-      metadata: metadata || {},
     });
 
     return await this.auditLogRepository.save(auditLog);
