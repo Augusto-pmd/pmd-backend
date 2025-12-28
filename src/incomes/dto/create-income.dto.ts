@@ -12,6 +12,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Currency } from '../../common/enums/currency.enum';
 import { IncomeType } from '../../common/enums/income-type.enum';
+import { PaymentMethod } from '../../common/enums/payment-method.enum';
 
 export class CreateIncomeDto {
   @ApiProperty({
@@ -93,5 +94,14 @@ export class CreateIncomeDto {
   @IsString()
   @IsOptional()
   observations?: string;
+
+  @ApiPropertyOptional({
+    description: 'Payment method',
+    enum: PaymentMethod,
+    example: PaymentMethod.TRANSFER,
+  })
+  @IsEnum(PaymentMethod)
+  @IsOptional()
+  payment_method?: PaymentMethod;
 }
 

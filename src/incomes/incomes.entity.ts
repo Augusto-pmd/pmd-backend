@@ -10,6 +10,7 @@ import {
 import { Work } from '../works/works.entity';
 import { Currency } from '../common/enums/currency.enum';
 import { IncomeType } from '../common/enums/income-type.enum';
+import { PaymentMethod } from '../common/enums/payment-method.enum';
 
 @Entity('incomes')
 export class Income {
@@ -58,6 +59,13 @@ export class Income {
 
   @Column({ type: 'text', nullable: true })
   observations: string;
+
+  @Column({
+    type: 'enum',
+    enum: PaymentMethod,
+    nullable: true,
+  })
+  payment_method: PaymentMethod;
 
   @CreateDateColumn()
   created_at: Date;

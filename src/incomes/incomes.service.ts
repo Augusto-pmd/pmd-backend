@@ -39,9 +39,10 @@ export class IncomesService {
     const income = this.incomeRepository.create(createIncomeDto);
     const savedIncome = await this.incomeRepository.save(income);
 
-    // Update work totals if income is validated
+    // Update work totals and progress if income is validated
     if (createIncomeDto.is_validated) {
       await this.worksService.updateWorkTotals(work.id);
+      await this.worksService.updateAllProgress(work.id);
     }
 
     return savedIncome;
@@ -97,9 +98,10 @@ export class IncomesService {
     Object.assign(income, updateIncomeDto);
     const savedIncome = await this.incomeRepository.save(income);
 
-    // Update work totals if validation status changed
+    // Update work totals and progress if validation status changed
     if (wasValidated !== savedIncome.is_validated) {
       await this.worksService.updateWorkTotals(savedIncome.work_id);
+      await this.worksService.updateAllProgress(savedIncome.work_id);
     }
 
     return savedIncome;
