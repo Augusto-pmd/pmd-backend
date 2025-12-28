@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AccountingService } from './accounting.service';
+import { CalculationsService } from './calculations.service';
 import { AccountingController } from './accounting.controller';
 import { AccountingRecord } from './accounting.entity';
 import { Organization } from '../organizations/organization.entity';
@@ -19,8 +20,8 @@ import { Contract } from '../contracts/contracts.entity';
     ]),
   ],
   controllers: [AccountingController],
-  providers: [AccountingService],
-  exports: [AccountingService],
+  providers: [AccountingService, CalculationsService],
+  exports: [AccountingService, CalculationsService],
 })
 export class AccountingModule {}
 

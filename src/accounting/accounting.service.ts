@@ -326,7 +326,13 @@ export class AccountingService {
   }
 
   // Reports
-  async getPurchasesBook(month: number, year: number, user: User): Promise<AccountingRecord[]> {
+  async getPurchasesBook(
+    month: number,
+    year: number,
+    user: User,
+    workId?: string,
+    supplierId?: string,
+  ): Promise<AccountingRecord[]> {
     // Only Administration and Direction can view reports
     if (
       user.role.name !== UserRole.ADMINISTRATION &&
@@ -335,18 +341,40 @@ export class AccountingService {
       throw new ForbiddenException('Only Administration and Direction can view reports');
     }
 
-    return await this.accountingRepository.find({
-      where: {
-        month,
-        year,
-        accounting_type: AccountingType.FISCAL,
-      },
-      relations: ['supplier', 'work'],
-      order: { date: 'ASC' },
-    });
+    const organizationId = getOrganizationId(user);
+    const queryBuilder = this.accountingRepository
+      .createQueryBuilder('record')
+      .leftJoinAndSelect('record.supplier', 'supplier')
+      .leftJoinAndSelect('record.work', 'work')
+      .where('record.month = :month', { month })
+      .andWhere('record.year = :year', { year })
+      .andWhere('record.accounting_type = :type', { type: AccountingType.FISCAL });
+
+    // Filter by organization
+    if (organizationId) {
+      queryBuilder.andWhere('work.organization_id = :organizationId', { organizationId });
+    }
+
+    // Filter by work
+    if (workId) {
+      queryBuilder.andWhere('record.work_id = :workId', { workId });
+    }
+
+    // Filter by supplier
+    if (supplierId) {
+      queryBuilder.andWhere('record.supplier_id = :supplierId', { supplierId });
+    }
+
+    return await queryBuilder.orderBy('record.date', 'ASC').getMany();
   }
 
-  async getPerceptionsReport(month: number, year: number, user: User): Promise<PerceptionsReport> {
+  async getPerceptionsReport(
+    month: number,
+    year: number,
+    user: User,
+    workId?: string,
+    supplierId?: string,
+  ): Promise<PerceptionsReport> {
     if (
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
@@ -354,29 +382,55 @@ export class AccountingService {
       throw new ForbiddenException('Only Administration and Direction can view reports');
     }
 
-    const records = await this.accountingRepository.find({
-      where: {
-        month,
-        year,
-      },
-    });
+    const organizationId = getOrganizationId(user);
+    const queryBuilder = this.accountingRepository
+      .createQueryBuilder('record')
+      .leftJoinAndSelect('record.supplier', 'supplier')
+      .leftJoinAndSelect('record.work', 'work')
+      .where('record.month = :month', { month })
+      .andWhere('record.year = :year', { year });
+
+    // Filter by organization
+    if (organizationId) {
+      queryBuilder.andWhere('work.organization_id = :organizationId', { organizationId });
+    }
+
+    // Filter by work
+    if (workId) {
+      queryBuilder.andWhere('record.work_id = :workId', { workId });
+    }
+
+    // Filter by supplier
+    if (supplierId) {
+      queryBuilder.andWhere('record.supplier_id = :supplierId', { supplierId });
+    }
+
+    const records = await queryBuilder.getMany();
+
+    const filteredRecords = records.filter(
+      (r) => r.vat_perception > 0 || r.iibb_perception > 0,
+    );
 
     return {
-      total_vat_perception: records.reduce(
+      total_vat_perception: filteredRecords.reduce(
         (sum, r) => sum + parseFloat(r.vat_perception?.toString() || '0'),
         0,
       ),
-      total_iibb_perception: records.reduce(
+      total_iibb_perception: filteredRecords.reduce(
         (sum, r) => sum + parseFloat(r.iibb_perception?.toString() || '0'),
         0,
       ),
-      records: records.filter(
-        (r) => r.vat_perception > 0 || r.iibb_perception > 0,
-      ),
+      records: filteredRecords,
     };
   }
 
-  async getWithholdingsReport(month: number, year: number, user: User): Promise<WithholdingsReport> {
+  async getWithholdingsReport(
+    month: number,
+    year: number,
+    user: User,
+    workId?: string,
+    supplierId?: string,
+  ): Promise<WithholdingsReport> {
     if (
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
@@ -384,25 +438,45 @@ export class AccountingService {
       throw new ForbiddenException('Only Administration and Direction can view reports');
     }
 
-    const records = await this.accountingRepository.find({
-      where: {
-        month,
-        year,
-      },
-    });
+    const organizationId = getOrganizationId(user);
+    const queryBuilder = this.accountingRepository
+      .createQueryBuilder('record')
+      .leftJoinAndSelect('record.supplier', 'supplier')
+      .leftJoinAndSelect('record.work', 'work')
+      .where('record.month = :month', { month })
+      .andWhere('record.year = :year', { year });
+
+    // Filter by organization
+    if (organizationId) {
+      queryBuilder.andWhere('work.organization_id = :organizationId', { organizationId });
+    }
+
+    // Filter by work
+    if (workId) {
+      queryBuilder.andWhere('record.work_id = :workId', { workId });
+    }
+
+    // Filter by supplier
+    if (supplierId) {
+      queryBuilder.andWhere('record.supplier_id = :supplierId', { supplierId });
+    }
+
+    const records = await queryBuilder.getMany();
+
+    const filteredRecords = records.filter(
+      (r) => r.vat_withholding > 0 || r.income_tax_withholding > 0,
+    );
 
     return {
-      total_vat_withholding: records.reduce(
+      total_vat_withholding: filteredRecords.reduce(
         (sum, r) => sum + parseFloat(r.vat_withholding?.toString() || '0'),
         0,
       ),
-      total_income_tax_withholding: records.reduce(
+      total_income_tax_withholding: filteredRecords.reduce(
         (sum, r) => sum + parseFloat(r.income_tax_withholding?.toString() || '0'),
         0,
       ),
-      records: records.filter(
-        (r) => r.vat_withholding > 0 || r.income_tax_withholding > 0,
-      ),
+      records: filteredRecords,
     };
   }
 }
