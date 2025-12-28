@@ -25,6 +25,7 @@ import { AccountingRecord } from '../accounting/accounting.entity';
 import { AccountingType } from '../common/enums/accounting-type.enum';
 import { Contract } from '../contracts/contracts.entity';
 import { ContractsService } from '../contracts/contracts.service';
+import { ContractStatus } from '../common/enums/contract-status.enum';
 import { SupplierDocument } from '../supplier-documents/supplier-documents.entity';
 import { SupplierDocumentType } from '../common/enums/supplier-document-type.enum';
 import { SupplierStatus } from '../common/enums/supplier-status.enum';
@@ -394,6 +395,13 @@ export class ExpensesService {
     await queryRunner.startTransaction();
 
     try {
+      // Save original state BEFORE changing it (for reversal logic)
+      const originalState = expense.state;
+      const wasValidated = originalState === ExpenseState.VALIDATED;
+      const isBeingRejected =
+        validateDto.state === ExpenseState.OBSERVED ||
+        validateDto.state === ExpenseState.ANNULLED;
+
       // 1. Buscar contrato del proveedor en la obra
       let contract: Contract | null = null;
       if (expense.supplier_id && expense.work_id) {
@@ -409,31 +417,33 @@ export class ExpensesService {
         if (contract) {
           expense.contract_id = contract.id;
 
-          // 3. Validar que el contrato tenga saldo disponible
-          const amountTotal = Number(contract.amount_total);
-          const amountExecuted = Number(contract.amount_executed);
-          const expenseAmount = Number(expense.amount);
-          const availableBalance = amountTotal - amountExecuted;
+          // 3. Validar que el contrato tenga saldo disponible (only if validating, not if rejecting)
+          if (validateDto.state === ExpenseState.VALIDATED) {
+            const amountTotal = Number(contract.amount_total);
+            const amountExecuted = Number(contract.amount_executed);
+            const expenseAmount = Number(expense.amount);
+            const availableBalance = amountTotal - amountExecuted;
 
-          // 4. Si no hay saldo, bloquear y alertar
-          if (availableBalance < expenseAmount) {
-            await queryRunner.rollbackTransaction();
-            await queryRunner.release();
+            // 4. Si no hay saldo, bloquear y alertar
+            if (availableBalance < expenseAmount) {
+              await queryRunner.rollbackTransaction();
+              await queryRunner.release();
 
-            // Generate alert
-            await this.alertsService.createAlert({
-              type: AlertType.CONTRACT_INSUFFICIENT_BALANCE,
-              severity: AlertSeverity.CRITICAL,
-              title: 'Insufficient contract balance',
-              message: `Contract ${contract.id} has insufficient balance. Available: ${availableBalance.toFixed(2)}, Required: ${expenseAmount.toFixed(2)}`,
-              contract_id: contract.id,
-              expense_id: expense.id,
-              user_id: user.id,
-            });
+              // Generate alert
+              await this.alertsService.createAlert({
+                type: AlertType.CONTRACT_INSUFFICIENT_BALANCE,
+                severity: AlertSeverity.CRITICAL,
+                title: 'Insufficient contract balance',
+                message: `Contract ${contract.id} has insufficient balance. Available: ${availableBalance.toFixed(2)}, Required: ${expenseAmount.toFixed(2)}`,
+                contract_id: contract.id,
+                expense_id: expense.id,
+                user_id: user.id,
+              });
 
-            throw new BadRequestException(
-              `Contract has insufficient balance. Available: ${availableBalance.toFixed(2)}, Required: ${expenseAmount.toFixed(2)}`,
-            );
+              throw new BadRequestException(
+                `Contract has insufficient balance. Available: ${availableBalance.toFixed(2)}, Required: ${expenseAmount.toFixed(2)}`,
+              );
+            }
           }
         }
       }
@@ -445,13 +455,7 @@ export class ExpensesService {
         expense.observations = validateDto.observations;
       }
 
-      // Check if expense was previously validated and is now being rejected/observed/annulled
-      const wasValidated = expense.state === ExpenseState.VALIDATED;
-      const isBeingRejected =
-        validateDto.state === ExpenseState.OBSERVED ||
-        validateDto.state === ExpenseState.ANNULLED;
-
-      // If expense was validated and is now being rejected, revert contract balance
+      // If expense was previously validated and is now being rejected/observed/annulled, revert contract balance
       if (wasValidated && isBeingRejected && expense.contract_id) {
         const existingContract = await queryRunner.manager.findOne(Contract, {
           where: { id: expense.contract_id },
@@ -463,6 +467,32 @@ export class ExpensesService {
             0,
             Number(existingContract.amount_executed) - Number(expense.amount),
           );
+          
+          // Update contract status after reverting balance
+          const amountTotal = Number(existingContract.amount_total);
+          const amountExecuted = Number(existingContract.amount_executed);
+          const saldo = amountTotal - amountExecuted;
+          
+          // If balance is restored, update status accordingly
+          if (saldo > 0) {
+            const balancePercentage = (saldo / amountTotal) * 100;
+            if (balancePercentage < 10) {
+              if (existingContract.status !== ContractStatus.CANCELLED && existingContract.status !== ContractStatus.FINISHED && existingContract.status !== ContractStatus.PAUSED) {
+                existingContract.status = ContractStatus.LOW_BALANCE;
+              }
+            } else {
+              if (existingContract.status === ContractStatus.NO_BALANCE || existingContract.status === ContractStatus.LOW_BALANCE) {
+                existingContract.status = ContractStatus.ACTIVE;
+              }
+            }
+            // Unblock contract if balance was restored
+            if (existingContract.is_blocked && saldo > 0) {
+              existingContract.is_blocked = false;
+            }
+          } else {
+            existingContract.status = ContractStatus.NO_BALANCE;
+          }
+          
           await queryRunner.manager.save(Contract, existingContract);
         }
       }
@@ -498,6 +528,29 @@ export class ExpensesService {
               contract_id: contract.id,
               work_id: contract.work_id,
             });
+          }
+          
+          // Update contract status automatically based on balance
+          // If no balance, status is NO_BALANCE
+          if (saldo <= 0) {
+            if (contract.status !== ContractStatus.CANCELLED && contract.status !== ContractStatus.FINISHED) {
+              contract.status = ContractStatus.NO_BALANCE;
+            }
+          } else {
+            // If balance is low (< 10% of total), status is LOW_BALANCE
+            const balancePercentage = (saldo / Number(contract.amount_total)) * 100;
+            if (balancePercentage < 10) {
+              if (contract.status !== ContractStatus.CANCELLED && contract.status !== ContractStatus.FINISHED && contract.status !== ContractStatus.PAUSED) {
+                contract.status = ContractStatus.LOW_BALANCE;
+              }
+            } else if (!contract.is_blocked && saldo > 0) {
+              // If contract has balance and is not blocked, it's ACTIVE
+              if (contract.status === ContractStatus.PENDING || contract.status === ContractStatus.APPROVED) {
+                contract.status = ContractStatus.ACTIVE;
+              } else if (contract.status !== ContractStatus.ACTIVE && contract.status !== ContractStatus.CANCELLED && contract.status !== ContractStatus.FINISHED && contract.status !== ContractStatus.PAUSED) {
+                contract.status = ContractStatus.ACTIVE;
+              }
+            }
           }
           
           await queryRunner.manager.save(Contract, contract);
