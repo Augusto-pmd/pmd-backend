@@ -103,6 +103,34 @@ export class WorksController {
     return this.worksService.close(id, req.user);
   }
 
+  @Post(':id/allow-post-closure')
+  @Roles(UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Allow post-closure expenses',
+    description: 'Enable post-closure expenses for a closed work. Only Direction can enable this. Expenses created after closure will be marked as post-closure.',
+  })
+  @ApiParam({ name: 'id', description: 'Work UUID', type: String, format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Post-closure expenses enabled successfully' })
+  @ApiResponse({ status: 400, description: 'Work is not closed' })
+  @ApiResponse({ status: 403, description: 'Only Direction can enable post-closure expenses' })
+  @ApiResponse({ status: 404, description: 'Work not found' })
+  allowPostClosure(@Param('id') id: string, @Request() req) {
+    return this.worksService.allowPostClosure(id, req.user);
+  }
+
+  @Post(':id/update-progress')
+  @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Update all progress indicators',
+    description: 'Recalculate and update physical, economic, and financial progress for a work. This is usually called automatically but can be triggered manually.',
+  })
+  @ApiParam({ name: 'id', description: 'Work UUID', type: String, format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Progress updated successfully' })
+  @ApiResponse({ status: 404, description: 'Work not found' })
+  updateProgress(@Param('id') id: string, @Request() req) {
+    return this.worksService.updateAllProgress(id);
+  }
+
   @Delete(':id')
   @Roles(UserRole.DIRECTION)
   @ApiOperation({
