@@ -8,6 +8,8 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SupplierStatus } from '../../common/enums/supplier-status.enum';
+import { SupplierType } from '../../common/enums/supplier-type.enum';
+import { FiscalCondition } from '../../common/enums/fiscal-condition.enum';
 import { IsCuit } from '../../common/validators/cuit.validator';
 
 export class CreateSupplierDto {
@@ -78,6 +80,24 @@ export class CreateSupplierDto {
   @IsString()
   @IsOptional()
   address?: string;
+
+  @ApiPropertyOptional({
+    description: 'Supplier type',
+    enum: SupplierType,
+    example: SupplierType.MATERIALS,
+  })
+  @IsEnum(SupplierType)
+  @IsOptional()
+  type?: SupplierType;
+
+  @ApiPropertyOptional({
+    description: 'Fiscal condition of the supplier',
+    enum: FiscalCondition,
+    example: FiscalCondition.RI,
+  })
+  @IsEnum(FiscalCondition)
+  @IsOptional()
+  fiscal_condition?: FiscalCondition;
 
   @ApiPropertyOptional({
     description: 'User UUID who created the supplier (for provisional suppliers)',

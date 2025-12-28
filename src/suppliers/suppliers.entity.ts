@@ -9,6 +9,8 @@ import {
   OneToMany,
 } from 'typeorm';
 import { SupplierStatus } from '../common/enums/supplier-status.enum';
+import { SupplierType } from '../common/enums/supplier-type.enum';
+import { FiscalCondition } from '../common/enums/fiscal-condition.enum';
 import { Organization } from '../organizations/organization.entity';
 import { SupplierDocument } from '../supplier-documents/supplier-documents.entity';
 import { Contract } from '../contracts/contracts.entity';
@@ -40,6 +42,20 @@ export class Supplier {
     default: SupplierStatus.PROVISIONAL,
   })
   status: SupplierStatus;
+
+  @Column({
+    type: 'enum',
+    enum: SupplierType,
+    nullable: true,
+  })
+  type: SupplierType;
+
+  @Column({
+    type: 'enum',
+    enum: FiscalCondition,
+    nullable: true,
+  })
+  fiscal_condition: FiscalCondition;
 
   @Column({ type: 'text', nullable: true })
   address: string;
