@@ -121,6 +121,9 @@ export class Expense {
   @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
   income_tax_withholding: number;
 
+  @Column({ type: 'boolean', default: false })
+  is_post_closure: boolean;
+
   @CreateDateColumn()
   created_at: Date;
 
