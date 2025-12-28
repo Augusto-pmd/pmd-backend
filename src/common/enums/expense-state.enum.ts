@@ -3,5 +3,6 @@ export enum ExpenseState {
   VALIDATED = 'validated',
   OBSERVED = 'observed',
   ANNULLED = 'annulled',
+  REJECTED = 'rejected',
 }
 

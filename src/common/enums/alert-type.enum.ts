@@ -6,6 +6,9 @@ export enum AlertType {
   DUPLICATE_INVOICE = 'duplicate_invoice',
   OVERDUE_STAGE = 'overdue_stage',
   OBSERVED_EXPENSE = 'observed_expense',
+  REJECTED_EXPENSE = 'rejected_expense',
+  ANNULLED_EXPENSE = 'annulled_expense',
+  POST_CLOSURE_EXPENSE = 'post_closure_expense',
   MISSING_VALIDATION = 'missing_validation',
   PENDING_INCOME_CONFIRMATION = 'pending_income_confirmation',
 }

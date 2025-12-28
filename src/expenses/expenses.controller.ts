@@ -25,6 +25,7 @@ import { ExpensesService } from './expenses.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { ValidateExpenseDto } from './dto/validate-expense.dto';
+import { RejectExpenseDto } from './dto/reject-expense.dto';
 
 @ApiTags('Expenses')
 @ApiBearerAuth('JWT-auth')
@@ -94,6 +95,21 @@ export class ExpensesController {
   @ApiResponse({ status: 403, description: 'Only Administration and Direction can validate' })
   validate(@Param('id') id: string, @Body() validateDto: ValidateExpenseDto, @Request() req) {
     return this.expensesService.validate(id, validateDto, req.user);
+  }
+
+  @Post(':id/reject')
+  @Roles(UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Reject expense',
+    description: 'Reject an expense. Only Administration and Direction can reject. Observations are mandatory.',
+  })
+  @ApiParam({ name: 'id', description: 'Expense UUID', type: String, format: 'uuid' })
+  @ApiBody({ type: RejectExpenseDto })
+  @ApiResponse({ status: 200, description: 'Expense rejected successfully' })
+  @ApiResponse({ status: 400, description: 'Observations are mandatory or expense cannot be rejected' })
+  @ApiResponse({ status: 403, description: 'Only Administration and Direction can reject expenses' })
+  reject(@Param('id') id: string, @Body() rejectDto: RejectExpenseDto, @Request() req) {
+    return this.expensesService.reject(id, rejectDto, req.user);
   }
 
   @Delete(':id')
