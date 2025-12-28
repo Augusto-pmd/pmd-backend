@@ -169,6 +169,50 @@ export class AuditController {
   removeAll() {
     return this.auditService.removeAll();
   }
+
+  @Get('action/:action')
+  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION)
+  @ApiOperation({
+    summary: 'Get audit logs by action',
+    description: 'Retrieve audit logs filtered by action type (e.g., login, logout, login_failed) with pagination.',
+  })
+  @ApiParam({ name: 'action', description: 'Action type', example: 'login' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 50)', example: 50 })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated audit logs for the action',
+  })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  findByAction(
+    @Param('action') action: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ) {
+    return this.auditService.findByAction(action, page, limit);
+  }
+
+  @Get('ip/:ipAddress')
+  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION)
+  @ApiOperation({
+    summary: 'Get audit logs by IP address',
+    description: 'Retrieve audit logs filtered by IP address with pagination.',
+  })
+  @ApiParam({ name: 'ipAddress', description: 'IP address', example: '192.168.1.1' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 50)', example: 50 })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated audit logs for the IP address',
+  })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  findByIp(
+    @Param('ipAddress') ipAddress: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ) {
+    return this.auditService.findByIp(ipAddress, page, limit);
+  }
 }
 
 

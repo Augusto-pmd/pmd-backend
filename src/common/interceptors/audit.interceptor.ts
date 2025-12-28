@@ -48,6 +48,9 @@ export class AuditInterceptor implements NestInterceptor {
           // Determine previous_value and new_value based on HTTP method
           const { previousValue, newValue } = this.getAuditValues(method, body, response);
 
+          // Extract device info from user agent
+          const deviceInfo = this.extractDeviceInfo(userAgent);
+
           const auditLog = this.auditLogRepository.create({
             user_id: user?.id || null,
             action,
@@ -58,6 +61,7 @@ export class AuditInterceptor implements NestInterceptor {
             new_value: newValue,
             ip_address: ipAddress,
             user_agent: userAgent,
+            device_info: deviceInfo,
             criticality,
             // Store organizationId in metadata if audit entity supports it
             ...(organizationId && { metadata: { organizationId } }),
@@ -103,6 +107,7 @@ export class AuditInterceptor implements NestInterceptor {
   /**
    * Get previous and new values for audit log based on HTTP method
    * Business Rule: Capture previous value before update, new value after
+   * Improved: Better detail in previous_value and new_value
    */
   private getAuditValues(
     method: string,
@@ -111,36 +116,128 @@ export class AuditInterceptor implements NestInterceptor {
   ): { previousValue: any; newValue: any } {
     switch (method) {
       case 'POST':
-        // CREATE: no previous value, new value is the created entity
+        // CREATE: no previous value, new value is the created entity with full details
         return {
           previousValue: null,
-          newValue: this.sanitizeData(response),
+          newValue: this.sanitizeData(this.extractEntityData(response)),
         };
 
       case 'PUT':
       case 'PATCH':
-        // UPDATE: previous value is the body (data sent), new value is the updated entity
-        // Note: For a complete previous value, we'd need to fetch the entity before update
-        // This is a limitation, but we capture what was sent vs what was saved
+        // UPDATE: previous value includes what was sent, new value is the updated entity
+        // Enhanced: Include more context in previous_value
+        const previousData = body ? {
+          ...this.sanitizeData(body),
+          _audit_note: 'Data sent in request (may not include all fields)',
+        } : null;
+        
         return {
-          previousValue: this.sanitizeData(body),
-          newValue: this.sanitizeData(response),
+          previousValue: previousData,
+          newValue: this.sanitizeData(this.extractEntityData(response)),
         };
 
       case 'DELETE':
-        // DELETE: previous value is the deleted entity, new value is null
+        // DELETE: previous value is the deleted entity with full details, new value is null
         return {
-          previousValue: this.sanitizeData(response),
-          newValue: null,
+          previousValue: this.sanitizeData(this.extractEntityData(response)),
+          newValue: { status: 'deleted', timestamp: new Date().toISOString() },
         };
 
       default:
         // GET and others: minimal logging
         return {
           previousValue: null,
-          newValue: this.sanitizeData(response),
+          newValue: this.sanitizeData(this.extractEntityData(response)),
         };
     }
+  }
+
+  /**
+   * Extract entity data from response, handling various response formats
+   */
+  private extractEntityData(response: any): any {
+    if (!response) return null;
+    
+    // If response is already an object/array, return it
+    if (typeof response === 'object') {
+      // Handle paginated responses
+      if (response.data && Array.isArray(response.data)) {
+        return response.data;
+      }
+      // Handle single entity responses
+      if (response.id || response.name || response.email) {
+        return response;
+      }
+      // Handle nested entity in response
+      if (response.entity) {
+        return response.entity;
+      }
+      return response;
+    }
+    
+    return response;
+  }
+
+  /**
+   * Extract device information from user agent string
+   */
+  private extractDeviceInfo(userAgent: string): Record<string, any> {
+    const info: Record<string, any> = {};
+
+    // Extract browser
+    if (userAgent.includes('Chrome') && !userAgent.includes('Edg')) {
+      info.browser = 'Chrome';
+      const chromeMatch = userAgent.match(/Chrome\/([\d.]+)/);
+      if (chromeMatch) info.browser_version = chromeMatch[1];
+    } else if (userAgent.includes('Firefox')) {
+      info.browser = 'Firefox';
+      const firefoxMatch = userAgent.match(/Firefox\/([\d.]+)/);
+      if (firefoxMatch) info.browser_version = firefoxMatch[1];
+    } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
+      info.browser = 'Safari';
+      const safariMatch = userAgent.match(/Version\/([\d.]+)/);
+      if (safariMatch) info.browser_version = safariMatch[1];
+    } else if (userAgent.includes('Edg')) {
+      info.browser = 'Edge';
+      const edgeMatch = userAgent.match(/Edg\/([\d.]+)/);
+      if (edgeMatch) info.browser_version = edgeMatch[1];
+    } else {
+      info.browser = 'Unknown';
+    }
+
+    // Extract OS
+    if (userAgent.includes('Windows NT 10.0')) info.os = 'Windows 10';
+    else if (userAgent.includes('Windows NT 6.3')) info.os = 'Windows 8.1';
+    else if (userAgent.includes('Windows NT 6.2')) info.os = 'Windows 8';
+    else if (userAgent.includes('Windows NT 6.1')) info.os = 'Windows 7';
+    else if (userAgent.includes('Windows')) info.os = 'Windows';
+    else if (userAgent.includes('Mac OS X')) {
+      info.os = 'macOS';
+      const macMatch = userAgent.match(/Mac OS X ([0-9_]+)/);
+      if (macMatch) info.os_version = macMatch[1].replace(/_/g, '.');
+    } else if (userAgent.includes('Linux')) info.os = 'Linux';
+    else if (userAgent.includes('Android')) {
+      info.os = 'Android';
+      const androidMatch = userAgent.match(/Android ([\d.]+)/);
+      if (androidMatch) info.os_version = androidMatch[1];
+    } else if (userAgent.includes('iOS') || userAgent.includes('iPhone') || userAgent.includes('iPad')) {
+      info.os = 'iOS';
+      const iosMatch = userAgent.match(/OS ([\d_]+)/);
+      if (iosMatch) info.os_version = iosMatch[1].replace(/_/g, '.');
+    } else {
+      info.os = 'Unknown';
+    }
+
+    // Extract device type
+    if (userAgent.includes('Mobile') || userAgent.includes('Android')) {
+      info.device_type = 'Mobile';
+    } else if (userAgent.includes('Tablet') || userAgent.includes('iPad')) {
+      info.device_type = 'Tablet';
+    } else {
+      info.device_type = 'Desktop';
+    }
+
+    return info;
   }
 
   private getCriticality(method: string, module: string): string {

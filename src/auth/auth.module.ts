@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller';
 import { AuthBootstrapController } from './auth-bootstrap.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersModule } from '../users/users.module';
+import { AuditModule } from '../audit/audit.module';
 import { User } from '../users/user.entity';
 import { Role } from '../roles/role.entity';
 import { Organization } from '../organizations/organization.entity';
@@ -15,6 +16,7 @@ import { Organization } from '../organizations/organization.entity';
 @Module({
   imports: [
     UsersModule,
+    AuditModule,
     PassportModule,
     ConfigModule,
     JwtModule.registerAsync({

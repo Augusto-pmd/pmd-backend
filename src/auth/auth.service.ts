@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -13,6 +13,7 @@ import { RegisterDto } from './dto/register.dto';
 import { normalizeUser } from '../common/helpers/normalize-user.helper';
 import { JwtUserPayload } from './interfaces/jwt-user-payload.interface';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class AuthService {
@@ -24,6 +25,8 @@ export class AuthService {
     @InjectRepository(Organization) private readonly orgRepository: Repository<Organization>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Inject(forwardRef(() => AuditService))
+    private readonly auditService: AuditService,
   ) {}
 
   async ensureAdminUser(): Promise<void> {
@@ -102,7 +105,7 @@ export class AuthService {
     return normalizeUser(user);
   }
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
     // Normalize email (trim + lowercase)
     const normalizedEmail = loginDto.email.trim().toLowerCase();
 
@@ -112,16 +115,46 @@ export class AuthService {
       relations: ['role', 'organization'],
     });
 
-    // If user is null, inactive, or has no password, throw UnauthorizedException('USER_NOT_FOUND')
+    // Extract IP and user agent if not provided
+    const ip = ipAddress || 'unknown';
+    const ua = userAgent || 'unknown';
+
+    // If user is null, inactive, or has no password, log failed attempt and throw
     if (!user || !user.isActive || !user.password) {
+      // Log failed login attempt
+      try {
+        await this.auditService.logAuthEvent(
+          'login_failed',
+          null,
+          ip,
+          ua,
+          undefined,
+          { email: normalizedEmail, reason: 'USER_NOT_FOUND' },
+        );
+      } catch (error) {
+        this.logger.warn('Failed to log authentication event', error);
+      }
       throw new UnauthorizedException('USER_NOT_FOUND');
     }
 
     // Compare password with bcrypt.compare
     const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
 
-    // If false, throw UnauthorizedException('INVALID_PASSWORD')
+    // If false, log failed attempt and throw
     if (!isPasswordValid) {
+      // Log failed login attempt
+      try {
+        await this.auditService.logAuthEvent(
+          'login_failed',
+          user.id,
+          ip,
+          ua,
+          undefined,
+          { email: normalizedEmail, reason: 'INVALID_PASSWORD' },
+        );
+      } catch (error) {
+        this.logger.warn('Failed to log authentication event', error);
+      }
       throw new UnauthorizedException('INVALID_PASSWORD');
     }
 
@@ -140,11 +173,48 @@ export class AuthService {
     const accessTokenExpiration = process.env.JWT_EXPIRATION || '1d';
     const refreshTokenExpiration = process.env.JWT_REFRESH_EXPIRATION || '7d';
 
-    return {
+    const result = {
       accessToken: await this.jwtService.signAsync(payload, { expiresIn: accessTokenExpiration }),
       refresh_token: await this.jwtService.signAsync(payload, { expiresIn: refreshTokenExpiration }),
       user: normalizedUser,
     };
+
+    // Log successful login
+    try {
+      await this.auditService.logAuthEvent(
+        'login',
+        user.id,
+        ip,
+        ua,
+        undefined,
+        { email: normalizedEmail, role: user.role?.name },
+      );
+    } catch (error) {
+      this.logger.warn('Failed to log authentication event', error);
+    }
+
+    return result;
+  }
+
+  /**
+   * Logout user - record logout event in audit log
+   */
+  async logout(userId: string, ipAddress?: string, userAgent?: string): Promise<void> {
+    const ip = ipAddress || 'unknown';
+    const ua = userAgent || 'unknown';
+
+    try {
+      await this.auditService.logAuthEvent(
+        'logout',
+        userId,
+        ip,
+        ua,
+        undefined,
+        { timestamp: new Date().toISOString() },
+      );
+    } catch (error) {
+      this.logger.warn('Failed to log logout event', error);
+    }
   }
 
   async register(registerDto: RegisterDto) {

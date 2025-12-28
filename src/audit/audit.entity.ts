@@ -44,6 +44,9 @@ export class AuditLog {
   @Column({ type: 'varchar', length: 500, nullable: true })
   user_agent: string;
 
+  @Column({ type: 'jsonb', nullable: true })
+  device_info: Record<string, any>;
+
   @Column({ type: 'varchar', length: 50, nullable: true })
   criticality: string;
 
