@@ -12,6 +12,7 @@ import { SupplierDocument } from '../supplier-documents/supplier-documents.entit
 import { AlertsModule } from '../alerts/alerts.module';
 import { ContractsModule } from '../contracts/contracts.module';
 import { WorksModule } from '../works/works.module';
+import { AccountingModule } from '../accounting/accounting.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { WorksModule } from '../works/works.module';
     AlertsModule,
     ContractsModule,
     WorksModule,
+    AccountingModule,
   ],
   controllers: [ExpensesController],
   providers: [ExpensesService],

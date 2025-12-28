@@ -43,7 +43,7 @@ if (databaseUrl) {
 }
 
 // For local development without DATABASE_URL, use individual variables
-const connectionOptions: DataSourceOptions = {
+const baseOptions: Partial<DataSourceOptions> = {
   type: 'postgres' as const,
   entities: [
     Role,
@@ -88,24 +88,25 @@ const connectionOptions: DataSourceOptions = {
 };
 
 // Configure connection based on environment
-if (databaseUrl) {
-  // Use DATABASE_URL (production or when explicitly set)
-  connectionOptions.url = databaseUrl;
-  if (requiresSsl) {
-    connectionOptions.ssl = {
-      rejectUnauthorized: false
-    };
-  }
-} else {
-  // Use individual variables (local development)
-  connectionOptions.host = process.env.DB_HOST || 'localhost';
-  connectionOptions.port = parseInt(process.env.DB_PORT || '5432', 10);
-  connectionOptions.username = process.env.DB_USERNAME || 'postgres';
-  connectionOptions.password = process.env.DB_PASSWORD || 'postgres';
-  connectionOptions.database = process.env.DB_DATABASE || 'pmd_management';
-  // No SSL for local development
-  connectionOptions.ssl = false;
-}
+const connectionOptions: DataSourceOptions = databaseUrl
+  ? {
+      ...baseOptions,
+      url: databaseUrl,
+      ...(requiresSsl && {
+        ssl: {
+          rejectUnauthorized: false
+        }
+      }),
+    } as DataSourceOptions
+  : {
+      ...baseOptions,
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432', 10),
+      username: process.env.DB_USERNAME || 'postgres',
+      password: process.env.DB_PASSWORD || 'postgres',
+      database: process.env.DB_DATABASE || 'pmd_management',
+      ssl: false,
+    } as DataSourceOptions;
 
 export default new DataSource(connectionOptions);
 
