@@ -504,56 +504,17 @@ export class ExpensesService {
         await this.createAccountingRecord(savedExpense, user);
         await this.updateWorkExpenses(expense.work_id);
 
-        // 5. Actualizar amount_executed del contrato (only if not already updated above)
+        // 5. Actualizar amount_executed del contrato usando el método centralizado (only if not already updated above)
         if (contract && savedExpense.contract_id && !wasValidated) {
           const newAmountExecuted =
             Number(contract.amount_executed) + Number(expense.amount);
           
-          // Update amount_executed
-          contract.amount_executed = newAmountExecuted;
-          
-          // Calculate saldo: amount_total - amount_executed
-          const saldo = Number(contract.amount_total) - newAmountExecuted;
-          
-          // Auto-block if saldo <= 0 (amount_executed >= amount_total)
-          if (saldo <= 0 && !contract.is_blocked) {
-            contract.is_blocked = true;
-            
-            // Generate alert
-            await this.alertsService.createAlert({
-              type: AlertType.CONTRACT_ZERO_BALANCE,
-              severity: AlertSeverity.WARNING,
-              title: 'Contract balance reached zero',
-              message: `Contract ${contract.id} has been automatically blocked. Saldo: ${saldo.toFixed(2)} (amount_total: ${contract.amount_total.toFixed(2)}, amount_executed: ${newAmountExecuted.toFixed(2)})`,
-              contract_id: contract.id,
-              work_id: contract.work_id,
-            });
-          }
-          
-          // Update contract status automatically based on balance
-          // If no balance, status is NO_BALANCE
-          if (saldo <= 0) {
-            if (contract.status !== ContractStatus.CANCELLED && contract.status !== ContractStatus.FINISHED) {
-              contract.status = ContractStatus.NO_BALANCE;
-            }
-          } else {
-            // If balance is low (< 10% of total), status is LOW_BALANCE
-            const balancePercentage = (saldo / Number(contract.amount_total)) * 100;
-            if (balancePercentage < 10) {
-              if (contract.status !== ContractStatus.CANCELLED && contract.status !== ContractStatus.FINISHED && contract.status !== ContractStatus.PAUSED) {
-                contract.status = ContractStatus.LOW_BALANCE;
-              }
-            } else if (!contract.is_blocked && saldo > 0) {
-              // If contract has balance and is not blocked, it's ACTIVE
-              if (contract.status === ContractStatus.PENDING || contract.status === ContractStatus.APPROVED) {
-                contract.status = ContractStatus.ACTIVE;
-              } else if (contract.status !== ContractStatus.ACTIVE && contract.status !== ContractStatus.CANCELLED && contract.status !== ContractStatus.FINISHED && contract.status !== ContractStatus.PAUSED) {
-                contract.status = ContractStatus.ACTIVE;
-              }
-            }
-          }
-          
-          await queryRunner.manager.save(Contract, contract);
+          // Use centralized method to update amount_executed, which handles auto-blocking and status updates
+          await this.contractsService.updateAmountExecuted(
+            contract.id,
+            newAmountExecuted,
+            queryRunner,
+          );
         }
       } else if (validateDto.state === ExpenseState.OBSERVED) {
         // Generate alert for observed expense

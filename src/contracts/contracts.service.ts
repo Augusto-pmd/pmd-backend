@@ -316,14 +316,23 @@ export class ContractsService {
    * Update amount_executed and check for auto-blocking
    * Business Rule: Auto-block contract when saldo <= 0 (amount_executed >= amount_total)
    * Business Rule: Generate alert when contract is blocked
+   * @param contractId - Contract ID
+   * @param newAmountExecuted - New amount executed value
+   * @param queryRunner - Optional query runner for transaction support
    */
   async updateAmountExecuted(
     contractId: string,
     newAmountExecuted: number,
+    queryRunner?: any,
   ): Promise<Contract> {
-    const contract = await this.contractRepository.findOne({
-      where: { id: contractId },
-    });
+    // Use queryRunner manager if provided (for transactions), otherwise use repository
+    const contract = queryRunner
+      ? await queryRunner.manager.findOne(Contract, {
+          where: { id: contractId },
+        })
+      : await this.contractRepository.findOne({
+          where: { id: contractId },
+        });
 
     if (!contract) {
       throw new NotFoundException(`Contract with ID ${contractId} not found`);
@@ -361,7 +370,10 @@ export class ContractsService {
     // Calculate status automatically based on balance
     contract.status = this.calculateContractStatus(contract);
 
-    return await this.contractRepository.save(contract);
+    // Save using queryRunner manager if provided, otherwise use repository
+    return queryRunner
+      ? await queryRunner.manager.save(Contract, contract)
+      : await this.contractRepository.save(contract);
   }
 
   /**
