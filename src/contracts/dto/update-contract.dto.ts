@@ -1,7 +1,9 @@
 import { PartialType, OmitType } from '@nestjs/mapped-types';
-import { IsBoolean, IsOptional, IsEnum, IsNumber, Min } from 'class-validator';
+import { IsBoolean, IsOptional, IsEnum, IsNumber, Min, IsString, IsDateString, IsUUID } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { CreateContractDto } from './create-contract.dto';
 import { Currency } from '../../common/enums/currency.enum';
+import { ContractStatus } from '../../common/enums/contract-status.enum';
 
 export class UpdateContractDto extends PartialType(
   OmitType(CreateContractDto, ['work_id'] as const),
@@ -19,5 +21,13 @@ export class UpdateContractDto extends PartialType(
   @IsEnum(Currency)
   @IsOptional()
   currency?: Currency;
+
+  @ApiPropertyOptional({
+    description: 'Contract status (only Direction can set manually)',
+    enum: ContractStatus,
+  })
+  @IsEnum(ContractStatus)
+  @IsOptional()
+  status?: ContractStatus;
 }
 

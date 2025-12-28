@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Currency } from '../../common/enums/currency.enum';
+import { ContractStatus } from '../../common/enums/contract-status.enum';
 
 export class CreateContractDto {
   @ApiProperty({
@@ -105,5 +106,48 @@ export class CreateContractDto {
   @IsOptional()
   @ValidateIf((o) => o.end_date && o.start_date)
   end_date?: string;
+
+  @ApiPropertyOptional({
+    description: 'Contract status',
+    enum: ContractStatus,
+    example: ContractStatus.PENDING,
+  })
+  @IsEnum(ContractStatus)
+  @IsOptional()
+  status?: ContractStatus;
+
+  @ApiPropertyOptional({
+    description: 'Observations or notes about the contract',
+    example: 'Contract requires special handling',
+  })
+  @IsString()
+  @IsOptional()
+  observations?: string;
+
+  @ApiPropertyOptional({
+    description: 'Contract validity date (ISO 8601 format)',
+    example: '2024-12-31',
+    type: String,
+    format: 'date',
+  })
+  @IsDateString()
+  @IsOptional()
+  validity_date?: string;
+
+  @ApiPropertyOptional({
+    description: 'Contract scope',
+    example: 'Construction of main building',
+  })
+  @IsString()
+  @IsOptional()
+  scope?: string;
+
+  @ApiPropertyOptional({
+    description: 'Contract specifications',
+    example: 'All materials must meet ISO standards',
+  })
+  @IsString()
+  @IsOptional()
+  specifications?: string;
 }
 

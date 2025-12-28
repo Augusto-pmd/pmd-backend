@@ -10,7 +10,9 @@ import {
 import { Work } from '../works/works.entity';
 import { Supplier } from '../suppliers/suppliers.entity';
 import { Rubric } from '../rubrics/rubrics.entity';
+import { User } from '../users/user.entity';
 import { Currency } from '../common/enums/currency.enum';
+import { ContractStatus } from '../common/enums/contract-status.enum';
 
 @Entity('contracts')
 export class Contract {
@@ -58,6 +60,35 @@ export class Contract {
 
   @Column({ type: 'boolean', default: false })
   is_blocked: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: ContractStatus,
+    default: ContractStatus.PENDING,
+  })
+  status: ContractStatus;
+
+  @Column({ type: 'text', nullable: true })
+  observations: string;
+
+  @Column({ type: 'date', nullable: true })
+  validity_date: Date;
+
+  @Column({ type: 'text', nullable: true })
+  scope: string;
+
+  @Column({ type: 'text', nullable: true })
+  specifications: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  closed_by_id: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'closed_by_id' })
+  closed_by: User;
+
+  @Column({ type: 'timestamp', nullable: true })
+  closed_at: Date;
 
   @Column({ type: 'date', nullable: true })
   start_date: Date;

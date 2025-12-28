@@ -13,7 +13,7 @@ import { UpdateContractDto } from './dto/update-contract.dto';
 import { UserRole } from '../common/enums/user-role.enum';
 import { User } from '../users/user.entity';
 import { AlertsService } from '../alerts/alerts.service';
-import { AlertType, AlertSeverity } from '../common/enums';
+import { AlertType, AlertSeverity, ContractStatus } from '../common/enums';
 import { Supplier } from '../suppliers/suppliers.entity';
 import { Work } from '../works/works.entity';
 import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
@@ -21,6 +21,52 @@ import { getOrganizationId } from '../common/helpers/get-organization-id.helper'
 @Injectable()
 export class ContractsService {
   private readonly logger = new Logger(ContractsService.name);
+
+  /**
+   * Calculate contract status based on balance and other factors
+   */
+  private calculateContractStatus(contract: Contract): ContractStatus {
+    // If contract is cancelled or finished, keep that status
+    if (contract.status === ContractStatus.CANCELLED || contract.status === ContractStatus.FINISHED) {
+      return contract.status;
+    }
+
+    // If contract is paused, keep that status
+    if (contract.status === ContractStatus.PAUSED) {
+      return contract.status;
+    }
+
+    const amountTotal = Number(contract.amount_total);
+    const amountExecuted = Number(contract.amount_executed);
+    const saldo = amountTotal - amountExecuted;
+
+    // If no balance, status is NO_BALANCE
+    if (saldo <= 0) {
+      return ContractStatus.NO_BALANCE;
+    }
+
+    // If balance is low (< 10% of total), status is LOW_BALANCE
+    const balancePercentage = (saldo / amountTotal) * 100;
+    if (balancePercentage < 10) {
+      return ContractStatus.LOW_BALANCE;
+    }
+
+    // If contract has balance and is not blocked, it's ACTIVE
+    if (!contract.is_blocked && saldo > 0) {
+      // If status is PENDING or APPROVED, transition to ACTIVE
+      if (contract.status === ContractStatus.PENDING || contract.status === ContractStatus.APPROVED) {
+        return ContractStatus.ACTIVE;
+      }
+      // If already ACTIVE, keep it
+      if (contract.status === ContractStatus.ACTIVE) {
+        return ContractStatus.ACTIVE;
+      }
+      return ContractStatus.ACTIVE;
+    }
+
+    // Default: keep current status or set to PENDING if not set
+    return contract.status || ContractStatus.PENDING;
+  }
 
   constructor(
     @InjectRepository(Contract)
@@ -69,9 +115,15 @@ export class ContractsService {
       ...createContractDto,
       amount_executed: createContractDto.amount_executed || 0,
       is_blocked: false,
+      status: createContractDto.status || ContractStatus.PENDING,
     });
 
-    return await this.contractRepository.save(contract);
+    const savedContract = await this.contractRepository.save(contract);
+    
+    // Calculate status automatically based on balance
+    savedContract.status = this.calculateContractStatus(savedContract);
+    
+    return await this.contractRepository.save(savedContract);
   }
 
   async findAll(user: User): Promise<Contract[]> {
@@ -99,7 +151,7 @@ export class ContractsService {
     const organizationId = getOrganizationId(user);
     const contract = await this.contractRepository.findOne({
       where: { id },
-      relations: ['work', 'supplier', 'rubric'],
+      relations: ['work', 'supplier', 'rubric', 'closed_by'],
     });
 
     if (!contract) {
@@ -235,6 +287,28 @@ export class ContractsService {
       contract.end_date = newEndDate;
     }
 
+    // Update additional fields
+    if (updateContractDto.observations !== undefined) {
+      contract.observations = updateContractDto.observations;
+    }
+    if (updateContractDto.validity_date !== undefined) {
+      contract.validity_date = new Date(updateContractDto.validity_date);
+    }
+    if (updateContractDto.scope !== undefined) {
+      contract.scope = updateContractDto.scope;
+    }
+    if (updateContractDto.specifications !== undefined) {
+      contract.specifications = updateContractDto.specifications;
+    }
+
+    // Update status if provided (only Direction can set status manually)
+    if (updateContractDto.status !== undefined && user.role.name === UserRole.DIRECTION) {
+      contract.status = updateContractDto.status;
+    } else {
+      // Calculate status automatically based on balance
+      contract.status = this.calculateContractStatus(contract);
+    }
+
     return await this.contractRepository.save(contract);
   }
 
@@ -283,6 +357,9 @@ export class ContractsService {
       // (Only Direction can unblock manually)
       contract.is_blocked = true;
     }
+
+    // Calculate status automatically based on balance
+    contract.status = this.calculateContractStatus(contract);
 
     return await this.contractRepository.save(contract);
   }
