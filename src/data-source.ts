@@ -21,6 +21,9 @@ import { Schedule } from './schedule/schedule.entity';
 import { Alert } from './alerts/alerts.entity';
 import { AccountingRecord } from './accounting/accounting.entity';
 import { AuditLog } from './audit/audit.entity';
+import { ExchangeRate } from './exchange-rates/exchange-rates.entity';
+import { OfflineItem } from './offline/offline-items.entity';
+import { Backup } from './backup/backup.entity';
 
 // Load environment variables
 config();
@@ -65,6 +68,9 @@ const baseOptions: Partial<DataSourceOptions> = {
     Alert,
     AccountingRecord,
     AuditLog,
+    ExchangeRate,
+    OfflineItem,
+    Backup,
   ],
   // Determinar qué ruta de migraciones usar
   // En producción: intentar usar compiladas, si no existen, usar fuente

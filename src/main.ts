@@ -75,11 +75,15 @@ async function bootstrap() {
   // Global exception filter - standardize error response format
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // Global validation pipe
+  // Global validation pipe with XSS sanitization
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },,
       transform: true,
     }),
   );
@@ -122,6 +126,9 @@ async function bootstrap() {
     .addTag('Alerts', 'Alert management endpoints')
     .addTag('Accounting', 'Accounting records and reports endpoints')
     .addTag('Audit', 'Audit log endpoints')
+    .addTag('Exchange Rates', 'Exchange rate management endpoints')
+    .addTag('Offline', 'Offline items and synchronization endpoints')
+    .addTag('Backups', 'Database backup management endpoints')
     .addTag('Health', 'Health check endpoints')
     .build();
   const document = SwaggerModule.createDocument(app, config);

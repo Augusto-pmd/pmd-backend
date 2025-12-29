@@ -3,8 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { databaseConfig } from './config/database.config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
+import { CsrfGuard } from './common/guards/csrf.guard';
+import { XssSanitizeInterceptor } from './common/interceptors/xss-sanitize.interceptor';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -25,6 +27,9 @@ import { ScheduleModule } from './schedule/schedule.module';
 import { AlertsModule } from './alerts/alerts.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { AuditModule } from './audit/audit.module';
+import { ExchangeRatesModule } from './exchange-rates/exchange-rates.module';
+import { OfflineModule } from './offline/offline.module';
+import { BackupModule } from './backup/backup.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TasksModule } from './tasks/tasks.module';
 import { StorageModule } from './storage/storage.module';
@@ -76,6 +81,9 @@ import { HealthModule } from './health/health.module';
     AlertsModule,
     AccountingModule,
     AuditModule,
+    ExchangeRatesModule,
+    OfflineModule,
+    BackupModule,
     DashboardModule,
     TasksModule,
     StorageModule,
@@ -87,6 +95,14 @@ import { HealthModule } from './health/health.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: XssSanitizeInterceptor,
     },
   ],
 })
