@@ -7,6 +7,8 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { AuthBootstrapController } from './auth-bootstrap.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { BruteForceService } from './services/brute-force.service';
+import { BruteForceGuard } from './guards/brute-force.guard';
 import { UsersModule } from '../users/users.module';
 import { AuditModule } from '../audit/audit.module';
 import { User } from '../users/user.entity';
@@ -33,8 +35,8 @@ import { Organization } from '../organizations/organization.entity';
     TypeOrmModule.forFeature([User, Role, Organization]),
   ],
   controllers: [AuthController, AuthBootstrapController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService],
+  providers: [AuthService, JwtStrategy, BruteForceService, BruteForceGuard],
+  exports: [AuthService, BruteForceService],
 })
 export class AuthModule implements OnModuleInit {
   constructor(private readonly authService: AuthService) {}
