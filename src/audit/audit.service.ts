@@ -118,6 +118,7 @@ export class AuditService {
   /**
    * Log authentication events (login, logout, failed attempts)
    * This method is used by AuthService to record authentication-specific events
+   * Business Rule: Detect device changes by comparing with previous login
    */
   async logAuthEvent(
     action: 'login' | 'logout' | 'login_failed',
@@ -133,20 +134,65 @@ export class AuditService {
       finalDeviceInfo.metadata = metadata;
     }
 
+    // Detect device changes for login events
+    let deviceChangeDetected = false;
+    let previousDeviceInfo = null;
+    
+    if (action === 'login' && userId) {
+      // Find the last successful login for this user
+      const lastLogin = await this.auditLogRepository.findOne({
+        where: {
+          user_id: userId,
+          action: 'login',
+          module: 'auth',
+        },
+        order: { created_at: 'DESC' },
+      });
+
+      if (lastLogin && lastLogin.device_info) {
+        previousDeviceInfo = lastLogin.device_info;
+        // Compare device info to detect changes
+        const currentDeviceKey = `${finalDeviceInfo.browser || ''}_${finalDeviceInfo.os || ''}_${finalDeviceInfo.device_type || ''}`;
+        const previousDeviceKey = `${lastLogin.device_info.browser || ''}_${lastLogin.device_info.os || ''}_${lastLogin.device_info.device_type || ''}`;
+        
+        // Also check IP address change
+        const ipChanged = lastLogin.ip_address !== ipAddress;
+        
+        deviceChangeDetected = currentDeviceKey !== previousDeviceKey || ipChanged;
+        
+        if (deviceChangeDetected) {
+          finalDeviceInfo.device_change_detected = true;
+          finalDeviceInfo.previous_device = previousDeviceInfo;
+          finalDeviceInfo.previous_ip = lastLogin.ip_address;
+        }
+      }
+    }
+
     const auditLog = this.auditLogRepository.create({
       user_id: userId,
       action,
       module: 'auth',
       entity_id: userId,
       entity_type: 'user',
-      previous_value: action === 'login' ? { status: 'logged_out' } : null,
-      new_value: action === 'login' ? { status: 'logged_in', timestamp: new Date().toISOString() } : 
-                 action === 'logout' ? { status: 'logged_out', timestamp: new Date().toISOString() } :
-                 { status: 'login_failed', timestamp: new Date().toISOString(), ...(metadata || {}) },
+      previous_value: action === 'login' 
+        ? { 
+            status: 'logged_out',
+            ...(deviceChangeDetected && previousDeviceInfo ? { previous_device: previousDeviceInfo } : {}),
+          } 
+        : null,
+      new_value: action === 'login' 
+        ? { 
+            status: 'logged_in', 
+            timestamp: new Date().toISOString(),
+            ...(deviceChangeDetected ? { device_change_detected: true } : {}),
+          } 
+        : action === 'logout' 
+        ? { status: 'logged_out', timestamp: new Date().toISOString() }
+        : { status: 'login_failed', timestamp: new Date().toISOString(), ...(metadata || {}) },
       ip_address: ipAddress,
       user_agent: userAgent,
       device_info: finalDeviceInfo,
-      criticality: action === 'login_failed' ? 'medium' : 'high',
+      criticality: action === 'login_failed' ? 'medium' : action === 'login' && deviceChangeDetected ? 'high' : 'high',
     });
 
     return await this.auditLogRepository.save(auditLog);

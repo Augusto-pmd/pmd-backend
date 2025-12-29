@@ -90,9 +90,15 @@ export class CreateEnums1700000000001 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TYPE "budget_type_enum" AS ENUM ('initial', 'addenda');
     `);
+
+    // Create ContractStatus enum
+    await queryRunner.query(`
+      CREATE TYPE "contract_status_enum" AS ENUM ('pending', 'approved', 'active', 'low_balance', 'no_balance', 'paused', 'finished', 'cancelled');
+    `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP TYPE IF EXISTS "contract_status_enum"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "budget_type_enum"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "month_status_enum"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "cashbox_status_enum"`);

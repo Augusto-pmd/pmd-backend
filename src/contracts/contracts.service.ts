@@ -302,11 +302,30 @@ export class ContractsService {
     }
 
     // Update status if provided (only Direction can set status manually)
+    const previousStatus = contract.status;
     if (updateContractDto.status !== undefined && user.role.name === UserRole.DIRECTION) {
       contract.status = updateContractDto.status;
     } else {
       // Calculate status automatically based on balance
       contract.status = this.calculateContractStatus(contract);
+    }
+
+    // Handle contract closure: set closed_by_id and closed_at when status changes to FINISHED or CANCELLED
+    const isClosing = (contract.status === ContractStatus.FINISHED || contract.status === ContractStatus.CANCELLED) &&
+                      (previousStatus !== ContractStatus.FINISHED && previousStatus !== ContractStatus.CANCELLED);
+    
+    if (isClosing && !contract.closed_at) {
+      contract.closed_by_id = user.id;
+      contract.closed_at = new Date();
+    }
+
+    // Handle contract reopening: clear closed_by_id and closed_at when status changes from FINISHED/CANCELLED to another status
+    const isReopening = (previousStatus === ContractStatus.FINISHED || previousStatus === ContractStatus.CANCELLED) &&
+                        (contract.status !== ContractStatus.FINISHED && contract.status !== ContractStatus.CANCELLED);
+    
+    if (isReopening && contract.closed_at) {
+      contract.closed_by_id = null;
+      contract.closed_at = null;
     }
 
     return await this.contractRepository.save(contract);
