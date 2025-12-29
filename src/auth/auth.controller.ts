@@ -7,13 +7,34 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { JwtUserPayload } from './interfaces/jwt-user-payload.interface';
+import { CsrfService } from '../common/services/csrf.service';
+import { SkipCsrf } from '../common/guards/csrf.guard';
+import { BruteForceGuard } from './guards/brute-force.guard';
+import { BruteForceService } from './services/brute-force.service';
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly csrfService: CsrfService,
+    private readonly bruteForceService: BruteForceService,
+  ) {}
+
+  @Get('csrf-token')
+  @SkipCsrf()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get CSRF token' })
+  @ApiResponse({ status: 200, description: 'CSRF token generated successfully' })
+  async getCsrfToken(@Req() req: Request) {
+    // Generate token with optional session identifier
+    const token = this.csrfService.generateToken();
+    return { csrfToken: token };
+  }
 
   @Post('login')
+  @SkipCsrf()
+  @UseGuards(BruteForceGuard)
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute for login
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User login' })
@@ -26,7 +47,11 @@ export class AuthController {
     const ipAddress = this.extractIpAddress(req);
     const userAgent = req.headers['user-agent'] || 'unknown';
 
-    const { accessToken, refresh_token, user } = await this.authService.login(dto, ipAddress, userAgent);
+    try {
+      const { accessToken, refresh_token, user } = await this.authService.login(dto, ipAddress, userAgent);
+      
+      // Record successful login (reset brute force counter)
+      this.bruteForceService.recordSuccessfulAttempt(ipAddress);
 
     const isProd = process.env.NODE_ENV === 'production';
 
@@ -38,11 +63,40 @@ export class AuthController {
       maxAge: 604800000
     });
 
-    return res.status(200).json({
-      accessToken,
-      refresh_token,
-      user,
-    });
+      return res.status(200).json({
+        accessToken,
+        refresh_token,
+        user,
+      });
+    } catch (error) {
+      // Record failed login attempt
+      this.bruteForceService.recordFailedAttempt(ipAddress);
+      throw error;
+    }
+  }
+
+  @Get('brute-force-status')
+  @SkipCsrf()
+  @ApiOperation({ summary: 'Get brute force protection status' })
+  @ApiResponse({ status: 200, description: 'Brute force status' })
+  async getBruteForceStatus(@Req() req: Request) {
+    const ipAddress = this.extractIpAddress(req);
+    const isBlocked = this.bruteForceService.isBlocked(ipAddress);
+    const remainingTime = this.bruteForceService.getRemainingBlockTime(ipAddress);
+    const attemptCount = this.bruteForceService.getAttemptCount(ipAddress);
+    const remainingAttempts = this.bruteForceService.getRemainingAttempts(ipAddress);
+    const config = this.bruteForceService.getConfig();
+
+    return {
+      isBlocked,
+      remainingTime,
+      remainingMinutes: Math.ceil(remainingTime / 60000),
+      attemptCount,
+      remainingAttempts,
+      maxAttempts: config.maxAttempts,
+      blockDuration: config.blockDuration,
+      retryAfter: isBlocked ? new Date(Date.now() + remainingTime).toISOString() : null,
+    };
   }
 
   @Get('me')
@@ -93,6 +147,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @SkipCsrf()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'User registration' })
   @ApiBody({ type: RegisterDto })
