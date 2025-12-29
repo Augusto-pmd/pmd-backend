@@ -19,6 +19,21 @@ import { UserRole } from '../common/enums/user-role.enum';
 
 const execAsync = promisify(exec);
 
+interface BackupStatusResponse {
+  total: number;
+  completed: number;
+  failed: number;
+  inProgress: number;
+  pending: number;
+  lastBackup: Backup | null;
+  lastSuccessfulBackup: Backup | null;
+  scheduledJobs: {
+    dailyFullBackup: { enabled: boolean; schedule: string };
+    incrementalBackup: { enabled: boolean; schedule: string };
+    weeklyCleanup: { enabled: boolean; schedule: string };
+  };
+}
+
 @Injectable()
 export class BackupService {
   private readonly logger = new Logger(BackupService.name);
@@ -380,7 +395,7 @@ export class BackupService {
   /**
    * Schedule incremental backup
    * Runs every 4 hours
-   * Cron expression: '0 */4 * * *' = Every 4 hours
+   * Cron expression: Every 4 hours
    */
   @Cron('0 */4 * * *', {
     name: 'incremental-backup',
@@ -456,26 +471,13 @@ export class BackupService {
   /**
    * Get backup status and statistics
    */
-  async getStatus(): Promise<{
-    total: number;
-    completed: number;
-    failed: number;
-    inProgress: number;
-    pending: number;
-    lastBackup: Backup | null;
-    lastSuccessfulBackup: Backup | null;
-    scheduledJobs: {
-      dailyFullBackup: { enabled: boolean; schedule: string };
-      incrementalBackup: { enabled: boolean; schedule: string };
-      weeklyCleanup: { enabled: boolean; schedule: string };
-    };
-  }> {
+  async getStatus(): Promise<BackupStatusResponse> {
     const allBackups = await this.backupRepository.find();
 
     const completed = allBackups.filter((b) => b.status === BackupStatus.COMPLETED).length;
     const failed = allBackups.filter((b) => b.status === BackupStatus.FAILED).length;
     const inProgress = allBackups.filter((b) => b.status === BackupStatus.IN_PROGRESS).length;
-    const pending = allBackups.filter((b) => b.status === BackupStatus.PENDING).length;
+    const pendingCount = allBackups.filter((b) => b.status === BackupStatus.PENDING).length;
 
     const lastBackup = allBackups.length > 0 
       ? allBackups.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
@@ -490,7 +492,7 @@ export class BackupService {
       completed,
       failed,
       inProgress,
-      pending,
+      pending: pendingCount,
       lastBackup,
       lastSuccessfulBackup,
       scheduledJobs: {
