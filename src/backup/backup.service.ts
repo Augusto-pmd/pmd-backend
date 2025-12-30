@@ -145,11 +145,15 @@ export class BackupService {
       // Upload to storage (if configured)
       let storageUrl: string | null = null;
       try {
-        // For now, we'll just store the file path
-        // In the future, this should upload to Google Drive/Dropbox
-        storageUrl = filePath;
+        // Upload to cloud storage (Google Drive/Dropbox) if configured
+        // Falls back to local storage if cloud storage is not available
+        storageUrl = await this.storageService.uploadFile(filePath, fileName);
+        if (storageUrl !== filePath) {
+          this.logger.log(`Backup uploaded to cloud storage: ${storageUrl}`);
+        }
       } catch (error) {
-        this.logger.warn('Failed to upload backup to storage:', error);
+        this.logger.warn('Failed to upload backup to cloud storage, using local path:', error);
+        storageUrl = filePath; // Fallback to local path
       }
 
       // Update backup record
@@ -239,9 +243,14 @@ export class BackupService {
 
       let storageUrl: string | null = null;
       try {
-        storageUrl = filePath;
+        // Upload to cloud storage (Google Drive/Dropbox) if configured
+        storageUrl = await this.storageService.uploadFile(filePath, fileName);
+        if (storageUrl !== filePath) {
+          this.logger.log(`Incremental backup uploaded to cloud storage: ${storageUrl}`);
+        }
       } catch (error) {
-        this.logger.warn('Failed to upload backup to storage:', error);
+        this.logger.warn('Failed to upload incremental backup to cloud storage, using local path:', error);
+        storageUrl = filePath; // Fallback to local path
       }
 
       savedBackup.status = BackupStatus.COMPLETED;
