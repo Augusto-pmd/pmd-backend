@@ -47,7 +47,7 @@ export const getTestDataSource = (): DataSourceOptions => ({
     AuditLog,
   ],
   synchronize: true, // Use synchronize for tests (not recommended for production)
-  dropSchema: true, // Drop schema before each test run
+  dropSchema: false, // Don't drop schema to avoid race conditions with multiple workers
   logging: false,
 });
 
@@ -56,10 +56,18 @@ export const getTestDataSource = (): DataSourceOptions => ({
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env.test',
+      // Override any DATABASE_URL that might interfere
+      ignoreEnvFile: false,
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: () => getTestDataSource(),
+      useFactory: () => {
+        // Ensure we use test database config, not DATABASE_URL
+        const config = getTestDataSource();
+        // Explicitly remove url if present to force use of individual parameters
+        delete (config as any).url;
+        return config;
+      },
     }),
   ],
 })

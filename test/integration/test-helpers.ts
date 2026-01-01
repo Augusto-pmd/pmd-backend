@@ -24,6 +24,29 @@ export class TestApp {
   private dataSource: DataSource;
 
   async setup(): Promise<void> {
+    // Ensure test environment variables are set before creating the module
+    // Set defaults if not already set
+    process.env.TEST_DB_USERNAME = process.env.TEST_DB_USERNAME || 'postgres';
+    process.env.TEST_DB_PASSWORD = process.env.TEST_DB_PASSWORD || 'postgres';
+    process.env.TEST_DB_HOST = process.env.TEST_DB_HOST || 'localhost';
+    process.env.TEST_DB_PORT = process.env.TEST_DB_PORT || '5432';
+    
+    // Use base database name - workers will share the same DB but dropSchema will clean it
+    // The dropSchema: true ensures clean state for each test suite
+    process.env.TEST_DB_DATABASE = process.env.TEST_DB_DATABASE || 'pmd_management_test';
+    
+    // Override DB_* variables from TEST_DB_* to ensure AppModule uses test config
+    // This prevents AppModule from using system username (Windows USERNAME env var)
+    process.env.DB_USERNAME = process.env.TEST_DB_USERNAME;
+    process.env.DB_PASSWORD = process.env.TEST_DB_PASSWORD;
+    process.env.DB_HOST = process.env.TEST_DB_HOST;
+    process.env.DB_PORT = process.env.TEST_DB_PORT;
+    process.env.DB_DATABASE = process.env.TEST_DB_DATABASE;
+    
+    // Unset DATABASE_URL to prevent AppModule from using it
+    // This is important because AppModule has a second TypeORM config that uses DATABASE_URL
+    delete process.env.DATABASE_URL;
+    
     this.moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -31,15 +54,55 @@ export class TestApp {
       .useModule(TestDatabaseModule)
       .compile();
 
+    // Create and initialize the app first
+    // This allows NestJS to initialize TypeORM, which will synchronize the schema
     this.app = this.moduleFixture.createNestApplication();
     this.app.setGlobalPrefix('api');
-    await this.app.init();
-
+    
+    // Get DataSource before initialization to ensure it's available
     this.dataSource = this.moduleFixture.get(DataSource);
     
-    // Run migrations or sync schema
-    if (!this.dataSource.isInitialized) {
-      await this.dataSource.initialize();
+    // Add a small random delay to avoid conflicts when multiple workers start simultaneously
+    // This helps prevent "duplicate key" errors when creating ENUMs
+    const randomDelay = Math.floor(Math.random() * 500);
+    await new Promise(resolve => setTimeout(resolve, randomDelay));
+    
+    // Initialize the app - TypeORM will synchronize automatically
+    await this.app.init();
+    
+    // Wait for TypeORM synchronization to complete
+    // TypeORM with synchronize: true and dropSchema: true will:
+    // 1. Drop all tables
+    // 2. Create all tables from entities
+    // This process is async, so we need to wait for it to complete
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Verify schema is ready by checking for a key table
+    // If it doesn't exist, wait a bit more with retries
+    let retries = 50;
+    let lastError: Error | null = null;
+    while (retries > 0) {
+      try {
+        await this.dataSource.query('SELECT 1 FROM roles LIMIT 1');
+        // Schema is ready, break out of retry loop
+        break;
+      } catch (error: any) {
+        lastError = error;
+        retries--;
+        if (retries > 0) {
+          // Wait a bit more before retrying
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+    }
+    
+    // If we've exhausted retries, throw an error with more context
+    if (retries === 0 && lastError) {
+      throw new Error(
+        `Schema synchronization failed: roles table does not exist after 50 retries (10 seconds). ` +
+        `DataSource initialized: ${this.dataSource.isInitialized}. ` +
+        `Original error: ${lastError.message}`
+      );
     }
   }
 
@@ -75,7 +138,15 @@ export class TestDataBuilder {
 
   async createRole(name: UserRole, description?: string): Promise<Role> {
     const roleRepo = this.dataSource.getRepository(Role);
-    const role = roleRepo.create({
+    
+    // Check if role already exists
+    let role = await roleRepo.findOne({ where: { name } });
+    if (role) {
+      return role;
+    }
+    
+    // Create new role if it doesn't exist
+    role = roleRepo.create({
       name,
       description: description || `${name} role`,
       permissions: {},

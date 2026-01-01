@@ -42,6 +42,10 @@ export class AuthModule implements OnModuleInit {
   constructor(private readonly authService: AuthService) {}
 
   async onModuleInit() {
+    // Skip ensureAdminUser in test mode - tests manage their own data
+    if (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined) {
+      return;
+    }
     await this.authService.ensureAdminUser();
   }
 }

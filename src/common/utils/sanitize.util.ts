@@ -65,8 +65,10 @@ export function sanitizeUrl(url: string): string | null {
 
 /**
  * Sanitize object recursively
+ * @param obj - Object to sanitize
+ * @param visited - Set of visited objects to prevent circular references (internal use)
  */
-export function sanitizeObject(obj: any): any {
+export function sanitizeObject(obj: any, visited: WeakSet<object> = new WeakSet()): any {
   if (obj === null || obj === undefined) {
     return obj;
   }
@@ -75,24 +77,46 @@ export function sanitizeObject(obj: any): any {
     return sanitizeString(obj);
   }
 
-  if (Array.isArray(obj)) {
-    return obj.map((item) => sanitizeObject(item));
+  // Handle primitive types
+  if (typeof obj !== 'object') {
+    return obj;
   }
 
-  if (typeof obj === 'object') {
-    const sanitized: any = {};
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        // Sanitize key
-        const sanitizedKey = sanitizeString(key);
-        // Sanitize value
-        sanitized[sanitizedKey] = sanitizeObject(obj[key]);
+  // Prevent circular references
+  if (visited.has(obj)) {
+    return '[Circular Reference]';
+  }
+
+  if (Array.isArray(obj)) {
+    visited.add(obj);
+    const result = obj.map((item) => sanitizeObject(item, visited));
+    visited.delete(obj);
+    return result;
+  }
+
+  // Handle Date, RegExp, Error, etc. - return as is
+  if (obj instanceof Date || obj instanceof RegExp || obj instanceof Error) {
+    return obj;
+  }
+
+  // Handle objects
+  visited.add(obj);
+  const sanitized: any = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      // Sanitize key
+      const sanitizedKey = sanitizeString(key);
+      // Sanitize value
+      try {
+        sanitized[sanitizedKey] = sanitizeObject(obj[key], visited);
+      } catch (error) {
+        // If sanitization fails (e.g., too deep recursion), skip this property
+        sanitized[sanitizedKey] = '[Sanitization Error]';
       }
     }
-    return sanitized;
   }
-
-  return obj;
+  visited.delete(obj);
+  return sanitized;
 }
 
 /**

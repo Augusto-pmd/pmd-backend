@@ -139,7 +139,11 @@ describe('AuditInterceptor', () => {
 
       expect(mockAuditLogRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          previous_value: { name: 'Updated User', email: 'updated@example.com' },
+          previous_value: expect.objectContaining({
+            name: 'Updated User',
+            email: 'updated@example.com',
+            _audit_note: 'Data sent in request (may not include all fields)',
+          }),
           new_value: { id: 'user-id', name: 'Updated User', email: 'updated@example.com' },
         }),
       );
@@ -175,7 +179,10 @@ describe('AuditInterceptor', () => {
       expect(mockAuditLogRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           previous_value: deletedEntity,
-          new_value: null,
+          new_value: expect.objectContaining({
+            status: 'deleted',
+            timestamp: expect.any(String),
+          }),
           criticality: 'high',
         }),
       );

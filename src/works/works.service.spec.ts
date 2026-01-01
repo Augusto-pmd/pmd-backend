@@ -5,6 +5,8 @@ import { WorksService } from './works.service';
 import { Work } from './works.entity';
 import { Expense } from '../expenses/expenses.entity';
 import { Income } from '../incomes/incomes.entity';
+import { Schedule } from '../schedule/schedule.entity';
+import { ScheduleService } from '../schedule/schedule.service';
 import { ExpenseState } from '../common/enums/expense-state.enum';
 import { WorkStatus } from '../common/enums/work-status.enum';
 import { UserRole } from '../common/enums/user-role.enum';
@@ -32,6 +34,17 @@ describe('WorksService', () => {
 
   const mockIncomeRepository = {
     createQueryBuilder: jest.fn(),
+  };
+
+  const mockScheduleRepository = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+  };
+
+  const mockScheduleService = {
+    generateAutomaticGantt: jest.fn(),
   };
 
   const mockWork: Work = {
@@ -78,6 +91,14 @@ describe('WorksService', () => {
         {
           provide: getRepositoryToken(Income),
           useValue: mockIncomeRepository,
+        },
+        {
+          provide: getRepositoryToken(Schedule),
+          useValue: mockScheduleRepository,
+        },
+        {
+          provide: ScheduleService,
+          useValue: mockScheduleService,
         },
       ],
     }).compile();

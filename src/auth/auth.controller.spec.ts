@@ -3,6 +3,9 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { CsrfService } from '../common/services/csrf.service';
+import { BruteForceService } from './services/brute-force.service';
+import { Request, Response } from 'express';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -13,6 +16,32 @@ describe('AuthController', () => {
     register: jest.fn(),
   };
 
+  const mockCsrfService = {
+    generateToken: jest.fn(),
+  };
+
+  const mockBruteForceService = {
+    recordSuccessfulAttempt: jest.fn(),
+    recordFailedAttempt: jest.fn(),
+    isBlocked: jest.fn(),
+    getRemainingBlockTime: jest.fn(),
+    getAttemptCount: jest.fn(),
+    getRemainingAttempts: jest.fn(),
+    getConfig: jest.fn(),
+  };
+
+  const mockRequest = {
+    ip: '127.0.0.1',
+    socket: { remoteAddress: '127.0.0.1' },
+    headers: { 'user-agent': 'test-agent' },
+  } as unknown as Request;
+
+  const mockResponse = {
+    cookie: jest.fn().mockReturnThis(),
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn(),
+  } as unknown as Response;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -20,6 +49,14 @@ describe('AuthController', () => {
         {
           provide: AuthService,
           useValue: mockAuthService,
+        },
+        {
+          provide: CsrfService,
+          useValue: mockCsrfService,
+        },
+        {
+          provide: BruteForceService,
+          useValue: mockBruteForceService,
         },
       ],
     }).compile();
@@ -44,21 +81,23 @@ describe('AuthController', () => {
       };
 
       const expectedResult = {
-        access_token: 'mock-jwt-token',
+        accessToken: 'mock-jwt-token',
+        refresh_token: 'refresh-token',
         user: {
           id: 'user-id',
           email: 'test@example.com',
-          name: 'Test User',
-          role: 'direction',
+          fullName: 'Test User',
+          role: { name: 'direction' },
         },
       };
 
       mockAuthService.login.mockResolvedValue(expectedResult);
 
-      const result = await controller.login(loginDto);
+      const result = await controller.login(loginDto, mockRequest, mockResponse);
 
-      expect(result).toEqual(expectedResult);
-      expect(authService.login).toHaveBeenCalledWith(loginDto);
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith(expectedResult);
+      expect(authService.login).toHaveBeenCalledWith(loginDto, '127.0.0.1', 'test-agent');
     });
 
     it('should handle login errors', async () => {
@@ -69,7 +108,7 @@ describe('AuthController', () => {
 
       mockAuthService.login.mockRejectedValue(new Error('Invalid credentials'));
 
-      await expect(controller.login(loginDto)).rejects.toThrow('Invalid credentials');
+      await expect(controller.login(loginDto, mockRequest, mockResponse)).rejects.toThrow('Invalid credentials');
     });
   });
 

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import {
   NotFoundException,
   BadRequestException,
@@ -57,6 +57,23 @@ describe('AccountingService', () => {
     updated_at: new Date(),
   } as AccountingRecord;
 
+  const mockQueryRunner = {
+    connect: jest.fn(),
+    startTransaction: jest.fn(),
+    commitTransaction: jest.fn(),
+    rollbackTransaction: jest.fn(),
+    release: jest.fn(),
+    manager: {
+      findOne: jest.fn(),
+      save: jest.fn(),
+      update: jest.fn(),
+    },
+  };
+
+  const mockDataSource = {
+    createQueryRunner: jest.fn(() => mockQueryRunner),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -76,6 +93,10 @@ describe('AccountingService', () => {
         {
           provide: getRepositoryToken(Contract),
           useValue: mockContractRepository,
+        },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
         },
       ],
     }).compile();
@@ -107,6 +128,7 @@ describe('AccountingService', () => {
       const user = createMockUser();
       const createDto: CreateAccountingRecordDto = {
         accounting_type: AccountingType.FISCAL,
+        work_id: 'work-id',
         date: '2024-01-15',
         month: 1,
         year: 2024,
@@ -136,6 +158,7 @@ describe('AccountingService', () => {
       const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
       const createDto: CreateAccountingRecordDto = {
         accounting_type: AccountingType.FISCAL,
+        work_id: 'work-id',
         date: '2024-01-15',
         month: 1,
         year: 2024,
@@ -158,6 +181,7 @@ describe('AccountingService', () => {
       const user = createMockUser({ role: { name: UserRole.DIRECTION } });
       const createDto: CreateAccountingRecordDto = {
         accounting_type: AccountingType.FISCAL,
+        work_id: 'work-id',
         date: '2024-01-15',
         month: 1,
         year: 2024,
@@ -202,11 +226,12 @@ describe('AccountingService', () => {
       mockExpenseRepository.find.mockResolvedValue([]); // No pending expenses
       mockCashboxRepository.find.mockResolvedValue([]); // No unapproved differences
       mockContractRepository.find.mockResolvedValue([]); // No problematic contracts
-      mockAccountingRepository.update.mockResolvedValue({ affected: 1 });
+      mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
 
       await service.closeMonth(closeDto, user);
 
-      expect(mockAccountingRepository.update).toHaveBeenCalledWith(
+      expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
+        expect.anything(), // AccountingRecord entity
         {
           month: closeDto.month,
           year: closeDto.year,
@@ -334,11 +359,11 @@ describe('AccountingService', () => {
       mockExpenseRepository.find.mockResolvedValue([]); // No pending expenses
       mockCashboxRepository.find.mockResolvedValue([cashboxWithZeroDifference]); // Zero differences
       mockContractRepository.find.mockResolvedValue([]); // No problematic contracts
-      mockAccountingRepository.update.mockResolvedValue({ affected: 1 });
+      mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
 
       await service.closeMonth(closeDto, user);
 
-      expect(mockAccountingRepository.update).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.update).toHaveBeenCalled();
     });
   });
 

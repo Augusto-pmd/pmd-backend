@@ -32,7 +32,9 @@ describe('SanitizeUtil', () => {
     it('should strip tags and escape HTML', () => {
       const result = sanitizeString('<script>alert("xss")</script>');
       expect(result).not.toContain('<script>');
-      expect(result).toContain('&lt;');
+      // After stripHtmlTags, the tags are removed, so we check the content is escaped
+      expect(result).toContain('alert');
+      expect(result).toContain('&quot;xss&quot;');
     });
   });
 

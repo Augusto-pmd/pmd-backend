@@ -5,6 +5,7 @@ import { NotFoundException, BadRequestException, ForbiddenException } from '@nes
 import { ContractsService } from './contracts.service';
 import { Contract } from './contracts.entity';
 import { Supplier } from '../suppliers/suppliers.entity';
+import { Work } from '../works/works.entity';
 import { AlertsService } from '../alerts/alerts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
@@ -34,13 +35,23 @@ describe('ContractsService', () => {
     findOne: jest.fn(),
   };
 
+  const mockWorkRepository = {
+    findOne: jest.fn(),
+  };
+
   const mockAlertsService = {
     createAlert: jest.fn(),
   };
 
+  const mockWork = {
+    id: 'work-id',
+    organization_id: null,
+  } as Work;
+
   const mockContract: Contract = {
     id: 'contract-id',
     work_id: 'work-id',
+    work: mockWork,
     supplier_id: 'supplier-id',
     rubric_id: 'rubric-id',
     amount_total: 100000,
@@ -62,6 +73,10 @@ describe('ContractsService', () => {
         {
           provide: getRepositoryToken(Supplier),
           useValue: mockSupplierRepository,
+        },
+        {
+          provide: getRepositoryToken(Work),
+          useValue: mockWorkRepository,
         },
         {
           provide: AlertsService,
@@ -368,7 +383,8 @@ describe('ContractsService', () => {
         amount_total: 150000,
       };
 
-      mockContractRepository.findOne.mockResolvedValue(mockContract);
+      const contract = { ...mockContract, is_blocked: false };
+      mockContractRepository.findOne.mockResolvedValue(contract);
 
       await expect(service.update('contract-id', updateDto, user)).rejects.toThrow(
         ForbiddenException,
@@ -384,7 +400,8 @@ describe('ContractsService', () => {
         currency: Currency.USD,
       };
 
-      mockContractRepository.findOne.mockResolvedValue(mockContract);
+      const contract = { ...mockContract, is_blocked: false };
+      mockContractRepository.findOne.mockResolvedValue(contract);
 
       await expect(service.update('contract-id', updateDto, user)).rejects.toThrow(
         ForbiddenException,
@@ -400,9 +417,10 @@ describe('ContractsService', () => {
         payment_terms: 'New payment terms',
       };
 
-      mockContractRepository.findOne.mockResolvedValue(mockContract);
+      const contract = { ...mockContract, is_blocked: false };
+      mockContractRepository.findOne.mockResolvedValue(contract);
       mockContractRepository.save.mockResolvedValue({
-        ...mockContract,
+        ...contract,
         payment_terms: 'New payment terms',
       });
 
@@ -417,9 +435,10 @@ describe('ContractsService', () => {
         file_url: 'https://example.com/new-file.pdf',
       };
 
-      mockContractRepository.findOne.mockResolvedValue(mockContract);
+      const contract = { ...mockContract, is_blocked: false };
+      mockContractRepository.findOne.mockResolvedValue(contract);
       mockContractRepository.save.mockResolvedValue({
-        ...mockContract,
+        ...contract,
         file_url: 'https://example.com/new-file.pdf',
       });
 
@@ -435,9 +454,10 @@ describe('ContractsService', () => {
         end_date: '2024-12-31',
       };
 
-      mockContractRepository.findOne.mockResolvedValue(mockContract);
+      const contract = { ...mockContract, is_blocked: false };
+      mockContractRepository.findOne.mockResolvedValue(contract);
       mockContractRepository.save.mockResolvedValue({
-        ...mockContract,
+        ...contract,
         start_date: new Date('2024-02-01'),
         end_date: new Date('2024-12-31'),
       });
@@ -563,9 +583,12 @@ describe('ContractsService', () => {
         is_blocked: false,
       };
 
-      mockContractRepository.createQueryBuilder().getMany.mockResolvedValue([
-        contractWithZeroBalance,
-      ]);
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([contractWithZeroBalance]),
+      };
+      mockContractRepository.createQueryBuilder.mockReturnValue(queryBuilder);
       mockContractRepository.save.mockResolvedValue({
         ...contractWithZeroBalance,
         is_blocked: true,

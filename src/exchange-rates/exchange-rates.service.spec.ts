@@ -296,9 +296,13 @@ describe('ExchangeRatesService', () => {
       };
       const existingRate = { ...mockExchangeRate, id: 'other-id' };
 
+      // this.findOne calls findOne with relations, then update calls findOne again for date check
+      // Need to mock both calls: first for this.findOne (with relations), second for date conflict check
+      // Clear any previous mocks
+      mockExchangeRateRepository.findOne.mockReset();
       mockExchangeRateRepository.findOne
-        .mockResolvedValueOnce(mockExchangeRate) // findOne for ID
-        .mockResolvedValueOnce(existingRate); // findOne for date conflict check
+        .mockResolvedValueOnce(mockExchangeRate) // First call: this.findOne(id) - needs relations (includes created_by)
+        .mockResolvedValueOnce(existingRate); // Second call: findOne for date conflict check in update method
 
       await expect(
         service.update('exchange-rate-id', updateDto, user),
@@ -311,14 +315,19 @@ describe('ExchangeRatesService', () => {
     it('should delete exchange rate when user is Administration', async () => {
       const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
 
+      // this.findOne calls findOne with relations, so we need to mock it correctly
       mockExchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
       mockExchangeRateRepository.remove.mockResolvedValue(mockExchangeRate);
 
       await service.remove('exchange-rate-id', user);
 
       expect(mockExchangeRateRepository.findOne).toHaveBeenCalled();
+      // remove is called with the rate returned by this.findOne (which includes created_by)
       expect(mockExchangeRateRepository.remove).toHaveBeenCalledWith(
-        mockExchangeRate,
+        expect.objectContaining({
+          id: mockExchangeRate.id,
+          created_by: expect.anything(),
+        }),
       );
     });
 
@@ -336,11 +345,16 @@ describe('ExchangeRatesService', () => {
     it('should throw NotFoundException when exchange rate not found', async () => {
       const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
 
+      // this.findOne calls findOne with relations, so we need to mock it correctly
+      // When findOne returns null, this.findOne throws NotFoundException
+      // Clear any previous mocks
+      mockExchangeRateRepository.findOne.mockReset();
       mockExchangeRateRepository.findOne.mockResolvedValue(null);
 
       await expect(service.remove('non-existent-id', user)).rejects.toThrow(
         NotFoundException,
       );
+      expect(mockExchangeRateRepository.remove).not.toHaveBeenCalled();
     });
   });
 });

@@ -32,6 +32,23 @@ function parseDatabaseUrl(url: string): {
 export function databaseConfig(configService: ConfigService): TypeOrmModuleOptions {
   const databaseUrl = configService.get<string>('DATABASE_URL');
   const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+  
+  // In test mode, this config will be overridden by TestDatabaseModule
+  // Return a minimal config to prevent connection attempts
+  if (nodeEnv === 'test' || process.env.JEST_WORKER_ID !== undefined) {
+    return {
+      type: 'postgres',
+      host: 'localhost',
+      port: 5432,
+      username: 'postgres',
+      password: 'postgres',
+      database: 'pmd_management_test',
+      synchronize: false,
+      logging: false,
+      autoLoadEntities: true,
+      retryAttempts: 0, // Don't retry in test mode
+    } as TypeOrmModuleOptions;
+  }
 
   // If DATABASE_URL exists, use it (production mode - Render)
   if (databaseUrl) {

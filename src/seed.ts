@@ -53,32 +53,65 @@ async function seed() {
       console.log('ℹ️  Organización ya existe: PMD Arquitectura');
     }
 
-    // 2. Crear Rol ADMINISTRATION si no existe
-    let adminRole = await roleRepository.findOne({ 
-      where: { name: UserRole.ADMINISTRATION } 
-    });
-    
-    if (!adminRole) {
-      adminRole = roleRepository.create({
+    // 2. Crear todos los roles
+    const rolesToCreate = [
+      {
+        name: UserRole.DIRECTION,
+        description: 'Rol de dirección con acceso completo al sistema y permisos de sobrescritura',
+        permissions: { all: true },
+      },
+      {
+        name: UserRole.SUPERVISOR,
+        description: 'Rol de supervisión de obras y gestión de cronogramas',
+        permissions: {},
+      },
+      {
         name: UserRole.ADMINISTRATION,
-        description: 'Rol de administración con acceso completo al sistema',
-        permissions: {
-          all: true,
-        },
+        description: 'Rol de administración con permisos de validación y aprobación',
+        permissions: {},
+      },
+      {
+        name: UserRole.OPERATOR,
+        description: 'Rol de operador con acceso limitado a recursos propios',
+        permissions: {},
+      },
+    ];
+
+    const createdRoles: { [key: string]: Role } = {};
+    
+    for (const roleData of rolesToCreate) {
+      let role = await roleRepository.findOne({ 
+        where: { name: roleData.name } 
       });
-      adminRole = await roleRepository.save(adminRole);
-      console.log('✅ Rol creado: ADMINISTRATION');
-    } else {
-      console.log('ℹ️  Rol ya existe: ADMINISTRATION');
+      
+      if (!role) {
+        role = roleRepository.create({
+          name: roleData.name,
+          description: roleData.description,
+          permissions: roleData.permissions,
+        });
+        role = await roleRepository.save(role);
+        console.log(`✅ Rol creado: ${roleData.name.toUpperCase()}`);
+      } else {
+        console.log(`ℹ️  Rol ya existe: ${roleData.name.toUpperCase()}`);
+      }
+      
+      createdRoles[roleData.name] = role;
     }
 
-    // 3. Crear Usuario Admin
+    // 3. Crear Usuario Admin con rol DIRECTION (mayor rol)
     const adminEmail = 'admin@pmd.com';
     const adminPlainPassword = '1102Pequ';
+    const directionRole = createdRoles[UserRole.DIRECTION];
+    
+    if (!directionRole) {
+      throw new Error('El rol DIRECTION no se pudo crear o encontrar');
+    }
     
     // Buscar usuario sin relaciones primero para evitar errores
     let admin = await userRepository.findOne({
       where: { email: adminEmail },
+      relations: ['role'],
     });
 
     if (!admin) {
@@ -87,18 +120,19 @@ async function seed() {
         email: adminEmail,
         password: hashedPassword,
         fullName: 'Administrador PMD',
-        role: adminRole,
+        role: directionRole,
         organization: defaultOrg,
         isActive: true,
       });
       admin = await userRepository.save(admin);
-      console.log('✅ Usuario admin creado');
+      console.log('✅ Usuario admin creado con rol DIRECTION');
     } else {
-      // Actualizar si falta información
+      // Actualizar si falta información o si tiene un rol diferente
       let updated = false;
       
-      if (!admin.role) {
-        admin.role = adminRole;
+      // Actualizar el rol a DIRECTION si no lo tiene
+      if (!admin.role || admin.role.name !== UserRole.DIRECTION) {
+        admin.role = directionRole;
         updated = true;
       }
       
@@ -121,7 +155,7 @@ async function seed() {
 
       if (updated) {
         await userRepository.save(admin);
-        console.log('🔧 Usuario admin actualizado');
+        console.log('🔧 Usuario admin actualizado con rol DIRECTION');
       } else {
         console.log('ℹ️  Usuario admin ya existe y está actualizado');
       }

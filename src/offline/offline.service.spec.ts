@@ -153,10 +153,14 @@ describe('OfflineService', () => {
         .mockRejectedValue(new Error('Sync failed'));
       const errorItem = {
         ...mockOfflineItem,
+        is_synced: false,
         error_message: 'Failed to sync item after 3 attempts: Sync failed',
       };
 
-      mockOfflineItemRepository.findOne.mockResolvedValue(mockOfflineItem);
+      // Ensure the item is not synced initially
+      const unsyncedItem = { ...mockOfflineItem, is_synced: false };
+      mockOfflineItemRepository.findOne.mockResolvedValue(unsyncedItem);
+      // First save call marks with error, then exception is thrown
       mockOfflineItemRepository.save.mockResolvedValue(errorItem);
 
       // Mock delay to speed up test
@@ -167,6 +171,7 @@ describe('OfflineService', () => {
       ).rejects.toThrow(BadRequestException);
 
       expect(syncHandler).toHaveBeenCalledTimes(3); // MAX_RETRIES
+      expect(mockOfflineItemRepository.save).toHaveBeenCalled();
     });
   });
 

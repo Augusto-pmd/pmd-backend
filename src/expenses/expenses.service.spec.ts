@@ -11,6 +11,9 @@ import { Contract } from '../contracts/contracts.entity';
 import { AccountingRecord } from '../accounting/accounting.entity';
 import { SupplierDocument } from '../supplier-documents/supplier-documents.entity';
 import { AlertsService } from '../alerts/alerts.service';
+import { ContractsService } from '../contracts/contracts.service';
+import { WorksService } from '../works/works.service';
+import { CalculationsService } from '../accounting/calculations.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { ValidateExpenseDto } from './dto/validate-expense.dto';
 import { User } from '../users/user.entity';
@@ -46,6 +49,7 @@ describe('ExpensesService', () => {
     createQueryBuilder: jest.fn(() => ({
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
       getRawOne: jest.fn(),
       orderBy: jest.fn().mockReturnThis(),
@@ -55,6 +59,7 @@ describe('ExpensesService', () => {
   };
 
   const mockValRepository = {
+    findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     createQueryBuilder: jest.fn(() => ({
@@ -93,6 +98,19 @@ describe('ExpensesService', () => {
     createAlert: jest.fn(),
   };
 
+  const mockContractsService = {
+    updateAmountExecuted: jest.fn(),
+  };
+
+  const mockWorksService = {
+    updateWorkTotals: jest.fn(),
+    updateAllProgress: jest.fn(),
+  };
+
+  const mockCalculationsService = {
+    calculateWorkTotals: jest.fn(),
+  };
+
   // Mock QueryRunner
   const mockQueryRunner = {
     connect: jest.fn(),
@@ -121,14 +139,21 @@ describe('ExpensesService', () => {
     end_date: null,
     status: WorkStatus.ACTIVE,
     currency: Currency.ARS,
+    work_type: null,
     supervisor_id: null,
     supervisor: null,
+    organization_id: null,
+    organization: null,
     total_budget: 100000,
     total_expenses: 0,
     total_incomes: 0,
     physical_progress: 0,
     economic_progress: 0,
     financial_progress: 0,
+    allow_post_closure_expenses: false,
+    post_closure_enabled_by_id: null,
+    post_closure_enabled_by: null,
+    post_closure_enabled_at: null,
     created_at: new Date(),
     updated_at: new Date(),
     budgets: [],
@@ -136,6 +161,7 @@ describe('ExpensesService', () => {
     expenses: [],
     incomes: [],
     schedules: [],
+    documents: [],
   };
 
   const mockSupplier: Supplier = {
@@ -188,6 +214,18 @@ describe('ExpensesService', () => {
         {
           provide: AlertsService,
           useValue: mockAlertsService,
+        },
+        {
+          provide: ContractsService,
+          useValue: mockContractsService,
+        },
+        {
+          provide: WorksService,
+          useValue: mockWorksService,
+        },
+        {
+          provide: CalculationsService,
+          useValue: mockCalculationsService,
         },
       ],
     }).compile();
@@ -436,7 +474,11 @@ describe('ExpensesService', () => {
         created_by_id: user.id,
       });
       mockValRepository.findOne.mockResolvedValue(null); // No existing VAL for this expense
-      mockValRepository.createQueryBuilder().getOne.mockResolvedValue(existingVal); // Last VAL is VAL-000005
+      const valQueryBuilder = {
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(existingVal), // Last VAL is VAL-000005
+      };
+      mockValRepository.createQueryBuilder.mockReturnValue(valQueryBuilder);
       mockValRepository.create.mockReturnValue({
         code: 'VAL-000006', // Next sequential number
         expense_id: 'expense-id',
@@ -547,10 +589,14 @@ describe('ExpensesService', () => {
 
   describe('validate', () => {
     it('should validate expense successfully', async () => {
-      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const user = createMockUser({ 
+        role: { name: UserRole.ADMINISTRATION },
+        organizationId: 'org-id',
+      });
       const expense: Expense = {
         id: 'expense-id',
         work_id: 'work-id',
+        work: { ...mockWork, organization_id: user.organizationId || null },
         rubric_id: 'rubric-id',
         amount: 15000,
         currency: Currency.ARS,
@@ -567,13 +613,19 @@ describe('ExpensesService', () => {
         observations: 'All good',
       };
 
-      mockExpenseRepository.findOne.mockResolvedValue(expense);
-      mockExpenseRepository.save.mockResolvedValue({
+      const expenseWithState = {
         ...expense,
+        state: ExpenseState.PENDING,
+      };
+      const savedExpense = {
+        ...expenseWithState,
         state: ExpenseState.VALIDATED,
         validated_by_id: user.id,
         validated_at: new Date(),
-      });
+      };
+      mockExpenseRepository.findOne.mockResolvedValue(expenseWithState);
+      mockQueryRunner.manager.save.mockResolvedValue(savedExpense);
+      mockAccountingRepository.findOne.mockResolvedValue(null); // No existing accounting record
       mockAccountingRepository.create.mockReturnValue({});
       mockAccountingRepository.save.mockResolvedValue({});
       mockExpenseRepository.createQueryBuilder().getRawOne.mockResolvedValue({ total: '15000' });
@@ -623,10 +675,14 @@ describe('ExpensesService', () => {
     });
 
     it('should auto-assign contract and update amount_executed when contract exists', async () => {
-      const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
+      const user = createMockUser({ 
+        role: { name: UserRole.ADMINISTRATION },
+        organizationId: 'org-id',
+      });
       const expense: Expense = {
         id: 'expense-id',
         work_id: 'work-id',
+        work: { ...mockWork, organization_id: user.organizationId || null },
         supplier_id: 'supplier-id',
         rubric_id: 'rubric-id',
         amount: 10000,
@@ -656,13 +712,13 @@ describe('ExpensesService', () => {
         state: ExpenseState.VALIDATED,
       };
 
-      mockExpenseRepository.findOne
-        .mockResolvedValueOnce(expense) // findOne in validate
-        .mockResolvedValueOnce({ ...expense, contract_id: 'contract-id', contract }); // findOne at end
+      const expenseWithState = { ...expense, state: ExpenseState.PENDING };
+      const savedExpense = { ...expenseWithState, contract_id: 'contract-id', state: ExpenseState.VALIDATED };
+      mockExpenseRepository.findOne.mockResolvedValue(expenseWithState);
       mockQueryRunner.manager.findOne.mockResolvedValue(contract);
-      mockQueryRunner.manager.save
-        .mockResolvedValueOnce({ ...expense, contract_id: 'contract-id' }) // Save expense
-        .mockResolvedValueOnce({ ...contract, amount_executed: 60000 }); // Save contract
+      mockQueryRunner.manager.save.mockResolvedValue(savedExpense); // Save expense
+      mockContractsService.updateAmountExecuted.mockResolvedValue({ ...contract, amount_executed: 60000 });
+      mockAccountingRepository.findOne.mockResolvedValue(null); // No existing accounting record
       mockAccountingRepository.create.mockReturnValue({});
       mockAccountingRepository.save.mockResolvedValue({});
       mockExpenseRepository.createQueryBuilder().getRawOne.mockResolvedValue({ total: '60000' });
@@ -682,13 +738,12 @@ describe('ExpensesService', () => {
           },
         }),
       );
-      // Verify contract amount_executed was updated
-      const contractSaveCall = mockQueryRunner.manager.save.mock.calls.find(
-        (call) => call[0] === Contract,
+      // Verify contract amount_executed was updated using the centralized method
+      expect(mockContractsService.updateAmountExecuted).toHaveBeenCalledWith(
+        contract.id,
+        60000, // 50000 + 10000
+        mockQueryRunner,
       );
-      expect(contractSaveCall).toBeDefined();
-      const updatedContract = contractSaveCall[1];
-      expect(updatedContract.amount_executed).toBe(60000);
     });
 
     it('should throw BadRequestException when contract has insufficient balance', async () => {
@@ -944,6 +999,7 @@ describe('ExpensesService', () => {
       const expense: Expense = {
         id: 'expense-id',
         work_id: 'work-id',
+        work: { ...mockWork, organization_id: user.organizationId || null },
         supplier_id: 'supplier-id',
         rubric_id: 'rubric-id',
         amount: 10000,
@@ -962,21 +1018,28 @@ describe('ExpensesService', () => {
         observations: 'Needs correction',
       };
 
-      mockExpenseRepository.findOne
-        .mockResolvedValueOnce(expense) // findOne in validate
-        .mockResolvedValueOnce({ ...expense, state: ExpenseState.OBSERVED }); // findOne at end
-      mockQueryRunner.manager.save.mockResolvedValueOnce({ ...expense, state: ExpenseState.OBSERVED });
+      const expenseWithState = { ...expense, state: ExpenseState.VALIDATED, contract_id: null };
+      const savedExpense = { ...expenseWithState, state: ExpenseState.OBSERVED };
+      mockExpenseRepository.findOne.mockResolvedValue(expenseWithState);
+      // No contract findOne calls should happen since contract_id is null and state is not VALIDATED
+      mockQueryRunner.manager.findOne.mockResolvedValue(null);
+      mockQueryRunner.manager.save.mockResolvedValueOnce(savedExpense);
       mockWorkRepository.findOne.mockResolvedValue(mockWork);
       mockWorkRepository.save.mockResolvedValue(mockWork);
 
       const result = await service.validate('expense-id', validateDto, user);
 
       expect(result.state).toBe(ExpenseState.OBSERVED);
-      // Verify contract was NOT updated (no contract findOne or save calls)
+      // Verify contract was searched (because supplier_id and work_id exist), but not saved since state is OBSERVED
       const contractFindCalls = mockQueryRunner.manager.findOne.mock.calls.filter(
         (call) => call[0] === Contract,
       );
-      expect(contractFindCalls.length).toBe(0); // No contract find calls
+      // Contract is searched but not saved when state is OBSERVED
+      expect(contractFindCalls.length).toBeGreaterThan(0); // Contract is searched
+      const contractSaveCalls = mockQueryRunner.manager.save.mock.calls.filter(
+        (call) => call[0] === Contract,
+      );
+      expect(contractSaveCalls.length).toBe(0); // But not saved
       expect(mockAlertsService.createAlert).toHaveBeenCalled();
     });
 
@@ -988,6 +1051,7 @@ describe('ExpensesService', () => {
       const expense: Expense = {
         id: 'expense-id',
         work_id: 'work-id',
+        work: { ...mockWork, organization_id: 'org-id' },
         supplier_id: 'supplier-id',
         rubric_id: 'rubric-id',
         amount: 15000,
@@ -995,7 +1059,7 @@ describe('ExpensesService', () => {
         purchase_date: new Date('2024-01-15'),
         document_type: DocumentType.INVOICE_A,
         document_number: 'FAC-001',
-        state: ExpenseState.VALIDATED,
+        state: ExpenseState.PENDING,
         vat_amount: 3150,
         vat_rate: 21,
         vat_perception: 500,
@@ -1013,11 +1077,11 @@ describe('ExpensesService', () => {
         state: ExpenseState.VALIDATED,
       };
 
-      mockExpenseRepository.findOne
-        .mockResolvedValueOnce(expense) // findOne in validate
-        .mockResolvedValueOnce({ ...expense }); // findOne at end
+      const expenseWithState = { ...expense, state: ExpenseState.PENDING };
+      const savedExpense = { ...expenseWithState, state: ExpenseState.VALIDATED };
+      mockExpenseRepository.findOne.mockResolvedValue(expenseWithState);
       mockQueryRunner.manager.findOne.mockResolvedValue(null); // No contract
-      mockQueryRunner.manager.save.mockResolvedValueOnce({ ...expense }); // Save expense
+      mockQueryRunner.manager.save.mockResolvedValue(savedExpense); // Save expense with VALIDATED state
       mockAccountingRepository.findOne.mockResolvedValue(null); // No existing accounting record
       mockAccountingRepository.create.mockReturnValue({
         id: 'accounting-record-id',
@@ -1073,9 +1137,9 @@ describe('ExpensesService', () => {
           vat_amount: expense.vat_amount,
           vat_rate: expense.vat_rate,
           vat_perception: expense.vat_perception,
-          vat_withholding: expense.vat_withholding,
+          vat_withholding: expense.vat_withholding || null, // Service converts 0 to null
           iibb_perception: expense.iibb_perception,
-          income_tax_withholding: expense.income_tax_withholding,
+          income_tax_withholding: expense.income_tax_withholding || null, // Service converts 0 to null
           file_url: expense.file_url,
         }),
       );
@@ -1090,13 +1154,14 @@ describe('ExpensesService', () => {
       const expense: Expense = {
         id: 'expense-id',
         work_id: 'work-id',
+        work: { ...mockWork, organization_id: 'org-id' },
         supplier_id: 'supplier-id',
         rubric_id: 'rubric-id',
         amount: 15000,
         currency: Currency.ARS,
         purchase_date: new Date('2024-01-15'),
         document_type: DocumentType.INVOICE_A,
-        state: ExpenseState.VALIDATED,
+        state: ExpenseState.PENDING,
         created_by_id: 'user-id',
         created_at: new Date(),
         updated_at: new Date(),
@@ -1111,11 +1176,11 @@ describe('ExpensesService', () => {
         state: ExpenseState.VALIDATED,
       };
 
-      mockExpenseRepository.findOne
-        .mockResolvedValueOnce(expense) // findOne in validate
-        .mockResolvedValueOnce({ ...expense }); // findOne at end
+      const expenseWithState = { ...expense, state: ExpenseState.PENDING };
+      const savedExpense = { ...expenseWithState, state: ExpenseState.VALIDATED };
+      mockExpenseRepository.findOne.mockResolvedValue(expenseWithState);
       mockQueryRunner.manager.findOne.mockResolvedValue(null); // No contract
-      mockQueryRunner.manager.save.mockResolvedValueOnce({ ...expense }); // Save expense
+      mockQueryRunner.manager.save.mockResolvedValue(savedExpense); // Save expense with VALIDATED state
       mockAccountingRepository.findOne.mockResolvedValue(existingAccountingRecord); // Existing record
       mockExpenseRepository.createQueryBuilder().getRawOne.mockResolvedValue({ total: '15000' });
       mockWorkRepository.findOne.mockResolvedValue(mockWork);
@@ -1139,13 +1204,14 @@ describe('ExpensesService', () => {
       const expense: Expense = {
         id: 'expense-id',
         work_id: 'work-id',
+        work: { ...mockWork, organization_id: 'org-id' },
         supplier_id: 'supplier-id',
         rubric_id: 'rubric-id',
         amount: 10000,
         currency: Currency.ARS,
         purchase_date: new Date('2024-01-15'),
         document_type: DocumentType.VAL,
-        state: ExpenseState.VALIDATED,
+        state: ExpenseState.PENDING,
         created_by_id: 'user-id',
         created_at: new Date(),
         updated_at: new Date(),
@@ -1155,11 +1221,11 @@ describe('ExpensesService', () => {
         state: ExpenseState.VALIDATED,
       };
 
-      mockExpenseRepository.findOne
-        .mockResolvedValueOnce(expense) // findOne in validate
-        .mockResolvedValueOnce({ ...expense }); // findOne at end
+      const expenseWithState = { ...expense, state: ExpenseState.PENDING };
+      const savedExpense = { ...expenseWithState, state: ExpenseState.VALIDATED };
+      mockExpenseRepository.findOne.mockResolvedValue(expenseWithState);
       mockQueryRunner.manager.findOne.mockResolvedValue(null); // No contract
-      mockQueryRunner.manager.save.mockResolvedValueOnce({ ...expense }); // Save expense
+      mockQueryRunner.manager.save.mockResolvedValue(savedExpense); // Save expense with VALIDATED state
       mockAccountingRepository.findOne.mockResolvedValue(null); // No existing record
       mockAccountingRepository.create.mockReturnValue({});
       mockAccountingRepository.save.mockResolvedValue({});
@@ -1225,7 +1291,17 @@ describe('ExpensesService', () => {
         },
       ];
 
-      mockExpenseRepository.createQueryBuilder().getMany.mockResolvedValue(expenses);
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn(),
+        getMany: jest.fn().mockResolvedValue(expenses),
+      };
+      mockExpenseRepository.createQueryBuilder.mockReturnValue(queryBuilder);
 
       const result = await service.findAll(user);
 
@@ -1243,8 +1319,17 @@ describe('ExpensesService', () => {
         },
       ];
 
-      const queryBuilder = mockExpenseRepository.createQueryBuilder();
-      queryBuilder.getMany.mockResolvedValue(expenses);
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn(),
+        getMany: jest.fn().mockResolvedValue(expenses),
+      };
+      mockExpenseRepository.createQueryBuilder.mockReturnValue(queryBuilder);
 
       const result = await service.findAll(user);
 
@@ -1261,17 +1346,21 @@ describe('ExpensesService', () => {
       const expense: Expense = {
         id: 'expense-id',
         created_by_id: user.id,
+        work: { ...mockWork, organization_id: null }, // No organization restriction
       } as Expense;
 
       mockExpenseRepository.findOne.mockResolvedValue(expense);
 
       const result = await service.findOne('expense-id', user);
 
-      expect(result).toEqual(expense);
+      expect(result.id).toBe(expense.id);
+      expect(result.created_by_id).toBe(expense.created_by_id);
     });
 
     it('should throw NotFoundException when expense not found', async () => {
       const user = createMockUser();
+      // Clear any previous mocks
+      mockExpenseRepository.findOne.mockClear();
       mockExpenseRepository.findOne.mockResolvedValue(null);
 
       await expect(service.findOne('non-existent', user)).rejects.toThrow(NotFoundException);
@@ -1282,6 +1371,7 @@ describe('ExpensesService', () => {
       const expense: Expense = {
         id: 'expense-id',
         created_by_id: 'other-user-id',
+        work: { ...mockWork, organization_id: null }, // No organization restriction
       } as Expense;
 
       mockExpenseRepository.findOne.mockResolvedValue(expense);

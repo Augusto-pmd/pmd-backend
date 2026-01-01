@@ -38,11 +38,12 @@ export class AuthService {
       relations: ['role', 'organization'],
     });
 
-    let adminRole = await this.roleRepository.findOne({ where: { name: UserRole.ADMINISTRATION }});
+    let adminRole = await this.roleRepository.findOne({ where: { name: UserRole.DIRECTION }});
     if (!adminRole) {
       adminRole = this.roleRepository.create({
-        name: UserRole.ADMINISTRATION,
-        description: 'Default Admin Role',
+        name: UserRole.DIRECTION,
+        description: 'Rol de dirección con acceso completo al sistema',
+        permissions: { all: true },
       });
       adminRole = await this.roleRepository.save(adminRole);
     }
@@ -75,7 +76,11 @@ export class AuthService {
 
     let updated = false;
 
-    if (!admin.role) { admin.role = adminRole; updated = true; }
+    // Actualizar el rol a DIRECTION si no lo tiene
+    if (!admin.role || admin.role.name !== UserRole.DIRECTION) { 
+      admin.role = adminRole; 
+      updated = true; 
+    }
     if (!admin.organization) { admin.organization = defaultOrg; updated = true; }
     if (!admin.isActive) { admin.isActive = true; updated = true; }
 

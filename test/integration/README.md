@@ -57,14 +57,36 @@ This directory contains comprehensive integration tests (E2E) for the PMD Manage
 
 ### Prerequisites
 
-1. PostgreSQL test database must be running
-2. Set environment variables (or use defaults):
+1. **PostgreSQL must be running** on your system
+2. **Configure database credentials** using environment variables or set them before running tests:
    ```bash
-   TEST_DB_HOST=localhost
-   TEST_DB_PORT=5432
-   TEST_DB_USERNAME=postgres
-   TEST_DB_PASSWORD=postgres
-   TEST_DB_DATABASE=pmd_management_test
+   # Windows PowerShell
+   $env:TEST_DB_HOST="localhost"
+   $env:TEST_DB_PORT="5432"
+   $env:TEST_DB_USERNAME="postgres"  # or your PostgreSQL username
+   $env:TEST_DB_PASSWORD="postgres"  # or your PostgreSQL password
+   $env:TEST_DB_DATABASE="pmd_management_test"
+   
+   # Linux/Mac
+   export TEST_DB_HOST=localhost
+   export TEST_DB_PORT=5432
+   export TEST_DB_USERNAME=postgres
+   export TEST_DB_PASSWORD=postgres
+   export TEST_DB_DATABASE=pmd_management_test
+   ```
+
+   **Note:** If you don't set these variables, the defaults are:
+   - Host: `localhost`
+   - Port: `5432`
+   - Username: `postgres`
+   - Password: `postgres`
+   - Database: `pmd_management_test`
+
+3. **Setup test database** (automatically done when running tests, or manually):
+   ```bash
+   # The test database will be created automatically when running tests
+   # Or you can create it manually:
+   npm run test:e2e:setup
    ```
 
 ### Run All Integration Tests
@@ -72,6 +94,10 @@ This directory contains comprehensive integration tests (E2E) for the PMD Manage
 ```bash
 npm run test:e2e
 ```
+
+This command will:
+1. Automatically create the test database if it doesn't exist
+2. Run all integration tests
 
 ### Run Specific Test File
 

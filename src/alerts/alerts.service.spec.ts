@@ -4,6 +4,7 @@ import { Repository, LessThan } from 'typeorm';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { AlertsService } from './alerts.service';
 import { Alert } from './alerts.entity';
+import { User } from '../users/user.entity';
 import { SupplierDocument } from '../supplier-documents/supplier-documents.entity';
 import { Expense } from '../expenses/expenses.entity';
 import { Contract } from '../contracts/contracts.entity';
@@ -43,6 +44,11 @@ describe('AlertsService', () => {
     find: jest.fn(),
   };
 
+  const mockUserRepository = {
+    findOne: jest.fn(),
+    find: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,6 +72,10 @@ describe('AlertsService', () => {
         {
           provide: getRepositoryToken(Schedule),
           useValue: mockScheduleRepository,
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: mockUserRepository,
         },
       ],
     }).compile();
@@ -117,7 +127,7 @@ describe('AlertsService', () => {
 
       const expiringDoc = {
         id: 'doc-id',
-        document_type: SupplierDocumentType.INSURANCE,
+        document_type: SupplierDocumentType.PERSONAL_ACCIDENT_INSURANCE,
         expiration_date: expirationDate,
         is_valid: true,
         supplier: {
@@ -189,7 +199,7 @@ describe('AlertsService', () => {
 
       const expiringDoc = {
         id: 'doc-id',
-        document_type: SupplierDocumentType.INSURANCE,
+        document_type: SupplierDocumentType.PERSONAL_ACCIDENT_INSURANCE,
         expiration_date: expirationDate,
         is_valid: true,
         supplier: {

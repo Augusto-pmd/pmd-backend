@@ -42,7 +42,11 @@ import { HealthModule } from './health/health.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    NestScheduleModule.forRoot(),
+    // Only load ScheduleModule in non-test environments
+    ...(process.env.NODE_ENV !== 'test' && process.env.JEST_WORKER_ID === undefined
+      ? [NestScheduleModule.forRoot()]
+      : []),
+    // This TypeORM module will be overridden by TestDatabaseModule in tests
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: databaseConfig,
@@ -52,15 +56,19 @@ import { HealthModule } from './health/health.module';
       ttl: 60000, // 1 minute
       limit: 10, // 10 requests per minute
     }]),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      url: process.env.DATABASE_URL,
-      autoLoadEntities: true,
-      synchronize: false,
-      ssl: process.env.NODE_ENV === 'production' || process.env.DATABASE_URL
-        ? { rejectUnauthorized: false }
-        : false,
-    }),
+    // Only load second TypeORM module in non-test environments
+    // Tests use TestDatabaseModule which overrides the first TypeORM module
+    ...(process.env.NODE_ENV !== 'test' && process.env.JEST_WORKER_ID === undefined
+      ? [TypeOrmModule.forRoot({
+          type: 'postgres',
+          url: process.env.DATABASE_URL,
+          autoLoadEntities: true,
+          synchronize: false,
+          ssl: process.env.NODE_ENV === 'production' || process.env.DATABASE_URL
+            ? { rejectUnauthorized: false }
+            : false,
+        })]
+      : []),
     CommonModule,
     AuthModule,
     UsersModule,

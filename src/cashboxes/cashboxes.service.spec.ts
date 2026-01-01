@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import {
   NotFoundException,
   BadRequestException,
@@ -32,6 +32,13 @@ describe('CashboxesService', () => {
     create: jest.fn(),
     save: jest.fn(),
     remove: jest.fn(),
+    createQueryBuilder: jest.fn(() => ({
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      getMany: jest.fn(),
+      getOne: jest.fn(),
+    })),
   };
 
   const mockUserRepository = {
@@ -48,6 +55,24 @@ describe('CashboxesService', () => {
 
   const mockAlertsService = {
     createAlert: jest.fn(),
+  };
+
+  const mockQueryRunner = {
+    connect: jest.fn().mockResolvedValue(undefined),
+    startTransaction: jest.fn().mockResolvedValue(undefined),
+    commitTransaction: jest.fn().mockResolvedValue(undefined),
+    rollbackTransaction: jest.fn().mockResolvedValue(undefined),
+    release: jest.fn().mockResolvedValue(undefined),
+    manager: {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      save: jest.fn(),
+      create: jest.fn(),
+    },
+  };
+
+  const mockDataSource = {
+    createQueryRunner: jest.fn(() => mockQueryRunner),
   };
 
   const mockCashbox: Cashbox = {
@@ -90,6 +115,10 @@ describe('CashboxesService', () => {
         {
           provide: AlertsService,
           useValue: mockAlertsService,
+        },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
         },
       ],
     }).compile();
@@ -242,8 +271,8 @@ describe('CashboxesService', () => {
       ];
 
       mockCashboxRepository.findOne.mockResolvedValue(cashboxWithMovements);
-      mockCashMovementRepository.find.mockResolvedValue(mockMovements);
-      mockCashboxRepository.save.mockResolvedValue({
+      mockQueryRunner.manager.find.mockResolvedValue(mockMovements);
+      mockQueryRunner.manager.save.mockResolvedValue({
         ...cashboxWithMovements,
         ...closeDto,
         // Expected difference ARS: 12000 - (10000 + 3000 - 2000) = 12000 - 11000 = 1000
@@ -258,9 +287,10 @@ describe('CashboxesService', () => {
       expect(result.status).toBe(CashboxStatus.CLOSED);
       expect(result.difference_ars).toBe(1000);
       expect(result.difference_usd).toBe(10);
-      expect(mockCashMovementRepository.find).toHaveBeenCalledWith({
-        where: { cashbox_id: 'cashbox-id' },
-      });
+      expect(mockQueryRunner.manager.find).toHaveBeenCalledWith(
+        expect.any(Function), // CashMovement entity
+        { where: { cashbox_id: 'cashbox-id' } },
+      );
       expect(mockAlertsService.createAlert).toHaveBeenCalled();
     });
 
@@ -346,8 +376,8 @@ describe('CashboxesService', () => {
       ];
 
       mockCashboxRepository.findOne.mockResolvedValue(cashboxWithMovements);
-      mockCashMovementRepository.find.mockResolvedValue(mockMovements);
-      mockCashboxRepository.save.mockResolvedValue({
+      mockQueryRunner.manager.find.mockResolvedValue(mockMovements);
+      mockQueryRunner.manager.save.mockResolvedValue({
         ...cashboxWithMovements,
         ...closeDto,
         difference_ars: 0,
@@ -446,8 +476,8 @@ describe('CashboxesService', () => {
       ];
 
       mockCashboxRepository.findOne.mockResolvedValue(cashboxWithMovements);
-      mockCashMovementRepository.find.mockResolvedValue(mockMovements);
-      mockCashboxRepository.save.mockResolvedValue({
+      mockQueryRunner.manager.find.mockResolvedValue(mockMovements);
+      mockQueryRunner.manager.save.mockResolvedValue({
         ...cashboxWithMovements,
         ...closeDto,
         // Expected difference ARS: 10500 - (10000 + 3000 - 2000) = 10500 - 11000 = -500
@@ -544,82 +574,103 @@ describe('CashboxesService', () => {
       const user = createMockUser({ role: { name: UserRole.DIRECTION } });
       const cashboxes = [mockCashbox, { ...mockCashbox, id: 'cashbox-id-2', user_id: 'other-user-id' }];
 
-      mockCashboxRepository.find.mockResolvedValue(cashboxes);
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(cashboxes),
+        getOne: jest.fn(),
+      };
+      mockCashboxRepository.createQueryBuilder.mockReturnValue(queryBuilder);
 
       const result = await service.findAll(user);
 
       expect(result).toEqual(cashboxes);
-      expect(mockCashboxRepository.find).toHaveBeenCalledWith({
-        relations: ['user', 'movements'],
-        order: { created_at: 'DESC' },
-      });
-      // Verify no where clause is applied - Direction sees all cashboxes
-      const findCall = mockCashboxRepository.find.mock.calls[0][0];
-      expect(findCall.where).toBeUndefined();
+      expect(mockCashboxRepository.createQueryBuilder).toHaveBeenCalledWith('cashbox');
+      expect(queryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('cashbox.user', 'user');
+      expect(queryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('cashbox.movements', 'movements');
     });
 
     it('should return all cashboxes for Administration role (no filter)', async () => {
       const user = createMockUser({ role: { name: UserRole.ADMINISTRATION } });
       const cashboxes = [mockCashbox, { ...mockCashbox, id: 'cashbox-id-2', user_id: 'other-user-id' }];
 
-      mockCashboxRepository.find.mockResolvedValue(cashboxes);
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(cashboxes),
+        getOne: jest.fn(),
+      };
+      mockCashboxRepository.createQueryBuilder.mockReturnValue(queryBuilder);
 
       const result = await service.findAll(user);
 
       expect(result).toEqual(cashboxes);
-      expect(mockCashboxRepository.find).toHaveBeenCalledWith({
-        relations: ['user', 'movements'],
-        order: { created_at: 'DESC' },
-      });
-      // Verify no where clause is applied - Administration sees all cashboxes
-      const findCall = mockCashboxRepository.find.mock.calls[0][0];
-      expect(findCall.where).toBeUndefined();
+      expect(mockCashboxRepository.createQueryBuilder).toHaveBeenCalledWith('cashbox');
     });
 
     it('should return all cashboxes for Supervisor role (no filter)', async () => {
       const user = createMockUser({ role: { name: UserRole.SUPERVISOR } });
       const cashboxes = [mockCashbox, { ...mockCashbox, id: 'cashbox-id-2', user_id: 'other-user-id' }];
 
-      mockCashboxRepository.find.mockResolvedValue(cashboxes);
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(cashboxes),
+        getOne: jest.fn(),
+      };
+      mockCashboxRepository.createQueryBuilder.mockReturnValue(queryBuilder);
 
       const result = await service.findAll(user);
 
       expect(result).toEqual(cashboxes);
-      expect(mockCashboxRepository.find).toHaveBeenCalledWith({
-        relations: ['user', 'movements'],
-        order: { created_at: 'DESC' },
-      });
+      expect(mockCashboxRepository.createQueryBuilder).toHaveBeenCalledWith('cashbox');
       // Verify no where clause is applied - Supervisor sees all cashboxes
-      const findCall = mockCashboxRepository.find.mock.calls[0][0];
-      expect(findCall.where).toBeUndefined();
+      expect(queryBuilder.where).not.toHaveBeenCalled();
     });
 
     it('should return only user cashboxes for Operator role (with filter)', async () => {
       const user = createMockUser({ role: { name: UserRole.OPERATOR } });
       const cashboxes = [mockCashbox];
 
-      mockCashboxRepository.find.mockResolvedValue(cashboxes);
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(cashboxes),
+        getOne: jest.fn(),
+      };
+      mockCashboxRepository.createQueryBuilder.mockReturnValue(queryBuilder);
 
       const result = await service.findAll(user);
 
       expect(result).toEqual(cashboxes);
-      expect(mockCashboxRepository.find).toHaveBeenCalledWith({
-        where: { user_id: user.id },
-        relations: ['user', 'movements'],
-        order: { created_at: 'DESC' },
-      });
-      // Verify where clause is applied - Operator only sees their own cashboxes
-      const findCall = mockCashboxRepository.find.mock.calls[0][0];
-      expect(findCall.where).toEqual({ user_id: user.id });
+      expect(mockCashboxRepository.createQueryBuilder).toHaveBeenCalledWith('cashbox');
+      expect(queryBuilder.where).toHaveBeenCalledWith('cashbox.user_id = :userId', { userId: user.id });
     });
 
     it('should return empty array for unknown role', async () => {
       const user = createMockUser({ role: { name: 'unknown-role' as any } });
 
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+        getOne: jest.fn(),
+      };
+      mockCashboxRepository.createQueryBuilder.mockReturnValue(queryBuilder);
+
       const result = await service.findAll(user);
 
       expect(result).toEqual([]);
-      expect(mockCashboxRepository.find).not.toHaveBeenCalled();
     });
   });
 

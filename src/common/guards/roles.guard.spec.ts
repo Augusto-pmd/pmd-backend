@@ -102,18 +102,20 @@ describe('RolesGuard', () => {
     });
 
     it('should handle role as string directly', () => {
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.ADMINISTRATION]);
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.DIRECTION]);
 
       const context = {
         switchToHttp: jest.fn().mockReturnValue({
           getRequest: jest.fn().mockReturnValue({
-            user: { role: UserRole.ADMINISTRATION },
+            method: 'POST',
+            user: { role: UserRole.OPERATOR }, // User has OPERATOR role as string, requirement is DIRECTION
           }),
         }),
         getHandler: jest.fn(),
         getClass: jest.fn(),
       } as unknown as ExecutionContext;
 
+      // OPERATOR does not match DIRECTION requirement, so it should throw
       expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     });
   });

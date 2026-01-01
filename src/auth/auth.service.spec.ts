@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { UnauthorizedException, ConflictException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { AuthService } from './auth.service';
 import { User } from '../users/user.entity';
@@ -9,6 +10,7 @@ import { Role } from '../roles/role.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UserRole } from '../common/enums/user-role.enum';
+import { AuditService } from '../audit/audit.service';
 import * as bcrypt from 'bcrypt';
 
 jest.mock('bcrypt');
@@ -25,7 +27,15 @@ describe('AuthService', () => {
   };
 
   const mockJwtService = {
-    sign: jest.fn(),
+    signAsync: jest.fn(),
+  };
+
+  const mockAuditService = {
+    logAuthEvent: jest.fn(),
+  };
+
+  const mockRoleRepository = {
+    findOne: jest.fn(),
   };
 
   const mockRole: Role = {
@@ -40,18 +50,15 @@ describe('AuthService', () => {
 
   const mockUser: User = {
     id: 'user-id',
-    name: 'Test User',
+    fullName: 'Test User',
     email: 'test@example.com',
     password: 'hashedPassword',
-    phone: null,
-    is_active: true,
-    role_id: 'role-id',
+    isActive: true,
     role: mockRole,
+    organizationId: null,
+    organization: null,
     created_at: new Date(),
     updated_at: new Date(),
-    cashboxes: [],
-    expenses: [],
-    supervised_works: [],
   };
 
   beforeEach(async () => {
@@ -63,8 +70,26 @@ describe('AuthService', () => {
           useValue: mockUserRepository,
         },
         {
+          provide: getRepositoryToken(Role),
+          useValue: mockRoleRepository,
+        },
+        {
+          provide: getRepositoryToken(require('../organizations/organization.entity').Organization),
+          useValue: {},
+        },
+        {
           provide: JwtService,
           useValue: mockJwtService,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn(),
+          },
         },
       ],
     }).compile();
@@ -93,10 +118,10 @@ describe('AuthService', () => {
       expect(result).toBeDefined();
       expect(result.id).toBe(mockUser.id);
       expect(result.email).toBe(mockUser.email);
-      expect(result.password).toBeUndefined();
+      expect((result as any).password).toBeUndefined();
       expect(mockUserRepository.findOne).toHaveBeenCalledWith({
         where: { email: loginDto.email },
-        relations: ['role'],
+        relations: ['role', 'organization'],
       });
     });
 
@@ -127,19 +152,15 @@ describe('AuthService', () => {
 
       mockUserRepository.findOne.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      mockJwtService.sign.mockReturnValue('mock-jwt-token');
+      mockJwtService.signAsync.mockResolvedValue('mock-jwt-token');
 
-      const result = await service.login(loginDto);
+      const result = await service.login(loginDto, '127.0.0.1', 'test-agent');
 
-      expect(result).toHaveProperty('access_token');
+      expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('user');
-      expect(result.access_token).toBe('mock-jwt-token');
+      expect(result.accessToken).toBe('mock-jwt-token');
       expect(result.user.email).toBe(mockUser.email);
-      expect(mockJwtService.sign).toHaveBeenCalledWith({
-        email: mockUser.email,
-        sub: mockUser.id,
-        role: mockUser.role.name,
-      });
+      expect(mockJwtService.signAsync).toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException when credentials are invalid', async () => {
@@ -152,7 +173,7 @@ describe('AuthService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.login(loginDto)).rejects.toThrow('Invalid credentials');
+      await expect(service.login(loginDto)).rejects.toThrow('INVALID_PASSWORD');
     });
   });
 
@@ -167,19 +188,28 @@ describe('AuthService', () => {
       };
 
       mockUserRepository.findOne.mockResolvedValue(null);
+      mockRoleRepository.findOne.mockResolvedValue(mockRole); // Role exists
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashedPassword');
       mockUserRepository.create.mockReturnValue({
         ...registerDto,
         password: 'hashedPassword',
       });
-      mockUserRepository.save.mockResolvedValue({
+      const savedUser = {
         id: 'new-user-id',
         ...registerDto,
         password: 'hashedPassword',
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
-      });
+      };
+      mockUserRepository.save.mockResolvedValue(savedUser);
+      // After save, findOne is called to get user with relations
+      mockUserRepository.findOne.mockResolvedValueOnce(null) // First call: check if user exists
+        .mockResolvedValueOnce({ // Second call: get user with relations after save
+          ...savedUser,
+          role: mockRole,
+          organization: null,
+        });
 
       const result = await service.register(registerDto);
 
@@ -203,8 +233,8 @@ describe('AuthService', () => {
 
       mockUserRepository.findOne.mockResolvedValue(mockUser);
 
-      await expect(service.register(registerDto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.register(registerDto)).rejects.toThrow('User already exists');
+      await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
+      await expect(service.register(registerDto)).rejects.toThrow('User with this email already exists');
     });
   });
 });
