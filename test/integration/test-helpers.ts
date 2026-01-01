@@ -70,16 +70,13 @@ export class TestApp {
     // Initialize the app - TypeORM will synchronize automatically
     await this.app.init();
     
-    // Wait for TypeORM synchronization to complete
-    // TypeORM with synchronize: true and dropSchema: true will:
-    // 1. Drop all tables
-    // 2. Create all tables from entities
-    // This process is async, so we need to wait for it to complete
+    // TypeORM with synchronize: true will automatically create tables on initialization
+    // Wait a bit to ensure synchronization completes
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     // Verify schema is ready by checking for a key table
     // If it doesn't exist, wait a bit more with retries
-    let retries = 50;
+    let retries = 30;
     let lastError: Error | null = null;
     while (retries > 0) {
       try {
@@ -99,7 +96,7 @@ export class TestApp {
     // If we've exhausted retries, throw an error with more context
     if (retries === 0 && lastError) {
       throw new Error(
-        `Schema synchronization failed: roles table does not exist after 50 retries (10 seconds). ` +
+        `Schema synchronization failed: roles table does not exist after 30 retries (6 seconds). ` +
         `DataSource initialized: ${this.dataSource.isInitialized}. ` +
         `Original error: ${lastError.message}`
       );
