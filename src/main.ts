@@ -93,7 +93,8 @@ async function bootstrap() {
     .setDescription(
       'Complete API documentation for PMD Management System. ' +
       'Includes authentication, users, roles, suppliers, works, contracts, expenses, ' +
-      'incomes, cashboxes, cash movements, alerts, accounting records, and audit logs.',
+      'incomes, cashboxes, cash movements, alerts, accounting records, audit logs, ' +
+      'exchange rates, offline mode, backups, schedule/Gantt management, and comprehensive reporting.',
     )
     .setVersion('1.0')
     .addBearerAuth(

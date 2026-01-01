@@ -6,14 +6,19 @@ Complete backend implementation for the PMD Management System using NestJS, Type
 
 - **Authentication & Authorization:** JWT-based authentication with role-based access control (RBAC)
 - **User Management:** Complete user and role management system
-- **Work Management:** Project/Work tracking with budgets and contracts
-- **Expense Management:** Expense tracking with validation workflow
-- **Supplier Management:** Supplier approval and document management
-- **Cashbox Management:** Cashbox tracking with difference approval
-- **Accounting:** Accounting records with month closing
-- **Alerts System:** Automated alert generation
-- **Audit Logging:** Complete audit trail
-- **API Documentation:** Swagger/OpenAPI documentation
+- **Work Management:** Project/Work tracking with budgets, contracts, and Gantt charts
+- **Expense Management:** Expense tracking with validation workflow and automatic VAL generation
+- **Supplier Management:** Supplier approval, document management, and ART expiration tracking
+- **Cashbox Management:** Cashbox tracking with refills, difference approval, and detailed history
+- **Accounting:** Accounting records with month closing, automatic tax calculations, and comprehensive reports
+- **Alerts System:** Automated alert generation with assignment and resolution workflow
+- **Schedule Management:** Automatic Gantt chart generation and work progress tracking (physical, economic, financial)
+- **Exchange Rates:** Currency exchange rate management for multi-currency operations
+- **Offline Mode:** Offline item storage and synchronization for mobile/work in the field
+- **Backup System:** Automated database backups with scheduled jobs (daily full, incremental, weekly cleanup)
+- **Audit Logging:** Complete audit trail with detailed change tracking
+- **Security Features:** CSRF protection, brute force prevention, XSS sanitization
+- **API Documentation:** Comprehensive Swagger/OpenAPI documentation
 
 ## 📋 Prerequisites
 
@@ -66,7 +71,15 @@ npm run start:prod
 ## 📚 API Documentation
 
 Once the application is running, access Swagger documentation at:
-- **URL:** http://localhost:3000/api/docs
+- **Development:** http://localhost:5000/api/docs
+- **Production:** https://your-domain.com/api/docs
+
+The Swagger documentation includes:
+- Complete API reference for all endpoints
+- Authentication details (JWT Bearer token)
+- Request/response schemas
+- Example requests and responses
+- Role-based permissions for each endpoint
 
 ## 🧪 Testing
 
@@ -93,13 +106,28 @@ src/
 ├── users/             # User management
 ├── roles/              # Role management
 ├── suppliers/         # Supplier management
+├── supplier-documents/# Supplier document management
 ├── works/             # Work/Project management
+├── work-budgets/      # Work budget management
+├── work-documents/    # Work document management
+├── contracts/         # Contract management
+├── rubrics/           # Rubric/Category management
 ├── expenses/          # Expense management
+├── val/               # VAL document management
+├── incomes/           # Income management
 ├── cashboxes/         # Cashbox management
-├── accounting/        # Accounting records
-├── alerts/            # Alert system
+├── cash-movements/    # Cash movement tracking
+├── schedule/          # Schedule/Gantt management
+├── accounting/        # Accounting records and reports
+├── alerts/            # Alert system with assignment/resolution
 ├── audit/             # Audit logging
-├── common/            # Shared utilities
+├── exchange-rates/    # Exchange rate management
+├── offline/           # Offline mode and synchronization
+├── backup/            # Database backup management
+├── storage/           # File storage (Google Drive/Dropbox)
+├── dashboard/         # Dashboard data
+├── tasks/             # Scheduled tasks
+├── common/            # Shared utilities, guards, interceptors
 ├── config/            # Configuration
 └── migrations/        # Database migrations
 ```
@@ -118,11 +146,13 @@ src/
 
 ## 📖 Documentation
 
+- [User Guide](USER_GUIDE.md) - Complete user guide for all system features
 - [Seeding Guide](SEEDING_GUIDE.md) - Database seeding instructions
 - [Permissions Mapping](PERMISSIONS_MAPPING.md) - Role permissions documentation
 - [Build Validation](BUILD_VALIDATION_SUMMARY.md) - Build status and validation
 - [Integration Tests](test/integration/README.md) - E2E test documentation
 - [Unit Tests](UNIT_TESTS_IMPLEMENTATION.md) - Unit test documentation
+- [Swagger Documentation](SWAGGER_DOCUMENTATION.md) - API documentation status and guidelines
 
 ## 🗄️ Database
 

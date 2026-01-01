@@ -405,11 +405,12 @@ export class AccountingService {
       queryBuilder.andWhere('record.supplier_id = :supplierId', { supplierId });
     }
 
-    const records = await queryBuilder.getMany();
-
-    const filteredRecords = records.filter(
-      (r) => r.vat_perception > 0 || r.iibb_perception > 0,
+    // Optimize: Filter in SQL instead of loading all records and filtering in memory
+    queryBuilder.andWhere(
+      '(record.vat_perception > 0 OR record.iibb_perception > 0)',
     );
+
+    const filteredRecords = await queryBuilder.getMany();
 
     return {
       total_vat_perception: filteredRecords.reduce(
@@ -461,11 +462,12 @@ export class AccountingService {
       queryBuilder.andWhere('record.supplier_id = :supplierId', { supplierId });
     }
 
-    const records = await queryBuilder.getMany();
-
-    const filteredRecords = records.filter(
-      (r) => r.vat_withholding > 0 || r.income_tax_withholding > 0,
+    // Optimize: Filter in SQL instead of loading all records and filtering in memory
+    queryBuilder.andWhere(
+      '(record.vat_withholding > 0 OR record.income_tax_withholding > 0)',
     );
+
+    const filteredRecords = await queryBuilder.getMany();
 
     return {
       total_vat_withholding: filteredRecords.reduce(

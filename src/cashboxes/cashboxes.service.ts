@@ -595,31 +595,40 @@ export class CashboxesService {
       .take(limit)
       .getMany();
 
-    // Calculate summary (all movements for this cashbox, ignoring pagination)
-    const allMovements = await this.cashMovementRepository.find({
-      where: { cashbox_id: id },
-    });
+    // Optimize summary calculation using SQL aggregation instead of loading all records
+    // This avoids loading all movements into memory
+    const summaryQueryBuilder = this.cashMovementRepository
+      .createQueryBuilder('movement')
+      .select(`COUNT(CASE WHEN movement.type = '${CashMovementType.REFILL}' THEN 1 END)`, 'totalRefills')
+      .addSelect(`COUNT(CASE WHEN movement.type = '${CashMovementType.EXPENSE}' THEN 1 END)`, 'totalExpenses')
+      .addSelect(`COUNT(CASE WHEN movement.type = '${CashMovementType.INCOME}' THEN 1 END)`, 'totalIncomes')
+      .addSelect(`COALESCE(SUM(CASE WHEN movement.type = '${CashMovementType.REFILL}' THEN movement.amount ELSE 0 END), 0)`, 'totalRefillsAmount')
+      .addSelect(`COALESCE(SUM(CASE WHEN movement.type = '${CashMovementType.EXPENSE}' THEN movement.amount ELSE 0 END), 0)`, 'totalExpensesAmount')
+      .addSelect(`COALESCE(SUM(CASE WHEN movement.type = '${CashMovementType.INCOME}' THEN movement.amount ELSE 0 END), 0)`, 'totalIncomesAmount')
+      .where('movement.cashbox_id = :cashboxId', { cashboxId: id });
 
-    let totalRefills = 0;
-    let totalExpenses = 0;
-    let totalIncomes = 0;
-    let totalRefillsAmount = 0;
-    let totalExpensesAmount = 0;
-    let totalIncomesAmount = 0;
+    // Apply same filters for summary
+    if (filters.type) {
+      summaryQueryBuilder.andWhere('movement.type = :type', { type: filters.type });
+    }
+    if (filters.currency) {
+      summaryQueryBuilder.andWhere('movement.currency = :currency', { currency: filters.currency });
+    }
+    if (filters.startDate) {
+      summaryQueryBuilder.andWhere('movement.date >= :startDate', { startDate: filters.startDate });
+    }
+    if (filters.endDate) {
+      summaryQueryBuilder.andWhere('movement.date <= :endDate', { endDate: filters.endDate });
+    }
 
-    allMovements.forEach((movement) => {
-      const amount = Number(movement.amount);
-      if (movement.type === CashMovementType.REFILL) {
-        totalRefills++;
-        totalRefillsAmount += amount;
-      } else if (movement.type === CashMovementType.EXPENSE) {
-        totalExpenses++;
-        totalExpensesAmount += amount;
-      } else if (movement.type === CashMovementType.INCOME) {
-        totalIncomes++;
-        totalIncomesAmount += amount;
-      }
-    });
+    const summaryResult = await summaryQueryBuilder.getRawOne();
+    
+    const totalRefills = parseInt(summaryResult?.totalRefills || '0', 10);
+    const totalExpenses = parseInt(summaryResult?.totalExpenses || '0', 10);
+    const totalIncomes = parseInt(summaryResult?.totalIncomes || '0', 10);
+    const totalRefillsAmount = parseFloat(summaryResult?.totalRefillsAmount || '0');
+    const totalExpensesAmount = parseFloat(summaryResult?.totalExpensesAmount || '0');
+    const totalIncomesAmount = parseFloat(summaryResult?.totalIncomesAmount || '0');
 
     return {
       data: movements,
