@@ -64,8 +64,11 @@ export class SuppliersController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.OPERATOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
-  @ApiOperation({ summary: 'Update supplier' })
+  @Roles(UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({ 
+    summary: 'Update supplier',
+    description: 'Update supplier. Only Administration and Direction can update suppliers. Operators cannot update suppliers.',
+  })
   @ApiParam({ name: 'id', description: 'Supplier UUID', type: String, format: 'uuid' })
   @ApiBody({ type: UpdateSupplierDto })
   @ApiResponse({ status: 200, description: 'Supplier updated successfully' })

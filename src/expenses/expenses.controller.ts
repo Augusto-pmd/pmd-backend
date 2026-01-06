@@ -70,10 +70,10 @@ export class ExpensesController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.OPERATOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @Roles(UserRole.ADMINISTRATION, UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Update expense',
-    description: 'Update expense. Only Administration and Direction can edit validated expenses.',
+    description: 'Update expense. Only Administration and Direction can update expenses. Operators cannot update expenses.',
   })
   @ApiParam({ name: 'id', description: 'Expense UUID', type: String, format: 'uuid' })
   @ApiBody({ type: UpdateExpenseDto })

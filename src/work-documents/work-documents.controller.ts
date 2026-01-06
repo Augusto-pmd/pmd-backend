@@ -83,8 +83,11 @@ export class WorkDocumentsController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMINISTRATION, UserRole.DIRECTION)
-  @ApiOperation({ summary: 'Delete work document' })
+  @Roles(UserRole.DIRECTION)
+  @ApiOperation({ 
+    summary: 'Delete work document',
+    description: 'Delete work document. Only Direction can delete work documents.',
+  })
   @ApiParam({ name: 'id', description: 'Work document UUID', type: String, format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Work document deleted successfully' })
   remove(@Param('id') id: string, @Request() req) {

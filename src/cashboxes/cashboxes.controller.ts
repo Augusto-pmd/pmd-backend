@@ -76,8 +76,11 @@ export class CashboxesController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.OPERATOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
-  @ApiOperation({ summary: 'Update cashbox' })
+  @Roles(UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({ 
+    summary: 'Update cashbox',
+    description: 'Update cashbox. Only Administration and Direction can update cashboxes. Operators cannot update cashboxes.',
+  })
   @ApiParam({ name: 'id', description: 'Cashbox UUID', type: String, format: 'uuid' })
   @ApiBody({ type: UpdateCashboxDto })
   @ApiResponse({ status: 200, description: 'Cashbox updated successfully' })

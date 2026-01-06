@@ -129,6 +129,11 @@ export class CashboxesService {
       throw new BadRequestException('Cashbox is already closed');
     }
 
+    // Business Rule: Operators can only close their own cashbox
+    if (user.role.name === UserRole.OPERATOR && cashbox.user_id !== user.id) {
+      throw new ForbiddenException('Operators can only close their own cashbox');
+    }
+
     // Use transaction to ensure atomicity
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
