@@ -33,24 +33,24 @@ export class WorksController {
   constructor(private readonly worksService: WorksService) {}
 
   @Post()
-  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION)
+  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION, UserRole.SUPERVISOR)
   @ApiOperation({
     summary: 'Create work',
-    description: 'Create a new work/project. Direction and Administration can create works. Work will be assigned to the creator\'s organization.',
+    description: 'Create a new work/project. Direction, Administration and Supervisor can create works. Work will be assigned to the creator\'s organization.',
   })
   @ApiBody({ type: CreateWorkDto })
   @ApiResponse({ status: 201, description: 'Work created successfully' })
   @ApiResponse({ status: 400, description: 'Validation error' })
-  @ApiResponse({ status: 403, description: 'Only Direction and Administration can create works' })
+  @ApiResponse({ status: 403, description: 'Only Direction, Administration and Supervisor can create works' })
   create(@Body() createWorkDto: CreateWorkDto, @Request() req) {
     return this.worksService.create(createWorkDto, req.user);
   }
 
   @Get()
-  @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION, UserRole.OPERATOR)
   @ApiOperation({
     summary: 'Get all works',
-    description: 'Retrieve all works filtered by organization. Supervisors can only see works assigned to them.',
+    description: 'Retrieve all works filtered by organization. Supervisors can only see works assigned to them. Operators can view all works.',
   })
   @ApiResponse({ status: 200, description: 'List of works' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

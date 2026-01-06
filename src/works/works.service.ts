@@ -136,15 +136,44 @@ export class WorksService {
       throw new ForbiddenException('You can only update works you supervise');
     }
 
-    Object.assign(work, {
-      ...updateWorkDto,
-      start_date: updateWorkDto.start_date
-        ? new Date(updateWorkDto.start_date)
-        : work.start_date,
-      end_date: updateWorkDto.end_date
-        ? new Date(updateWorkDto.end_date)
-        : work.end_date,
-    });
+    // Business Rule: Supervisor can only update progress fields and minor observations
+    // Supervisor cannot modify: currency, status, total_budget, name, client, address, dates
+    if (user.role.name === UserRole.SUPERVISOR) {
+      const forbiddenFields = ['currency', 'status', 'total_budget', 'name', 'client', 'address', 'start_date', 'end_date', 'work_type', 'supervisor_id'];
+      const attemptedFields = Object.keys(updateWorkDto);
+      const forbiddenAttempted = attemptedFields.filter(field => forbiddenFields.includes(field));
+      
+      if (forbiddenAttempted.length > 0) {
+        throw new ForbiddenException(
+          `Supervisor cannot modify critical fields: ${forbiddenAttempted.join(', ')}. Only Direction can modify these fields.`
+        );
+      }
+      
+      // Supervisor can only update: economic_progress, financial_progress, and minor fields
+      // All other fields are filtered out
+      const allowedFields = ['economic_progress', 'financial_progress'];
+      const filteredDto: Partial<UpdateWorkDto> = {};
+      
+      allowedFields.forEach(field => {
+        if (updateWorkDto[field] !== undefined) {
+          filteredDto[field] = updateWorkDto[field];
+        }
+      });
+      
+      // Only apply allowed fields
+      Object.assign(work, filteredDto);
+    } else {
+      // Direction and Administration can update all fields
+      Object.assign(work, {
+        ...updateWorkDto,
+        start_date: updateWorkDto.start_date
+          ? new Date(updateWorkDto.start_date)
+          : work.start_date,
+        end_date: updateWorkDto.end_date
+          ? new Date(updateWorkDto.end_date)
+          : work.end_date,
+      });
+    }
 
     return await this.workRepository.save(work);
   }
