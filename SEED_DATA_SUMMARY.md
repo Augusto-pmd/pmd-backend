@@ -28,7 +28,7 @@ This document summarizes all seed data generated for the PMD Management System, 
 | direction@pmd.com | Direction | password123 | System administration |
 | supervisor@pmd.com | Supervisor | password123 | Work oversight |
 | admin@pmd.com | Administration | password123 | Expense validation, supplier approval |
-| operator1@pmd.com | Operator | password123 | Expense recording |
+| operator@pmd.com | Operator | password123 | Expense recording |
 | operator2@pmd.com | Operator | password123 | Expense recording |
 
 ## Sample Data Created

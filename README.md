@@ -139,7 +139,7 @@ src/
 | direction@pmd.com | Direction | password123 |
 | supervisor@pmd.com | Supervisor | password123 |
 | admin@pmd.com | Administration | password123 |
-| operator1@pmd.com | Operator | password123 |
+| operator@pmd.com | Operator | password123 |
 | operator2@pmd.com | Operator | password123 |
 
 ⚠️ **Change these passwords in production!**

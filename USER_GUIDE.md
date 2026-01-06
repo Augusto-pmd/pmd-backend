@@ -100,7 +100,7 @@ El sistema cuenta con 4 roles principales:
 #### Usuario por defecto
 - **Email:** `admin@pmd.com`
 - **Password:** `1102Pequ`
-- **Rol:** Direction (acceso completo)
+- **Rol:** Administration (acceso completo)
 
 ⚠️ **IMPORTANTE:** Cambia esta contraseña en producción.
 

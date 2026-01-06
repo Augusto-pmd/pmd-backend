@@ -18,7 +18,7 @@ The seed script creates the following data:
 - `direction@pmd.com` - Direction role
 - `supervisor@pmd.com` - Supervisor role
 - `admin@pmd.com` - Administration role
-- `operator1@pmd.com` - Operator role
+- `operator@pmd.com` - Operator role
 - `operator2@pmd.com` - Operator role
 
 **Default Password:** `password123` (for all users)
@@ -174,7 +174,7 @@ curl -X POST http://localhost:3000/api/auth/login \
 | Direction | direction@pmd.com | password123 |
 | Supervisor | supervisor@pmd.com | password123 |
 | Administration | admin@pmd.com | password123 |
-| Operator 1 | operator1@pmd.com | password123 |
+| Operator 1 | operator@pmd.com | password123 |
 | Operator 2 | operator2@pmd.com | password123 |
 
 ⚠️ **Important:** Change these passwords in production!

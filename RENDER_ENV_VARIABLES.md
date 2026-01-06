@@ -51,6 +51,16 @@ Render requiere las siguientes variables de entorno configuradas en el Dashboard
 - **Descripción:** Dominio para cookies compartidas
 - **Estado:** ✅ Usado en `src/auth/auth.controller.ts`
 
+### PG_DUMP_PATH
+- **Valor:** (opcional) Ruta completa al ejecutable `pg_dump`
+- **Descripción:** Ruta personalizada a las herramientas cliente de PostgreSQL para backups
+- **Estado:** ✅ Usado en `src/backup/backup.service.ts`
+- **Ejemplos:**
+  - Windows: `C:\Program Files\PostgreSQL\15\bin\pg_dump.exe`
+  - Linux: `/usr/bin/pg_dump`
+  - macOS: `/usr/local/bin/pg_dump` o `/opt/homebrew/bin/pg_dump`
+- **Nota:** Si no se especifica, el sistema intentará encontrar `pg_dump` automáticamente en rutas comunes. Solo necesario si `pg_dump` no está en el PATH del sistema.
+
 ## ⚠️ Configuración en Render Dashboard
 
 1. Ve a tu servicio en Render Dashboard
