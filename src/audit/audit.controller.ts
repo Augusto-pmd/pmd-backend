@@ -30,10 +30,10 @@ export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
   @Get()
-  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION)
+  @Roles(UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Get all audit logs',
-    description: 'Retrieve all audit logs with pagination. Only Direction and Administration can view audit logs.',
+    description: 'Retrieve all audit logs with pagination. Only Direction can view audit logs.',
   })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)', example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 50)', example: 50 })
@@ -60,10 +60,10 @@ export class AuditController {
   }
 
   @Get(':id')
-  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION)
+  @Roles(UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Get audit log by ID',
-    description: 'Retrieve a specific audit log by its ID including user information.',
+    description: 'Retrieve a specific audit log by its ID including user information. Only Direction can view audit logs.',
   })
   @ApiParam({ name: 'id', description: 'Audit log UUID', type: String, format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Audit log details' })
@@ -74,10 +74,10 @@ export class AuditController {
   }
 
   @Get('module/:module')
-  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION)
+  @Roles(UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Get audit logs by module',
-    description: 'Retrieve audit logs filtered by module with pagination.',
+    description: 'Retrieve audit logs filtered by module with pagination. Only Direction can view audit logs.',
   })
   @ApiParam({ name: 'module', description: 'Module name', example: 'expenses' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)', example: 1 })
@@ -105,10 +105,10 @@ export class AuditController {
   }
 
   @Get('user/:userId')
-  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION)
+  @Roles(UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Get audit logs by user',
-    description: 'Retrieve audit logs filtered by user ID with pagination.',
+    description: 'Retrieve audit logs filtered by user ID with pagination. Only Direction can view audit logs.',
   })
   @ApiParam({ name: 'userId', description: 'User UUID', type: String, format: 'uuid' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)', example: 1 })
@@ -171,10 +171,10 @@ export class AuditController {
   }
 
   @Get('action/:action')
-  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION)
+  @Roles(UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Get audit logs by action',
-    description: 'Retrieve audit logs filtered by action type (e.g., login, logout, login_failed) with pagination.',
+    description: 'Retrieve audit logs filtered by action type (e.g., login, logout, login_failed) with pagination. Only Direction can view audit logs.',
   })
   @ApiParam({ name: 'action', description: 'Action type', example: 'login' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)', example: 1 })
@@ -193,10 +193,10 @@ export class AuditController {
   }
 
   @Get('ip/:ipAddress')
-  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION)
+  @Roles(UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Get audit logs by IP address',
-    description: 'Retrieve audit logs filtered by IP address with pagination.',
+    description: 'Retrieve audit logs filtered by IP address with pagination. Only Direction can view audit logs.',
   })
   @ApiParam({ name: 'ipAddress', description: 'IP address', example: '192.168.1.1' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)', example: 1 })

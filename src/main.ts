@@ -34,22 +34,28 @@ async function bootstrap() {
 
   // Register global OPTIONS handler BEFORE routes are matched
   // This ensures preflight requests always get CORS headers
-  expressApp.options('*', (req: Request, res: Response) => {
-    const origin = req.headers.origin;
+  // Use middleware instead of route wildcard for NestJS v11 compatibility with path-to-regexp
+  expressApp.use((req: Request, res: Response, next: Function) => {
+    if (req.method === 'OPTIONS') {
+      const origin = req.headers.origin;
 
-    if (isOriginAllowed(origin)) {
-      // Set CORS headers manually
-      if (origin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
+      if (isOriginAllowed(origin)) {
+        // Set CORS headers manually
+        if (origin) {
+          res.setHeader('Access-Control-Allow-Origin', origin);
+        }
+        res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+        res.status(204).end();
+        return;
+      } else {
+        res.status(403).end();
+        return;
       }
-      res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
-      res.status(204).end();
-    } else {
-      res.status(403).end();
     }
+    next();
   });
 
   // CORS origin validation function for app.enableCors() callback
@@ -66,7 +72,7 @@ async function bootstrap() {
     origin: validateOrigin,
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
   });
 
   // Set global prefix for all routes so frontend can call /api/*

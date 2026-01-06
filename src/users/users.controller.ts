@@ -47,10 +47,10 @@ export class UsersController {
   }
 
   @Get()
-  @Roles(UserRole.DIRECTION, UserRole.SUPERVISOR, UserRole.ADMINISTRATION)
+  @Roles(UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Get all users',
-    description: 'Retrieve all users filtered by organization. Direction, Supervisors, and Administration can view users.',
+    description: 'Retrieve all users filtered by organization. Only Direction can view users. Administration and Supervisor do not have access to user management.',
   })
   @ApiResponse({ status: 200, description: 'List of users' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -72,10 +72,10 @@ export class UsersController {
   }
 
   @Get(':id')
-  @Roles(UserRole.DIRECTION, UserRole.SUPERVISOR, UserRole.ADMINISTRATION)
+  @Roles(UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Get user by ID',
-    description: 'Retrieve a specific user by their ID. User must belong to the requester\'s organization.',
+    description: 'Retrieve a specific user by their ID. User must belong to the requester\'s organization. Only Direction can view users. Administration and Supervisor do not have access to user management.',
   })
   @ApiParam({ name: 'id', description: 'User UUID', type: String, format: 'uuid' })
   @ApiResponse({ status: 200, description: 'User details' })

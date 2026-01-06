@@ -11,7 +11,7 @@ export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get()
-  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION, UserRole.SUPERVISOR)
+  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION, UserRole.SUPERVISOR, UserRole.OPERATOR)
   getDashboard(@Request() req) {
     return this.dashboardService.getDashboard(req.user);
   }

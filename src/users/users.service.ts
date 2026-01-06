@@ -54,7 +54,7 @@ export class UsersService {
   async create(createUserDto: CreateUserDto, currentUser?: User): Promise<NormalizedUser> {
     // Validate permissions at service level (double check)
     if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can create users');
+      throw new ForbiddenException('Solo Dirección puede crear usuarios');
     }
 
     const role = await this.roleRepository.findOne({
@@ -139,7 +139,7 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto, currentUser?: User): Promise<NormalizedUser> {
     // Validate permissions at service level (double check)
     if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can update users');
+      throw new ForbiddenException('Solo Dirección puede actualizar usuarios');
     }
 
     const user = await this.findOneEntity(id);
@@ -161,7 +161,7 @@ export class UsersService {
   async remove(id: string, currentUser?: User): Promise<void> {
     // Validate permissions at service level (double check)
     if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can delete users');
+      throw new ForbiddenException('Solo Dirección puede eliminar usuarios');
     }
 
     const user = await this.findOneEntity(id);
@@ -171,7 +171,7 @@ export class UsersService {
   async updateRole(id: string, roleId: string, currentUser?: User): Promise<NormalizedUser> {
     // Validate permissions at service level (double check)
     if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can update user roles');
+      throw new ForbiddenException('Solo Dirección puede actualizar los roles de los usuarios');
     }
 
     const user = await this.findOneEntity(id);

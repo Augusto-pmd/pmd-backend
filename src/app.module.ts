@@ -54,11 +54,15 @@ import { HealthModule } from './health/health.module';
     }),
     ThrottlerModule.forRoot([{
       ttl: 60000, // 1 minute
-      limit: 10, // 10 requests per minute
+      // Aumentar límite en desarrollo/test para permitir más tests E2E
+      // Producción: 10 requests/minuto, Desarrollo/Test: 100 requests/minuto
+      limit: process.env.NODE_ENV === 'production' ? 10 : 100,
     }]),
-    // Only load second TypeORM module in non-test environments
+    // Only load second TypeORM module in non-test environments when DATABASE_URL is set
     // Tests use TestDatabaseModule which overrides the first TypeORM module
-    ...(process.env.NODE_ENV !== 'test' && process.env.JEST_WORKER_ID === undefined
+    ...(process.env.NODE_ENV !== 'test' && 
+        process.env.JEST_WORKER_ID === undefined &&
+        process.env.DATABASE_URL
       ? [TypeOrmModule.forRoot({
           type: 'postgres',
           url: process.env.DATABASE_URL,
