@@ -74,6 +74,7 @@ async function seed() {
           audit: ['read'],
           reports: ['read'],
           settings: ['read', 'update'],
+          schedule: ['create', 'read', 'update', 'delete'], // Control total sobre cronograma
         },
       },
       {
@@ -81,7 +82,7 @@ async function seed() {
         description: 'Rol de supervisión de obras y gestión de cronogramas',
         permissions: {
           dashboard: ['read'],
-          works: ['read', 'update'], // Solo progreso y estado
+          works: ['create', 'read', 'update'], // Puede crear obras y editar (solo campos menores)
           expenses: ['read'], // Solo lectura, no puede crear ni validar
           suppliers: ['read'], // Solo lectura
           contracts: ['read'], // Solo lectura
@@ -90,6 +91,7 @@ async function seed() {
           documents: ['read'], // Solo lectura
           alerts: ['read'], // Solo lectura
           reports: ['read'], // Solo lectura
+          schedule: ['read', 'update'], // Puede marcar etapas como completadas, no puede editar estructura
           // NO users, NO roles, NO accounting, NO audit, NO puede crear/validar expenses
         },
       },
@@ -98,17 +100,18 @@ async function seed() {
         description: 'Rol de administración con permisos de validación y aprobación',
         permissions: {
           dashboard: ['read'],
-          works: ['read'],
+          works: ['create', 'read'], // Puede crear obras y editar campos no críticos
           expenses: ['read', 'validate'], // Puede validar gastos
           suppliers: ['read', 'approve', 'reject'], // Puede aprobar/rechazar proveedores
           contracts: ['create', 'read', 'update'], // Puede crear y actualizar contratos
           cashboxes: ['read', 'approve'], // Puede aprobar diferencias de caja
           accounting: ['create', 'read', 'update', 'close'], // Puede cerrar meses, NO puede reopen
-          incomes: ['read'],
+          incomes: ['read', 'create'], // Puede cargar ingresos según documento maestro
           documents: ['read', 'create', 'update'],
           alerts: ['read', 'create', 'update'],
           reports: ['read'],
           settings: ['read'],
+          schedule: ['read'], // Solo consulta, no puede editar cronograma
           // NO users, NO roles, NO audit, NO puede reopen meses, NO puede override contratos bloqueados
         },
       },
@@ -123,6 +126,7 @@ async function seed() {
           cashboxes: ['create', 'read', 'close'], // Solo su propia caja
           documents: ['read', 'create'], // Puede crear documentos
           alerts: ['read'], // Solo lectura
+          schedule: ['read'], // Solo consulta básica de cronogramas de obras asignadas
           // NO accounting, NO contracts, NO users, NO roles
         },
       },
