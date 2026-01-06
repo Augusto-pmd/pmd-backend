@@ -22,7 +22,8 @@ export class CreateRoleDto {
   @ApiPropertyOptional({
     description: 'Role permissions (JSON object)',
     example: { 'users:read': true, 'users:write': true },
-    type: 'object',
+    type: Object,
+    additionalProperties: true,
   })
   @IsObject()
   @IsOptional()

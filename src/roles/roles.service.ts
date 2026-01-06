@@ -19,7 +19,7 @@ export class RolesService {
   async create(createRoleDto: CreateRoleDto, currentUser?: User): Promise<Role> {
     // Validate permissions at service level (double check)
     if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can create roles');
+      throw new ForbiddenException('Solo Dirección puede crear roles');
     }
 
     const role = this.roleRepository.create(createRoleDto);
@@ -30,13 +30,8 @@ export class RolesService {
     try {
       // Validate permissions at service level (double check)
       if (currentUser) {
-        const allowedRoles = [
-          UserRole.DIRECTION,
-          UserRole.SUPERVISOR,
-          UserRole.ADMINISTRATION,
-        ];
-        if (!allowedRoles.includes(currentUser.role.name)) {
-          throw new ForbiddenException('You do not have permission to view roles');
+        if (currentUser.role.name !== UserRole.DIRECTION) {
+          throw new ForbiddenException('Solo Dirección puede ver roles');
         }
       }
 
@@ -53,13 +48,8 @@ export class RolesService {
   async findOne(id: string, currentUser?: User): Promise<Role> {
     // Validate permissions at service level (double check)
     if (currentUser) {
-      const allowedRoles = [
-        UserRole.DIRECTION,
-        UserRole.SUPERVISOR,
-        UserRole.ADMINISTRATION,
-      ];
-      if (!allowedRoles.includes(currentUser.role.name)) {
-        throw new ForbiddenException('You do not have permission to view roles');
+      if (currentUser.role.name !== UserRole.DIRECTION) {
+        throw new ForbiddenException('Only Direction can view roles');
       }
     }
 
@@ -75,7 +65,7 @@ export class RolesService {
   async update(id: string, updateRoleDto: UpdateRoleDto, currentUser?: User): Promise<Role> {
     // Validate permissions at service level (double check)
     if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can update roles');
+      throw new ForbiddenException('Solo Dirección puede actualizar roles');
     }
 
     const role = await this.findOne(id, currentUser);
@@ -86,7 +76,7 @@ export class RolesService {
   async remove(id: string, currentUser?: User): Promise<void> {
     // Validate permissions at service level (double check)
     if (currentUser && currentUser.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can delete roles');
+      throw new ForbiddenException('Solo Dirección puede eliminar roles');
     }
 
     const role = await this.findOne(id, currentUser);
@@ -96,13 +86,8 @@ export class RolesService {
   async getPermissions(id: string, currentUser?: User): Promise<Record<string, boolean>> {
     // Validate permissions at service level (double check)
     if (currentUser) {
-      const allowedRoles = [
-        UserRole.DIRECTION,
-        UserRole.SUPERVISOR,
-        UserRole.ADMINISTRATION,
-      ];
-      if (!allowedRoles.includes(currentUser.role.name)) {
-        throw new ForbiddenException('You do not have permission to view role permissions');
+      if (currentUser.role.name !== UserRole.DIRECTION) {
+        throw new ForbiddenException('Solo Dirección puede ver los permisos de los roles');
       }
     }
 

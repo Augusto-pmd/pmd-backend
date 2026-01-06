@@ -21,18 +21,21 @@ export class RolesGuard implements CanActivate {
     const user = request.user;
 
     if (!user || !user.role) {
-      throw new ForbiddenException('User role not found');
+      throw new ForbiddenException('Rol de usuario no encontrado');
     }
 
     // Normalize role to lowercase string and validate it's a valid enum value
-    const userRoleRaw = user.role?.name || user.role;
+    // Handle both object format { id, name, permissions } and string format
+    const userRoleRaw = typeof user.role === 'object' && user.role !== null 
+      ? user.role.name 
+      : user.role;
     const userRoleNormalized = String(userRoleRaw).toLowerCase();
     
     // Validate that the normalized role is a valid UserRole enum value
     // Object.values(UserRole) returns UserRole[] for string enums
     const validRoles: readonly UserRole[] = Object.values(UserRole);
     if (!validRoles.includes(userRoleNormalized as UserRole)) {
-      throw new ForbiddenException('Invalid user role');
+      throw new ForbiddenException('Rol de usuario inválido');
     }
     
     // Type assertion is safe here because we validated above
@@ -53,17 +56,18 @@ export class RolesGuard implements CanActivate {
     // Note: 'auditor' role is not currently in the UserRole enum
     // If needed in the future, add it to the enum and uncomment this section
 
-    // Convert required roles to strings for comparison
-    const requiredRoleStrings = requiredRoles.map(role => String(role));
+    // Convert required roles to lowercase strings for comparison
+    const requiredRoleStrings = requiredRoles.map(role => String(role).toLowerCase());
 
     // Check if user role matches any required role
     const roleMatches = requiredRoleStrings.some(required => {
-      // Direct match
+      // Direct match (both normalized to lowercase)
       if (required === userRole) {
         return true;
       }
       // Admin matches DIRECTION/ADMINISTRATION
-      if ((required === UserRole.DIRECTION || required === UserRole.ADMINISTRATION) && isAdmin) {
+      const requiredNormalized = required.toLowerCase();
+      if ((requiredNormalized === UserRole.DIRECTION || requiredNormalized === UserRole.ADMINISTRATION) && isAdmin) {
         return true;
       }
       return false;
@@ -73,7 +77,7 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    throw new ForbiddenException('Insufficient permissions');
+    throw new ForbiddenException('Permisos insuficientes');
   }
 }
 

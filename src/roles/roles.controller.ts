@@ -47,10 +47,10 @@ export class RolesController {
   }
 
   @Get()
-  @Roles(UserRole.DIRECTION, UserRole.SUPERVISOR, UserRole.ADMINISTRATION)
+  @Roles(UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Get all roles',
-    description: 'Retrieve all available roles. Direction, Supervisors, and Administration can view roles.',
+    description: 'Retrieve all available roles. Only Direction can view roles.',
   })
   @ApiResponse({ status: 200, description: 'List of roles' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -60,10 +60,10 @@ export class RolesController {
   }
 
   @Get(':id')
-  @Roles(UserRole.DIRECTION, UserRole.SUPERVISOR, UserRole.ADMINISTRATION)
+  @Roles(UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Get role by ID',
-    description: 'Retrieve a specific role by its ID including permissions.',
+    description: 'Retrieve a specific role by its ID including permissions. Only Direction can view roles.',
   })
   @ApiParam({ name: 'id', description: 'Role UUID', type: String, format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Role details' })
@@ -74,10 +74,10 @@ export class RolesController {
   }
 
   @Get(':id/permissions')
-  @Roles(UserRole.DIRECTION, UserRole.SUPERVISOR, UserRole.ADMINISTRATION)
+  @Roles(UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Get role permissions',
-    description: 'Retrieve permissions for a specific role as a key-value object.',
+    description: 'Retrieve permissions for a specific role as a key-value object. Only Direction can view role permissions.',
   })
   @ApiParam({ name: 'id', description: 'Role UUID', type: String, format: 'uuid' })
   @ApiResponse({
