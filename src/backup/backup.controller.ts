@@ -102,6 +102,20 @@ export class BackupController {
     return await this.backupService.getStatus();
   }
 
+  @Get('diagnostics')
+  @Roles(
+    UserRole.ADMINISTRATION,
+    UserRole.DIRECTION,
+  )
+  @ApiOperation({
+    summary: 'Get backup diagnostics',
+    description: 'Get diagnostic information about pg_dump availability and configuration',
+  })
+  @ApiResponse({ status: 200, description: 'Backup diagnostics information' })
+  async getDiagnostics() {
+    return await this.backupService.getDiagnostics();
+  }
+
   @Get(':id')
   @Roles(
     UserRole.OPERATOR,
