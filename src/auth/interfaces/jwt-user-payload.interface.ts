@@ -6,7 +6,11 @@ export interface JwtUserPayload {
   id: string;
   email: string;
   fullName: string;
-  role: string;
+  role: {
+    id: string;
+    name: string;
+    permissions?: string[];
+  } | string;
   organizationId: string | null;
   organization: {
     id: string | null;

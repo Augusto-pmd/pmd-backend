@@ -38,6 +38,7 @@ export class AuthService {
       relations: ['role', 'organization'],
     });
 
+    // Buscar rol DIRECTION como fallback (para usuarios nuevos)
     let adminRole = await this.roleRepository.findOne({ where: { name: UserRole.DIRECTION }});
     if (!adminRole) {
       adminRole = this.roleRepository.create({
@@ -60,6 +61,7 @@ export class AuthService {
     }
 
     if (!admin) {
+      // Solo crear usuario si no existe - usar DIRECTION como fallback
       const hashed = await bcrypt.hash(adminPlainPassword, 10);
       admin = this.userRepository.create({
         email: adminEmail,
@@ -70,19 +72,29 @@ export class AuthService {
         isActive: true,
       });
       await this.userRepository.save(admin);
-      this.logger.log('Admin user created');
+      this.logger.log('Admin user created with DIRECTION role (fallback)');
       return;
     }
 
+    // Si el usuario ya existe, NO sobrescribir su rol
+    // El seed.ts es responsable de asignar el rol correcto (ADMINISTRATION para tests E2E)
+    // Solo actualizar organización, estado activo y contraseña si es necesario
     let updated = false;
 
-    // Actualizar el rol a DIRECTION si no lo tiene
-    if (!admin.role || admin.role.name !== UserRole.DIRECTION) { 
-      admin.role = adminRole; 
+    // NO actualizar el rol si el usuario ya existe - respetar el rol asignado por seed
+    // if (!admin.role || admin.role.name !== UserRole.DIRECTION) { 
+    //   admin.role = adminRole; 
+    //   updated = true; 
+    // }
+    
+    if (!admin.organization) { 
+      admin.organization = defaultOrg; 
       updated = true; 
     }
-    if (!admin.organization) { admin.organization = defaultOrg; updated = true; }
-    if (!admin.isActive) { admin.isActive = true; updated = true; }
+    if (!admin.isActive) { 
+      admin.isActive = true; 
+      updated = true; 
+    }
 
     const isHashCorrect = admin.password && admin.password.length >= 50;
     if (!isHashCorrect) {
@@ -92,7 +104,9 @@ export class AuthService {
 
     if (updated) {
       await this.userRepository.save(admin);
-      this.logger.log('Admin user repaired');
+      this.logger.log(`Admin user repaired (rol actual: ${admin.role?.name || 'sin rol'})`);
+    } else {
+      this.logger.debug(`Admin user exists (rol: ${admin.role?.name || 'sin rol'}) - no changes needed`);
     }
   }
 
@@ -179,8 +193,8 @@ export class AuthService {
     const refreshTokenExpiration = process.env.JWT_REFRESH_EXPIRATION || '7d';
 
     const result = {
-      accessToken: await this.jwtService.signAsync(payload, { expiresIn: accessTokenExpiration }),
-      refresh_token: await this.jwtService.signAsync(payload, { expiresIn: refreshTokenExpiration }),
+      accessToken: await this.jwtService.signAsync(payload, { expiresIn: accessTokenExpiration as any }),
+      refresh_token: await this.jwtService.signAsync(payload, { expiresIn: refreshTokenExpiration as any }),
       user: normalizedUser,
     };
 
@@ -298,8 +312,8 @@ export class AuthService {
     const refreshTokenExpiration = process.env.JWT_REFRESH_EXPIRATION || '7d';
 
     return {
-      access_token: await this.jwtService.signAsync(payload, { expiresIn: accessTokenExpiration }),
-      refresh_token: await this.jwtService.signAsync(payload, { expiresIn: refreshTokenExpiration }),
+      access_token: await this.jwtService.signAsync(payload, { expiresIn: accessTokenExpiration as any }),
+      refresh_token: await this.jwtService.signAsync(payload, { expiresIn: refreshTokenExpiration as any }),
       user: normalizedUser,
     };
   }

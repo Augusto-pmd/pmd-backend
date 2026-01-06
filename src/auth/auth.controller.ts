@@ -35,7 +35,14 @@ export class AuthController {
   @Post('login')
   @SkipCsrf()
   @UseGuards(BruteForceGuard)
-  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute for login
+  // Aumentar límite en desarrollo/test para permitir más tests E2E
+  // Producción: 5 requests/minuto, Desarrollo/Test: 50 requests/minuto
+  @Throttle({ 
+    default: { 
+      limit: process.env.NODE_ENV === 'production' ? 5 : 50, 
+      ttl: 60000 
+    } 
+  })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User login' })
   @ApiBody({ type: LoginDto })

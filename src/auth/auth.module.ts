@@ -23,13 +23,16 @@ import { Organization } from '../organizations/organization.entity';
     ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET', 'supersecret123'),
-        signOptions: { 
-          algorithm: 'HS256',
-          expiresIn: process.env.JWT_EXPIRATION || '1d',
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const expiresIn = process.env.JWT_EXPIRATION || '1d';
+        return {
+          secret: configService.get<string>('JWT_SECRET', 'supersecret123'),
+          signOptions: { 
+            algorithm: 'HS256',
+            expiresIn: expiresIn as any,
+          },
+        };
+      },
       inject: [ConfigService],
     }),
     TypeOrmModule.forFeature([User, Role, Organization]),
