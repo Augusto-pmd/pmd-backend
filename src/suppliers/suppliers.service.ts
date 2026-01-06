@@ -85,7 +85,7 @@ export class SuppliersService {
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
     ) {
-      throw new ForbiddenException('Only Administration and Direction can approve suppliers');
+      throw new ForbiddenException('Solo Administración y Dirección pueden aprobar proveedores');
     }
 
     const supplier = await this.findOne(id, user);
@@ -104,7 +104,7 @@ export class SuppliersService {
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
     ) {
-      throw new ForbiddenException('Only Administration and Direction can reject suppliers');
+      throw new ForbiddenException('Solo Administración y Dirección pueden rechazar proveedores');
     }
 
     const supplier = await this.findOne(id, user);
@@ -281,7 +281,7 @@ export class SuppliersService {
     }
 
     if (organizationId && supplier.organization_id !== organizationId) {
-      throw new ForbiddenException('Supplier does not belong to your organization');
+      throw new ForbiddenException('El proveedor no pertenece a tu organización');
     }
 
     return supplier;
@@ -305,7 +305,7 @@ export class SuppliersService {
 
     // Operators cannot change status
     if (user.role.name === UserRole.OPERATOR && updateSupplierDto.status) {
-      throw new ForbiddenException('Operators cannot change supplier status');
+      throw new ForbiddenException('Los operadores no pueden cambiar el estado de los proveedores');
     }
 
     // Only Direction can unblock a supplier
@@ -315,7 +315,7 @@ export class SuppliersService {
     ) {
       if (user.role.name !== UserRole.DIRECTION) {
         throw new ForbiddenException(
-          'Only Direction can unblock suppliers. Please contact Direction to unblock this supplier.',
+          'Solo Dirección puede desbloquear proveedores. Por favor, contacta a Dirección para desbloquear este proveedor.',
         );
       }
 
@@ -346,7 +346,7 @@ export class SuppliersService {
   async remove(id: string, user: User): Promise<void> {
     // Only Direction can delete suppliers
     if (user.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can delete suppliers');
+      throw new ForbiddenException('Solo Dirección puede eliminar proveedores');
     }
 
     const supplier = await this.findOne(id, user);

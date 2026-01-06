@@ -85,8 +85,9 @@ export class CashboxesService {
       } else {
         // Direction, Administration, and Supervisor can see all cashboxes
         // Filter by organization_id through user.organizationId
+        // Use COALESCE to handle both user.organizationId (direct) and user.organization.id (relation)
         if (organizationId) {
-          queryBuilder.where('user.organizationId = :organizationId', { organizationId });
+          queryBuilder.where('COALESCE(user.organizationId, user.organization.id) = :organizationId', { organizationId });
         }
       }
 
@@ -110,12 +111,12 @@ export class CashboxesService {
 
     // Operators can only access their own cashboxes
     if (user.role.name === UserRole.OPERATOR && cashbox.user_id !== user.id) {
-      throw new ForbiddenException('You can only access your own cashboxes');
+      throw new ForbiddenException('Solo puedes acceder a tus propias cajas');
     }
 
     // Validate ownership through user.organizationId
     if (organizationId && cashbox.user?.organizationId !== organizationId) {
-      throw new ForbiddenException('Cashbox does not belong to your organization');
+      throw new ForbiddenException('La caja no pertenece a tu organización');
     }
 
     return cashbox;
@@ -333,7 +334,7 @@ export class CashboxesService {
   async remove(id: string, user: User): Promise<void> {
     // Only Direction can delete cashboxes
     if (user.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can delete cashboxes');
+      throw new ForbiddenException('Solo Dirección puede eliminar cajas');
     }
 
     const cashbox = await this.findOne(id, user);
@@ -385,7 +386,7 @@ export class CashboxesService {
   ): Promise<Cashbox> {
     // Only Direction can reject differences
     if (user.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can reject cashbox differences');
+      throw new ForbiddenException('Solo Dirección puede rechazar diferencias de caja');
     }
 
     const cashbox = await this.findOne(id, user);
@@ -431,7 +432,7 @@ export class CashboxesService {
   ): Promise<Cashbox> {
     // Only Direction can make manual adjustments
     if (user.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can make manual adjustments to cashboxes');
+      throw new ForbiddenException('Solo Dirección puede hacer ajustes manuales a las cajas');
     }
 
     const cashbox = await this.findOne(id, user);

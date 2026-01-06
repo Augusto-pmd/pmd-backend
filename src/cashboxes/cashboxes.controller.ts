@@ -86,10 +86,10 @@ export class CashboxesController {
   }
 
   @Post(':id/close')
-  @Roles(UserRole.OPERATOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @Roles(UserRole.OPERATOR, UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Close cashbox',
-    description: 'Close a cashbox and calculate differences. Alerts are generated if differences exist.',
+    description: 'Close a cashbox and calculate differences. Alerts are generated if differences exist. Operators can only close their own cashboxes.',
   })
   @ApiParam({ name: 'id', description: 'Cashbox UUID', type: String, format: 'uuid' })
   @ApiBody({ type: CloseCashboxDto })

@@ -161,7 +161,7 @@ export class WorksService {
   async close(id: string, user: User): Promise<Work> {
     // Only Direction can close works
     if (user.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can close works');
+      throw new ForbiddenException('Solo Dirección puede cerrar obras');
     }
 
     const work = await this.findOne(id, user);
@@ -231,7 +231,7 @@ export class WorksService {
   async allowPostClosure(id: string, user: User): Promise<Work> {
     // Only Direction can enable post-closure expenses
     if (user.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can enable post-closure expenses');
+      throw new ForbiddenException('Solo Dirección puede habilitar gastos post-cierre');
     }
 
     const work = await this.findOne(id, user);

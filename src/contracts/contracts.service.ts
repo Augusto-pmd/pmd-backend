@@ -429,7 +429,7 @@ export class ContractsService {
   async remove(id: string, user: User): Promise<void> {
     // Only Direction can delete contracts
     if (user.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can delete contracts');
+      throw new ForbiddenException('Solo Dirección puede eliminar contratos');
     }
 
     const contract = await this.findOne(id, user);

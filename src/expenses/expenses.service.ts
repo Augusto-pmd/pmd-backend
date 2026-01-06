@@ -359,7 +359,7 @@ export class ExpensesService {
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
     ) {
-      throw new ForbiddenException('Only Administration and Direction can validate expenses');
+      throw new ForbiddenException('Solo Administración y Dirección pueden validar gastos');
     }
 
     const expense = await this.findOne(id, user);
@@ -617,6 +617,7 @@ export class ExpensesService {
 
   async findAll(user: User): Promise<Expense[]> {
     try {
+      const organizationId = getOrganizationId(user);
       const queryBuilder = this.expenseRepository
         .createQueryBuilder('expense')
         .leftJoinAndSelect('expense.work', 'work')
@@ -629,6 +630,11 @@ export class ExpensesService {
       // Operators can only see their own expenses
       if (user?.role?.name === UserRole.OPERATOR) {
         queryBuilder.where('expense.created_by_id = :userId', { userId: user.id });
+      } else {
+        // Filter by organization for other roles through work
+        if (organizationId) {
+          queryBuilder.where('work.organization_id = :organizationId', { organizationId });
+        }
       }
 
       return await queryBuilder.getMany();
@@ -651,12 +657,12 @@ export class ExpensesService {
 
     // Validate ownership through work.organization_id
     if (organizationId && expense.work?.organization_id !== organizationId) {
-      throw new ForbiddenException('Expense does not belong to your organization');
+      throw new ForbiddenException('El gasto no pertenece a tu organización');
     }
 
     // Operators can only access their own expenses
     if (user.role.name === UserRole.OPERATOR && expense.created_by_id !== user.id) {
-      throw new ForbiddenException('You can only access your own expenses');
+      throw new ForbiddenException('Solo puedes acceder a tus propios gastos');
     }
 
     return expense;
@@ -671,7 +677,7 @@ export class ExpensesService {
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
     ) {
-      throw new ForbiddenException('Only Administration and Direction can edit validated expenses');
+      throw new ForbiddenException('Solo Administración y Dirección pueden editar gastos validados');
     }
 
     // Validate amounts are not negative
@@ -767,7 +773,7 @@ export class ExpensesService {
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
     ) {
-      throw new ForbiddenException('Only Administration and Direction can reject expenses');
+      throw new ForbiddenException('Solo Administración y Dirección pueden rechazar gastos');
     }
 
     const expense = await this.findOne(id, user);
@@ -841,7 +847,7 @@ export class ExpensesService {
   async remove(id: string, user: User): Promise<void> {
     // Only Direction can delete expenses
     if (user.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can delete expenses');
+      throw new ForbiddenException('Solo Dirección puede eliminar gastos');
     }
 
     const expense = await this.findOne(id, user);

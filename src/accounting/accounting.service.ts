@@ -132,7 +132,7 @@ export class AccountingService {
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
     ) {
-      throw new ForbiddenException('Only Administration and Direction can close months');
+      throw new ForbiddenException('Solo Administración y Dirección pueden cerrar meses');
     }
 
     const records = await this.accountingRepository.find({
@@ -243,7 +243,7 @@ export class AccountingService {
    */
   async reopenMonth(month: number, year: number, user: User): Promise<void> {
     if (user.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can reopen closed months');
+      throw new ForbiddenException('Solo Dirección puede reabrir meses cerrados');
     }
 
     const records = await this.accountingRepository.find({
@@ -318,7 +318,7 @@ export class AccountingService {
   async remove(id: string, user: User): Promise<void> {
     // Only Direction can delete accounting records
     if (user.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Direction can delete accounting records');
+      throw new ForbiddenException('Solo Dirección puede eliminar registros contables');
     }
 
     const record = await this.findOne(id, user);
@@ -338,7 +338,7 @@ export class AccountingService {
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
     ) {
-      throw new ForbiddenException('Only Administration and Direction can view reports');
+      throw new ForbiddenException('Solo Administración y Dirección pueden ver reportes');
     }
 
     const organizationId = getOrganizationId(user);
@@ -379,7 +379,7 @@ export class AccountingService {
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
     ) {
-      throw new ForbiddenException('Only Administration and Direction can view reports');
+      throw new ForbiddenException('Solo Administración y Dirección pueden ver reportes');
     }
 
     const organizationId = getOrganizationId(user);
@@ -436,7 +436,7 @@ export class AccountingService {
       user.role.name !== UserRole.ADMINISTRATION &&
       user.role.name !== UserRole.DIRECTION
     ) {
-      throw new ForbiddenException('Only Administration and Direction can view reports');
+      throw new ForbiddenException('Solo Administración y Dirección pueden ver reportes');
     }
 
     const organizationId = getOrganizationId(user);

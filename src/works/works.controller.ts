@@ -33,15 +33,15 @@ export class WorksController {
   constructor(private readonly worksService: WorksService) {}
 
   @Post()
-  @Roles(UserRole.DIRECTION)
+  @Roles(UserRole.DIRECTION, UserRole.ADMINISTRATION)
   @ApiOperation({
     summary: 'Create work',
-    description: 'Create a new work/project. Only Direction can create works. Work will be assigned to the creator\'s organization.',
+    description: 'Create a new work/project. Direction and Administration can create works. Work will be assigned to the creator\'s organization.',
   })
   @ApiBody({ type: CreateWorkDto })
   @ApiResponse({ status: 201, description: 'Work created successfully' })
   @ApiResponse({ status: 400, description: 'Validation error' })
-  @ApiResponse({ status: 403, description: 'Only Direction can create works' })
+  @ApiResponse({ status: 403, description: 'Only Direction and Administration can create works' })
   create(@Body() createWorkDto: CreateWorkDto, @Request() req) {
     return this.worksService.create(createWorkDto, req.user);
   }
@@ -119,10 +119,10 @@ export class WorksController {
   }
 
   @Post(':id/update-progress')
-  @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @Roles(UserRole.SUPERVISOR, UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Update all progress indicators',
-    description: 'Recalculate and update physical, economic, and financial progress for a work. This is usually called automatically but can be triggered manually.',
+    description: 'Recalculate and update physical, economic, and financial progress for a work. This is usually called automatically but can be triggered manually. Only Supervisors and Direction can update progress.',
   })
   @ApiParam({ name: 'id', description: 'Work UUID', type: String, format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Progress updated successfully' })

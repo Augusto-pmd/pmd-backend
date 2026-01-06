@@ -35,8 +35,8 @@ export class WorkDocumentsController {
   constructor(private readonly workDocumentsService: WorkDocumentsService) {}
 
   @Post()
-  @Roles(UserRole.OPERATOR, UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
-  @ApiOperation({ summary: 'Create work document' })
+  @Roles(UserRole.OPERATOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({ summary: 'Create work document', description: 'Create a new work document. Operators, Administration, and Direction can create documents. Supervisors can only read documents.' })
   @ApiBody({ type: CreateWorkDocumentDto })
   @ApiResponse({ status: 201, description: 'Work document created successfully' })
   @ApiResponse({ status: 404, description: 'Work not found' })
@@ -73,8 +73,8 @@ export class WorkDocumentsController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
-  @ApiOperation({ summary: 'Update work document' })
+  @Roles(UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({ summary: 'Update work document', description: 'Update a work document. Only Administration and Direction can update documents. Supervisors can only read documents.' })
   @ApiParam({ name: 'id', description: 'Work document UUID', type: String, format: 'uuid' })
   @ApiBody({ type: UpdateWorkDocumentDto })
   @ApiResponse({ status: 200, description: 'Work document updated successfully' })

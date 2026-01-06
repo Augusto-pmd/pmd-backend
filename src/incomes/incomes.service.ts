@@ -25,7 +25,7 @@ export class IncomesService {
   async create(createIncomeDto: CreateIncomeDto, user: User): Promise<Income> {
     // Only Administration and Direction can create incomes
     if (user.role.name !== UserRole.ADMINISTRATION && user.role.name !== UserRole.DIRECTION) {
-      throw new ForbiddenException('Only Administration and Direction can create incomes');
+      throw new ForbiddenException('Solo Administración y Dirección pueden crear ingresos');
     }
 
     const work = await this.workRepository.findOne({
@@ -80,7 +80,7 @@ export class IncomesService {
 
     // Validate ownership through work.organization_id
     if (organizationId && income.work?.organization_id !== organizationId) {
-      throw new ForbiddenException('Income does not belong to your organization');
+      throw new ForbiddenException('El ingreso no pertenece a tu organización');
     }
 
     return income;
