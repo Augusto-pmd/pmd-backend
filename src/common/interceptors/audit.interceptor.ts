@@ -21,6 +21,11 @@ export class AuditInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
     const { method, url, body, params, query, user, ip, headers } = request;
 
+    // Skip audit logging for health check endpoint
+    if (url.includes('/health') || url.includes('/api/health')) {
+      return next.handle();
+    }
+
     const action = `${method} ${url}`;
     const module = url.split('/')[1] || 'unknown';
     const entityId = params?.id || body?.id || null;

@@ -10,34 +10,29 @@ const ROLE_PERMISSIONS_FALLBACK: Record<string, string[]> = {
   [UserRole.ADMINISTRATION]: [
     'dashboard.read',
     'works.read',
-    'works.create',
-    'works.update',
-    'works.delete',
+    'expenses.read',
+    'expenses.validate',
     'suppliers.read',
-    'suppliers.create',
-    'suppliers.update',
+    'suppliers.approve',
+    'suppliers.reject',
+    'contracts.read',
+    'contracts.create',
+    'contracts.update',
+    'cashboxes.read',
+    'cashboxes.approve',
     'accounting.read',
     'accounting.create',
     'accounting.update',
-    'cashbox.read',
-    'cashbox.create',
-    'cashbox.update',
+    'accounting.close',
     'documents.read',
     'documents.create',
     'documents.update',
     'alerts.read',
     'alerts.create',
     'alerts.update',
-    'audit.read',
-    'users.read',
-    'users.create',
-    'users.update',
-    'users.delete',
-    'roles.read',
-    'roles.create',
-    'roles.update',
+    'incomes.read',
     'settings.read',
-    'settings.update',
+    // Administration NO debe tener acceso a users, roles, audit según PERMISSIONS_MAPPING.md
   ],
   [UserRole.DIRECTION]: [
     'dashboard.read',
@@ -45,21 +40,45 @@ const ROLE_PERMISSIONS_FALLBACK: Record<string, string[]> = {
     'works.create',
     'works.update',
     'works.delete',
+    'expenses.read',
+    'expenses.create',
+    'expenses.update',
+    'expenses.delete',
+    'expenses.validate',
     'suppliers.read',
     'suppliers.create',
     'suppliers.update',
+    'suppliers.delete',
+    'suppliers.approve',
+    'suppliers.reject',
+    'contracts.read',
+    'contracts.create',
+    'contracts.update',
+    'contracts.delete',
+    'incomes.read',
+    'incomes.create',
+    'incomes.update',
+    'incomes.delete',
+    'cashboxes.read',
+    'cashboxes.create',
+    'cashboxes.update',
+    'cashboxes.delete',
+    'cashboxes.close',
+    'cashboxes.approve',
     'accounting.read',
     'accounting.create',
     'accounting.update',
-    'cashbox.read',
-    'cashbox.create',
-    'cashbox.update',
+    'accounting.delete',
+    'accounting.close',
+    'accounting.reopen',
     'documents.read',
     'documents.create',
     'documents.update',
+    'documents.delete',
     'alerts.read',
     'alerts.create',
     'alerts.update',
+    'alerts.delete',
     'audit.read',
     'users.read',
     'users.create',
@@ -68,41 +87,39 @@ const ROLE_PERMISSIONS_FALLBACK: Record<string, string[]> = {
     'roles.read',
     'roles.create',
     'roles.update',
+    'roles.delete',
     'settings.read',
     'settings.update',
   ],
   [UserRole.SUPERVISOR]: [
     'dashboard.read',
     'works.read',
-    'works.create',
     'works.update',
+    'expenses.read',
     'suppliers.read',
-    'suppliers.create',
-    'suppliers.update',
-    'accounting.read',
-    'accounting.create',
-    'cashbox.read',
-    'cashbox.create',
-    'cashbox.update',
+    'contracts.read',
+    'cashboxes.read',
     'documents.read',
-    'documents.create',
-    'documents.update',
     'alerts.read',
-    'alerts.create',
-    'alerts.update',
-    'users.read',
+    'incomes.read',
+    // Supervisor NO debe tener acceso a accounting, users, roles, audit según PERMISSIONS_MAPPING.md
+    // Supervisor solo puede leer, no crear ni modificar (excepto works.update para progreso)
   ],
   [UserRole.OPERATOR]: [
     'dashboard.read',
     'works.read',
-    'works.create',
-    'works.update',
+    'expenses.read',
+    'expenses.create',
     'suppliers.read',
-    'accounting.read',
-    'cashbox.read',
+    'suppliers.create',
+    'cashboxes.read',
+    'cashboxes.create',
+    'cashboxes.close',
     'documents.read',
     'documents.create',
     'alerts.read',
+    // Operator NO debe tener acceso a accounting, contracts, incomes, users, roles, audit según PERMISSIONS_MAPPING.md
+    // Operator solo puede acceder a sus propios recursos
   ],
 };
 
@@ -154,24 +171,76 @@ export function normalizeUser(u: User): NormalizedUser {
   }
   
   // 🔄 FALLBACK: Si permissions está vacío y existe un rol, usar permisos por defecto según el nombre del rol
+  const originalPermissionsType = typeof u.role?.permissions;
+  const originalPermissionsValue = u.role?.permissions;
+  const hadEmptyPermissions = rolePermissions.length === 0;
+  
   if (rolePermissions.length === 0 && u.role?.name) {
     const roleName = u.role.name.toLowerCase();
     const fallbackPermissions = ROLE_PERMISSIONS_FALLBACK[roleName];
     if (fallbackPermissions) {
       rolePermissions = fallbackPermissions;
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[NORMALIZE_USER] Using fallback permissions for role "${roleName}": ${rolePermissions.length} permissions`);
+        console.log(`[NORMALIZE_USER] ✅ Using fallback permissions for role "${roleName}": ${rolePermissions.length} permissions`);
+        console.log(`[NORMALIZE_USER] 📋 Fallback permissions:`, rolePermissions.slice(0, 10), rolePermissions.length > 10 ? '...' : '');
+        // Verificar específicamente si users.read está presente
+        const hasUsersRead = rolePermissions.includes('users.read');
+        if (hasUsersRead) {
+          console.warn(`[NORMALIZE_USER] ⚠️ WARNING: Fallback for "${roleName}" includes 'users.read' - this may be incorrect`);
+        } else {
+          console.log(`[NORMALIZE_USER] ✅ Confirmed: Fallback for "${roleName}" does NOT include 'users.read'`);
+        }
       }
     } else {
       if (process.env.NODE_ENV === 'development') {
-        console.warn(`[NORMALIZE_USER] No fallback permissions found for role "${roleName}"`);
+        console.warn(`[NORMALIZE_USER] ⚠️ No fallback permissions found for role "${roleName}"`);
       }
     }
   }
   
+  // 🔒 SEGURIDAD: Filtrar permisos incorrectos según el rol
+  // Administration NO debe tener acceso a users, roles, audit
+  // Supervisor NO debe tener acceso a users, roles, audit, accounting
+  const roleName = u.role?.name?.toLowerCase();
+  const forbiddenPermissions: string[] = [];
+  
+  if (roleName === UserRole.ADMINISTRATION.toLowerCase()) {
+    // Administration NO debe tener: users.*, roles.*, audit.*
+    forbiddenPermissions.push('users.read', 'users.create', 'users.update', 'users.delete');
+    forbiddenPermissions.push('roles.read', 'roles.create', 'roles.update', 'roles.delete', 'roles.manage');
+    forbiddenPermissions.push('audit.read', 'audit.create', 'audit.update', 'audit.delete');
+  } else if (roleName === UserRole.SUPERVISOR.toLowerCase()) {
+    // Supervisor NO debe tener: users.*, roles.*, audit.*, accounting.*
+    forbiddenPermissions.push('users.read', 'users.create', 'users.update', 'users.delete');
+    forbiddenPermissions.push('roles.read', 'roles.create', 'roles.update', 'roles.delete', 'roles.manage');
+    forbiddenPermissions.push('audit.read', 'audit.create', 'audit.update', 'audit.delete');
+    forbiddenPermissions.push('accounting.read', 'accounting.create', 'accounting.update', 'accounting.delete', 'accounting.close', 'accounting.reopen');
+  }
+  
+  if (forbiddenPermissions.length > 0) {
+    const originalCount = rolePermissions.length;
+    const removedPermissions = rolePermissions.filter(perm => forbiddenPermissions.includes(perm));
+    rolePermissions = rolePermissions.filter(perm => !forbiddenPermissions.includes(perm));
+    const removedCount = originalCount - rolePermissions.length;
+    if (removedCount > 0) {
+      console.warn(`[NORMALIZE_USER] ⚠️ WARNING: Removed ${removedCount} forbidden permission(s) for role "${roleName}":`, removedPermissions);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[NORMALIZE_USER] 🔒 Security filter applied: ${removedCount} permission(s) removed`);
+      }
+    }
+  }
+
   // Log conversion for audit (only in development)
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[NORMALIZE_USER] Original permissions type: ${typeof u.role?.permissions}, Converted length: ${rolePermissions.length}`);
+    console.log(`[NORMALIZE_USER] 📊 Summary for user ${u.email}:`);
+    console.log(`  - Original permissions type: ${originalPermissionsType}`);
+    console.log(`  - Original permissions value: ${JSON.stringify(originalPermissionsValue)}`);
+    console.log(`  - Had empty permissions: ${hadEmptyPermissions}`);
+    console.log(`  - Final permissions count: ${rolePermissions.length}`);
+    console.log(`  - Role: ${u.role?.name}`);
+    if (rolePermissions.length > 0) {
+      console.log(`  - Sample permissions:`, rolePermissions.slice(0, 5));
+    }
   }
 
   return {
