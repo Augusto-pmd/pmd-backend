@@ -10,6 +10,7 @@ const ROLE_PERMISSIONS_FALLBACK: Record<string, string[]> = {
   [UserRole.ADMINISTRATION]: [
     'dashboard.read',
     'works.read',
+    'works.create',
     'expenses.read',
     'expenses.validate',
     'suppliers.read',
@@ -31,7 +32,9 @@ const ROLE_PERMISSIONS_FALLBACK: Record<string, string[]> = {
     'alerts.create',
     'alerts.update',
     'incomes.read',
+    'incomes.create', // Puede cargar ingresos según documento maestro
     'settings.read',
+    'schedule.read', // Solo consulta, no puede editar cronograma
     // Administration NO debe tener acceso a users, roles, audit según PERMISSIONS_MAPPING.md
   ],
   [UserRole.DIRECTION]: [
@@ -90,10 +93,15 @@ const ROLE_PERMISSIONS_FALLBACK: Record<string, string[]> = {
     'roles.delete',
     'settings.read',
     'settings.update',
+    'schedule.read',
+    'schedule.create',
+    'schedule.update',
+    'schedule.delete',
   ],
   [UserRole.SUPERVISOR]: [
     'dashboard.read',
     'works.read',
+    'works.create',
     'works.update',
     'expenses.read',
     'suppliers.read',
@@ -102,8 +110,10 @@ const ROLE_PERMISSIONS_FALLBACK: Record<string, string[]> = {
     'documents.read',
     'alerts.read',
     'incomes.read',
+    'schedule.read',
+    'schedule.update', // Puede marcar etapas como completadas
     // Supervisor NO debe tener acceso a accounting, users, roles, audit según PERMISSIONS_MAPPING.md
-    // Supervisor solo puede leer, no crear ni modificar (excepto works.update para progreso)
+    // Supervisor solo puede leer, no crear ni modificar (excepto works.update para progreso y schedule.update para etapas)
   ],
   [UserRole.OPERATOR]: [
     'dashboard.read',
@@ -118,6 +128,7 @@ const ROLE_PERMISSIONS_FALLBACK: Record<string, string[]> = {
     'documents.read',
     'documents.create',
     'alerts.read',
+    'schedule.read', // Solo consulta básica de cronogramas de obras asignadas
     // Operator NO debe tener acceso a accounting, contracts, incomes, users, roles, audit según PERMISSIONS_MAPPING.md
     // Operator solo puede acceder a sus propios recursos
   ],
