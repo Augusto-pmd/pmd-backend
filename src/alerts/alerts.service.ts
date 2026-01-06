@@ -12,7 +12,7 @@ import { UpdateAlertDto } from './dto/update-alert.dto';
 import { MarkReadAlertDto } from './dto/mark-read-alert.dto';
 import { AssignAlertDto } from './dto/assign-alert.dto';
 import { ResolveAlertDto } from './dto/resolve-alert.dto';
-import { AlertType, AlertSeverity, AlertStatus } from '../common/enums';
+import { AlertType, AlertSeverity, AlertStatus, UserRole } from '../common/enums';
 import { SupplierDocument } from '../supplier-documents/supplier-documents.entity';
 import { Expense } from '../expenses/expenses.entity';
 import { Contract } from '../contracts/contracts.entity';
@@ -20,6 +20,7 @@ import { Schedule } from '../schedule/schedule.entity';
 import { SupplierDocumentType } from '../common/enums/supplier-document-type.enum';
 import { ExpenseState } from '../common/enums/expense-state.enum';
 import { ScheduleState } from '../common/enums/schedule-state.enum';
+import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 
 @Injectable()
 export class AlertsService {
@@ -248,8 +249,40 @@ export class AlertsService {
 
   async findAll(user: User): Promise<Alert[]> {
     try {
+      const whereCondition: any = {};
+      
+      // Operators can only see their own alerts
+      if (user?.role?.name === UserRole.OPERATOR) {
+        whereCondition.user_id = user.id;
+        return await this.alertRepository.find({
+          where: whereCondition,
+          relations: ['user', 'work', 'supplier', 'expense', 'contract', 'cashbox', 'assigned_to', 'resolved_by'],
+          order: { created_at: 'DESC' },
+        });
+      } else {
+        // Filter by organization for other roles
+        const organizationId = getOrganizationId(user);
+        if (organizationId) {
+          // Join with user relation to filter by organization
+          return await this.alertRepository
+            .createQueryBuilder('alert')
+            .leftJoinAndSelect('alert.user', 'user')
+            .leftJoinAndSelect('alert.work', 'work')
+            .leftJoinAndSelect('alert.supplier', 'supplier')
+            .leftJoinAndSelect('alert.expense', 'expense')
+            .leftJoinAndSelect('alert.contract', 'contract')
+            .leftJoinAndSelect('alert.cashbox', 'cashbox')
+            .leftJoinAndSelect('alert.assigned_to', 'assigned_to')
+            .leftJoinAndSelect('alert.resolved_by', 'resolved_by')
+            .where('user.organizationId = :organizationId OR alert.user_id IS NULL', { organizationId })
+            .orderBy('alert.created_at', 'DESC')
+            .getMany();
+        }
+      }
+      
+      // Fallback: return all alerts if no organization filter
       return await this.alertRepository.find({
-        where: user?.role?.name === 'operator' ? { user_id: user.id } : {},
+        where: whereCondition,
         relations: ['user', 'work', 'supplier', 'expense', 'contract', 'cashbox', 'assigned_to', 'resolved_by'],
         order: { created_at: 'DESC' },
       });
@@ -262,11 +295,39 @@ export class AlertsService {
   }
 
   async findUnread(user: User): Promise<Alert[]> {
+    const whereCondition: any = { is_read: false };
+    
+    // Operators can only see their own alerts
+    if (user?.role?.name === UserRole.OPERATOR) {
+      whereCondition.user_id = user.id;
+      return await this.alertRepository.find({
+        where: whereCondition,
+        relations: ['user', 'work', 'supplier', 'expense', 'contract', 'cashbox', 'assigned_to', 'resolved_by'],
+        order: { created_at: 'DESC' },
+      });
+    } else {
+      // Filter by organization for other roles
+      const organizationId = getOrganizationId(user);
+      if (organizationId) {
+        return await this.alertRepository
+          .createQueryBuilder('alert')
+          .leftJoinAndSelect('alert.user', 'user')
+          .leftJoinAndSelect('alert.work', 'work')
+          .leftJoinAndSelect('alert.supplier', 'supplier')
+          .leftJoinAndSelect('alert.expense', 'expense')
+          .leftJoinAndSelect('alert.contract', 'contract')
+          .leftJoinAndSelect('alert.cashbox', 'cashbox')
+          .leftJoinAndSelect('alert.assigned_to', 'assigned_to')
+          .leftJoinAndSelect('alert.resolved_by', 'resolved_by')
+          .where('alert.is_read = :isRead', { isRead: false })
+          .andWhere('(user.organizationId = :organizationId OR alert.user_id IS NULL)', { organizationId })
+          .orderBy('alert.created_at', 'DESC')
+          .getMany();
+      }
+    }
+    
     return await this.alertRepository.find({
-      where: {
-        is_read: false,
-        ...(user.role.name === 'operator' ? { user_id: user.id } : {}),
-      },
+      where: whereCondition,
       relations: ['user', 'work', 'supplier', 'expense', 'contract', 'cashbox', 'assigned_to', 'resolved_by'],
       order: { created_at: 'DESC' },
     });
@@ -284,7 +345,7 @@ export class AlertsService {
 
     // Operators can only see their own alerts
     if (user.role.name === 'operator' && alert.user_id !== user.id) {
-      throw new ForbiddenException('You can only access your own alerts');
+      throw new ForbiddenException('Solo puedes acceder a tus propias alertas');
     }
 
     return alert;
@@ -305,7 +366,7 @@ export class AlertsService {
   async remove(id: string, user: User): Promise<void> {
     // Only Direction can delete alerts
     if (user.role.name !== 'direction') {
-      throw new ForbiddenException('Only Direction can delete alerts');
+      throw new ForbiddenException('Solo Dirección puede eliminar alertas');
     }
 
     const alert = await this.findOne(id, user);
@@ -320,7 +381,7 @@ export class AlertsService {
   async assign(id: string, assignDto: AssignAlertDto, user: User): Promise<Alert> {
     // Only Administration and Direction can assign alerts
     if (user.role.name !== 'administration' && user.role.name !== 'direction') {
-      throw new ForbiddenException('Only Administration and Direction can assign alerts');
+      throw new ForbiddenException('Solo Administración y Dirección pueden asignar alertas');
     }
 
     // Verify that the assigned user exists
@@ -356,7 +417,7 @@ export class AlertsService {
       user.role.name === 'direction';
 
     if (!canResolve) {
-      throw new ForbiddenException('You do not have permission to resolve this alert');
+      throw new ForbiddenException('No tienes permiso para resolver esta alerta');
     }
 
     // Update alert with resolution

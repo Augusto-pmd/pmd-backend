@@ -43,8 +43,13 @@ export class AlertsController {
   })
   @ApiBody({ type: CreateAlertDto })
   @ApiResponse({ status: 201, description: 'Alert created successfully' })
-  create(@Body() createAlertDto: CreateAlertDto) {
-    return this.alertsService.createAlert(createAlertDto);
+  create(@Body() createAlertDto: CreateAlertDto, @Request() req) {
+    // Asignar user_id automáticamente si no se proporciona
+    const alertData = {
+      ...createAlertDto,
+      user_id: createAlertDto.user_id || req.user?.id,
+    };
+    return this.alertsService.createAlert(alertData);
   }
 
   @Get()
