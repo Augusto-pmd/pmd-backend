@@ -46,7 +46,10 @@ export const getTestDataSource = (): DataSourceOptions => ({
     AccountingRecord,
     AuditLog,
   ],
-  synchronize: true, // Use synchronize for tests (not recommended for production)
+  // Use migrations instead of synchronize to ensure enums are created correctly
+  migrations: ['src/migrations/*.ts'],
+  migrationsRun: false, // We'll run migrations manually in test-helpers
+  synchronize: false, // Disable synchronize, use migrations instead
   dropSchema: false, // Don't drop schema to avoid race conditions with multiple workers
   logging: false,
 });

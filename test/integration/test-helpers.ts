@@ -67,12 +67,58 @@ export class TestApp {
     const randomDelay = Math.floor(Math.random() * 500);
     await new Promise(resolve => setTimeout(resolve, randomDelay));
     
-    // Initialize the app - TypeORM will synchronize automatically
-    await this.app.init();
+    // Ensure DataSource is initialized before running migrations
+    if (!this.dataSource.isInitialized) {
+      await this.dataSource.initialize();
+    }
     
-    // TypeORM with synchronize: true will automatically create tables on initialization
-    // Wait a bit to ensure synchronization completes
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Create database if it doesn't exist
+    const dbName = process.env.TEST_DB_DATABASE || 'pmd_management_test';
+    try {
+      // Connect to postgres database to create test database
+      const adminDataSource = new DataSource({
+        type: 'postgres',
+        host: process.env.TEST_DB_HOST || 'localhost',
+        port: parseInt(process.env.TEST_DB_PORT || '5432', 10),
+        username: process.env.TEST_DB_USERNAME || 'postgres',
+        password: process.env.TEST_DB_PASSWORD || 'postgres',
+        database: 'postgres', // Connect to default postgres database
+      });
+      
+      await adminDataSource.initialize();
+      
+      // Check if database exists
+      const dbExists = await adminDataSource.query(
+        `SELECT 1 FROM pg_database WHERE datname = $1`,
+        [dbName]
+      );
+      
+      if (dbExists.length === 0) {
+        // Create database
+        await adminDataSource.query(`CREATE DATABASE "${dbName}"`);
+      }
+      
+      await adminDataSource.destroy();
+    } catch (error: any) {
+      // If database already exists or other error, continue
+      // This is not critical if the database already exists
+      if (!error.message?.includes('already exists')) {
+        console.warn(`Warning: Could not ensure database exists: ${error.message}`);
+      }
+    }
+    
+    // Run migrations to create schema
+    try {
+      await this.dataSource.runMigrations();
+    } catch (error: any) {
+      // If migrations fail, try to continue anyway (might be already run)
+      if (!error.message?.includes('already exists')) {
+        console.warn(`Warning: Migration error (may be expected): ${error.message}`);
+      }
+    }
+    
+    // Initialize the app after migrations
+    await this.app.init();
     
     // Verify schema is ready by checking for a key table
     // If it doesn't exist, wait a bit more with retries
