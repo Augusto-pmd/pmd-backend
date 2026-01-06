@@ -53,27 +53,78 @@ async function seed() {
       console.log('ℹ️  Organización ya existe: PMD Arquitectura');
     }
 
-    // 2. Crear todos los roles
+    // 2. Crear todos los roles con permisos completos según PERMISSIONS_MAPPING.md
     const rolesToCreate = [
       {
         name: UserRole.DIRECTION,
         description: 'Rol de dirección con acceso completo al sistema y permisos de sobrescritura',
-        permissions: { all: true },
+        permissions: {
+          dashboard: ['read'],
+          users: ['create', 'read', 'update', 'delete'],
+          roles: ['create', 'read', 'update', 'delete'],
+          works: ['create', 'read', 'update', 'delete'],
+          expenses: ['create', 'read', 'update', 'delete', 'validate'],
+          suppliers: ['create', 'read', 'update', 'delete', 'approve', 'reject'],
+          contracts: ['create', 'read', 'update', 'delete'],
+          cashboxes: ['create', 'read', 'update', 'delete', 'close', 'approve'],
+          accounting: ['create', 'read', 'update', 'delete', 'close', 'reopen'],
+          incomes: ['create', 'read', 'update', 'delete'],
+          documents: ['create', 'read', 'update', 'delete'],
+          alerts: ['create', 'read', 'update', 'delete'],
+          audit: ['read'],
+          reports: ['read'],
+          settings: ['read', 'update'],
+        },
       },
       {
         name: UserRole.SUPERVISOR,
         description: 'Rol de supervisión de obras y gestión de cronogramas',
-        permissions: {},
+        permissions: {
+          dashboard: ['read'],
+          works: ['read', 'update'], // Solo progreso y estado
+          expenses: ['read'], // Solo lectura, no puede crear ni validar
+          suppliers: ['read'], // Solo lectura
+          contracts: ['read'], // Solo lectura
+          cashboxes: ['read'], // Solo lectura, no puede cerrar
+          incomes: ['read'], // Solo lectura
+          documents: ['read'], // Solo lectura
+          alerts: ['read'], // Solo lectura
+          reports: ['read'], // Solo lectura
+          // NO users, NO roles, NO accounting, NO audit, NO puede crear/validar expenses
+        },
       },
       {
         name: UserRole.ADMINISTRATION,
         description: 'Rol de administración con permisos de validación y aprobación',
-        permissions: {},
+        permissions: {
+          dashboard: ['read'],
+          works: ['read'],
+          expenses: ['read', 'validate'], // Puede validar gastos
+          suppliers: ['read', 'approve', 'reject'], // Puede aprobar/rechazar proveedores
+          contracts: ['create', 'read', 'update'], // Puede crear y actualizar contratos
+          cashboxes: ['read', 'approve'], // Puede aprobar diferencias de caja
+          accounting: ['create', 'read', 'update', 'close'], // Puede cerrar meses, NO puede reopen
+          incomes: ['read'],
+          documents: ['read', 'create', 'update'],
+          alerts: ['read', 'create', 'update'],
+          reports: ['read'],
+          settings: ['read'],
+          // NO users, NO roles, NO audit, NO puede reopen meses, NO puede override contratos bloqueados
+        },
       },
       {
         name: UserRole.OPERATOR,
         description: 'Rol de operador con acceso limitado a recursos propios',
-        permissions: {},
+        permissions: {
+          dashboard: ['read'],
+          works: ['read'], // Solo lectura
+          expenses: ['create', 'read'], // Puede crear y leer (solo propios)
+          suppliers: ['create', 'read'], // Puede crear provisionales y leer
+          cashboxes: ['create', 'read', 'close'], // Solo su propia caja
+          documents: ['read', 'create'], // Puede crear documentos
+          alerts: ['read'], // Solo lectura
+          // NO accounting, NO contracts, NO users, NO roles
+        },
       },
     ];
 
@@ -93,77 +144,196 @@ async function seed() {
         role = await roleRepository.save(role);
         console.log(`✅ Rol creado: ${roleData.name.toUpperCase()}`);
       } else {
-        console.log(`ℹ️  Rol ya existe: ${roleData.name.toUpperCase()}`);
+        // Actualizar permisos y descripción si el rol ya existe
+        // SIEMPRE actualizar permisos para asegurar que estén sincronizados con la configuración
+        const currentPermsStr = JSON.stringify(role.permissions || {});
+        const targetPermsStr = JSON.stringify(roleData.permissions || {});
+        
+        const needsUpdate = 
+          role.description !== roleData.description ||
+          currentPermsStr !== targetPermsStr;
+        
+        if (needsUpdate) {
+          role.description = roleData.description;
+          role.permissions = roleData.permissions; // Actualizar permisos según configuración
+          role = await roleRepository.save(role);
+          
+          // Verificar específicamente para Supervisor que NO tenga users.read
+          if (roleData.name === UserRole.SUPERVISOR) {
+            const permsObj = role.permissions as Record<string, string[]>;
+            const hasUsersRead = permsObj?.users?.includes('read') || false;
+            if (hasUsersRead) {
+              console.warn(`⚠️  ADVERTENCIA: Supervisor tiene 'users.read' en permisos - esto es incorrecto`);
+            } else {
+              console.log(`✅ Confirmado: Supervisor NO tiene 'users.read' en permisos`);
+            }
+          }
+          
+          // Verificar específicamente para Administration que NO tenga users.read ni audit.read
+          if (roleData.name === UserRole.ADMINISTRATION) {
+            const permsObj = role.permissions as Record<string, string[]>;
+            const hasUsersRead = permsObj?.users?.includes('read') || false;
+            const hasAuditRead = permsObj?.audit?.includes('read') || false;
+            if (hasUsersRead) {
+              console.warn(`⚠️  ADVERTENCIA: Administration tiene 'users.read' en permisos - esto es incorrecto`);
+              // Eliminar permisos incorrectos
+              delete permsObj.users;
+              role.permissions = permsObj;
+              role = await roleRepository.save(role);
+              console.log(`🔧 Corregido: Se eliminaron permisos 'users' de Administration`);
+            }
+            if (hasAuditRead) {
+              console.warn(`⚠️  ADVERTENCIA: Administration tiene 'audit.read' en permisos - esto es incorrecto`);
+              // Eliminar permisos incorrectos
+              delete permsObj.audit;
+              role.permissions = permsObj;
+              role = await roleRepository.save(role);
+              console.log(`🔧 Corregido: Se eliminaron permisos 'audit' de Administration`);
+            }
+            if (!hasUsersRead && !hasAuditRead) {
+              console.log(`✅ Confirmado: Administration NO tiene 'users.read' ni 'audit.read' en permisos`);
+            }
+          }
+          
+          console.log(`🔄 Rol actualizado: ${roleData.name.toUpperCase()} (permisos y descripción sincronizados)`);
+        } else {
+          // Aunque no se detecte diferencia, verificar y corregir permisos incorrectos para Administration
+          if (roleData.name === UserRole.ADMINISTRATION) {
+            const permsObj = role.permissions as Record<string, string[]>;
+            const hasUsersRead = permsObj?.users?.includes('read') || false;
+            const hasAuditRead = permsObj?.audit?.includes('read') || false;
+            if (hasUsersRead || hasAuditRead) {
+              console.warn(`⚠️  ADVERTENCIA: Administration tiene permisos incorrectos aunque JSON parece igual`);
+              if (hasUsersRead) {
+                delete permsObj.users;
+                console.log(`🔧 Eliminando permisos 'users' de Administration`);
+              }
+              if (hasAuditRead) {
+                delete permsObj.audit;
+                console.log(`🔧 Eliminando permisos 'audit' de Administration`);
+              }
+              role.permissions = permsObj;
+              role = await roleRepository.save(role);
+              console.log(`🔄 Rol actualizado: ${roleData.name.toUpperCase()} (permisos incorrectos eliminados)`);
+            } else {
+              console.log(`ℹ️  Rol ya existe: ${roleData.name.toUpperCase()} (permisos ya están actualizados)`);
+            }
+          } else {
+            console.log(`ℹ️  Rol ya existe: ${roleData.name.toUpperCase()} (permisos ya están actualizados)`);
+          }
+        }
       }
       
       createdRoles[roleData.name] = role;
     }
 
-    // 3. Crear Usuario Admin con rol DIRECTION (mayor rol)
-    const adminEmail = 'admin@pmd.com';
-    const adminPlainPassword = '1102Pequ';
-    const directionRole = createdRoles[UserRole.DIRECTION];
-    
-    if (!directionRole) {
-      throw new Error('El rol DIRECTION no se pudo crear o encontrar');
-    }
-    
-    // Buscar usuario sin relaciones primero para evitar errores
-    let admin = await userRepository.findOne({
-      where: { email: adminEmail },
-      relations: ['role'],
-    });
+    // 3. Crear usuarios de prueba para cada rol (para tests E2E)
+    // NOTA: admin@pmd.com se creará con rol ADMINISTRATION para los tests E2E
+    const testUsers = [
+      {
+        email: 'direction@pmd.com',
+        password: 'password123',
+        fullName: 'Usuario Direction',
+        role: UserRole.DIRECTION,
+      },
+      {
+        email: 'supervisor@pmd.com',
+        password: 'password123',
+        fullName: 'Usuario Supervisor',
+        role: UserRole.SUPERVISOR,
+      },
+      {
+        email: 'admin@pmd.com', // Este usuario se usará para tests E2E con rol ADMINISTRATION
+        password: 'password123',
+        fullName: 'Usuario Administration',
+        role: UserRole.ADMINISTRATION,
+        updateExisting: true, // Flag para actualizar el usuario existente (si existe con otro rol)
+      },
+      {
+        email: 'operator@pmd.com',
+        password: 'password123',
+        fullName: 'Usuario Operator',
+        role: UserRole.OPERATOR,
+      },
+    ];
 
-    if (!admin) {
-      const hashedPassword = await bcrypt.hash(adminPlainPassword, 10);
-      admin = userRepository.create({
-        email: adminEmail,
-        password: hashedPassword,
-        fullName: 'Administrador PMD',
-        role: directionRole,
-        organization: defaultOrg,
-        isActive: true,
+    console.log('\n👥 Creando usuarios de prueba...');
+    for (const testUserData of testUsers) {
+      const testUserRole = createdRoles[testUserData.role];
+      if (!testUserRole) {
+        console.warn(`⚠️  Rol ${testUserData.role} no encontrado, saltando usuario ${testUserData.email}`);
+        continue;
+      }
+
+      let testUser = await userRepository.findOne({
+        where: { email: testUserData.email },
+        relations: ['role'],
       });
-      admin = await userRepository.save(admin);
-      console.log('✅ Usuario admin creado con rol DIRECTION');
-    } else {
-      // Actualizar si falta información o si tiene un rol diferente
-      let updated = false;
-      
-      // Actualizar el rol a DIRECTION si no lo tiene
-      if (!admin.role || admin.role.name !== UserRole.DIRECTION) {
-        admin.role = directionRole;
-        updated = true;
-      }
-      
-      if (!admin.organization) {
-        admin.organization = defaultOrg;
-        updated = true;
-      }
-      
-      if (!admin.isActive) {
-        admin.isActive = true;
-        updated = true;
-      }
 
-      // Verificar si la contraseña está hasheada correctamente
-      const isHashCorrect = admin.password && admin.password.length >= 50;
-      if (!isHashCorrect) {
-        admin.password = await bcrypt.hash(adminPlainPassword, 10);
-        updated = true;
-      }
-
-      if (updated) {
-        await userRepository.save(admin);
-        console.log('🔧 Usuario admin actualizado con rol DIRECTION');
+      if (!testUser) {
+        const hashedPassword = await bcrypt.hash(testUserData.password, 10);
+        testUser = userRepository.create({
+          email: testUserData.email,
+          password: hashedPassword,
+          fullName: testUserData.fullName,
+          role: testUserRole,
+          organization: defaultOrg,
+          isActive: true,
+        });
+        testUser = await userRepository.save(testUser);
+        console.log(`✅ Usuario de prueba creado: ${testUserData.email} (${testUserData.role})`);
       } else {
-        console.log('ℹ️  Usuario admin ya existe y está actualizado');
+        // Actualizar si el rol es diferente o si falta información
+        let updated = false;
+        
+        // Si tiene el flag updateExisting o el rol es diferente, actualizar el rol
+        // IMPORTANTE: Si updateExisting es true, SIEMPRE actualizar el rol aunque sea diferente
+        const oldRoleName = testUser.role?.name?.toLowerCase() || 'sin rol';
+        const newRoleName = testUserData.role.toLowerCase();
+        const hasUpdateExistingFlag = (testUserData as any).updateExisting === true;
+        const shouldUpdateRole = hasUpdateExistingFlag || !testUser.role || oldRoleName !== newRoleName;
+        
+        if (shouldUpdateRole) {
+          const oldRole = testUser.role?.name || 'sin rol';
+          testUser.role = testUserRole;
+          updated = true;
+          if (hasUpdateExistingFlag) {
+            console.log(`🔄 Forzando actualización de rol para ${testUserData.email} de ${oldRole} a ${testUserData.role} (updateExisting=true)`);
+          } else {
+            console.log(`🔄 Actualizando rol de ${testUserData.email} de ${oldRole} a ${testUserData.role}`);
+          }
+        }
+        
+        if (!testUser.organization) {
+          testUser.organization = defaultOrg;
+          updated = true;
+        }
+        
+        if (!testUser.isActive) {
+          testUser.isActive = true;
+          updated = true;
+        }
+
+        // Actualizar contraseña si tiene el flag updateExisting (para tests, usar password123)
+        if ((testUserData as any).updateExisting) {
+          testUser.password = await bcrypt.hash(testUserData.password, 10);
+          updated = true;
+        }
+
+        if (updated) {
+          await userRepository.save(testUser);
+          console.log(`🔧 Usuario de prueba actualizado: ${testUserData.email} (${testUserData.role})`);
+        } else {
+          console.log(`ℹ️  Usuario de prueba ya existe: ${testUserData.email} (rol actual: ${testUser.role?.name})`);
+        }
       }
     }
 
-    console.log('\n📋 Credenciales del usuario admin:');
-    console.log(`   Email: ${adminEmail}`);
-    console.log(`   Password: ${adminPlainPassword}`);
+    console.log('\n📋 Credenciales de usuarios:');
+    console.log(`   Direction: direction@pmd.com / password123`);
+    console.log(`   Supervisor: supervisor@pmd.com / password123`);
+    console.log(`   Administration: admin@pmd.com / password123`);
+    console.log(`   Operator: operator@pmd.com / password123`);
     console.log('\n✅ Seed completado exitosamente!\n');
 
   } catch (error) {
