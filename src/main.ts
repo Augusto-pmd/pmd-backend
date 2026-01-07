@@ -29,6 +29,16 @@ async function bootstrap() {
       return true;
     }
 
+    // Allow production domains (apayuscs.com)
+    if (origin === 'https://pmd.apayuscs.com' || origin === 'http://pmd.apayuscs.com') {
+      return true;
+    }
+
+    // Allow any subdomain of apayuscs.com
+    if (origin.endsWith('.apayuscs.com')) {
+      return true;
+    }
+
     return false;
   };
 
