@@ -374,11 +374,11 @@ export class ExpensesService {
 
     // Check for duplicate invoices before validation
     if (expense.document_number && expense.supplier_id && validateDto.state === ExpenseState.VALIDATED && expense.purchase_date) {
-      const purchaseDateStr = expense.purchase_date instanceof Date 
-        ? expense.purchase_date.toISOString().split('T')[0]
-        : typeof expense.purchase_date === 'string'
-        ? expense.purchase_date.split('T')[0]
-        : new Date(expense.purchase_date).toISOString().split('T')[0];
+      // Convert purchase_date to Date if needed, then format as YYYY-MM-DD
+      const purchaseDate = expense.purchase_date instanceof Date 
+        ? expense.purchase_date 
+        : new Date(expense.purchase_date as string | number | Date);
+      const purchaseDateStr = purchaseDate.toISOString().split('T')[0];
       
       const duplicateCheck = await this.checkDuplicateInvoice(
         expense.document_number,
