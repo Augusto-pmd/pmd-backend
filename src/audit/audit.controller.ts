@@ -1,10 +1,13 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Param,
   Query,
   Delete,
   UseGuards,
+  Request,
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
@@ -15,12 +18,14 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
+  ApiBody,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
 import { AuditService } from './audit.service';
+import { CreateAuditLogDto } from './dto/create-audit-log.dto';
 
 @ApiTags('Audit')
 @ApiBearerAuth('JWT-auth')
@@ -28,6 +33,24 @@ import { AuditService } from './audit.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
+
+  @Post()
+  @Roles(UserRole.DIRECTION, UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.OPERATOR)
+  @ApiOperation({
+    summary: 'Create audit log',
+    description: 'Create a new audit log entry. All authenticated users can create audit logs.',
+  })
+  @ApiBody({ type: CreateAuditLogDto })
+  @ApiResponse({ status: 201, description: 'Audit log created successfully' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  create(@Body() createAuditLogDto: CreateAuditLogDto, @Request() req) {
+    // Use user from request if user_id is not provided
+    if (!createAuditLogDto.user_id && req.user?.id) {
+      createAuditLogDto.user_id = req.user.id;
+    }
+    return this.auditService.create(createAuditLogDto);
+  }
 
   @Get()
   @Roles(UserRole.DIRECTION)
