@@ -83,12 +83,19 @@ export class CashMovementsService {
     }
   }
 
-  async findAll(user: User): Promise<CashMovement[]> {
+  async findAll(user: User, cashboxId?: string): Promise<CashMovement[]> {
     try {
-      return await this.cashMovementRepository.find({
+      const queryOptions: any = {
         relations: ['cashbox', 'expense', 'income'],
         order: { date: 'DESC' },
-      });
+      };
+
+      // Si se proporciona cashboxId, filtrar por esa caja
+      if (cashboxId) {
+        queryOptions.where = { cashbox_id: cashboxId };
+      }
+
+      return await this.cashMovementRepository.find(queryOptions);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
         console.error('[CashMovementsService.findAll] Error:', error);

@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -30,8 +31,8 @@ export class CashMovementsController {
 
   @Get()
   @Roles(UserRole.OPERATOR, UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
-  findAll(@Request() req) {
-    return this.cashMovementsService.findAll(req.user);
+  findAll(@Request() req, @Query('cashboxId') cashboxId?: string) {
+    return this.cashMovementsService.findAll(req.user, cashboxId);
   }
 
   @Get(':id')
