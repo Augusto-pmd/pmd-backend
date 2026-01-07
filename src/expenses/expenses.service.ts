@@ -373,11 +373,17 @@ export class ExpensesService {
     }
 
     // Check for duplicate invoices before validation
-    if (expense.document_number && expense.supplier_id && validateDto.state === ExpenseState.VALIDATED) {
+    if (expense.document_number && expense.supplier_id && validateDto.state === ExpenseState.VALIDATED && expense.purchase_date) {
+      const purchaseDateStr = expense.purchase_date instanceof Date 
+        ? expense.purchase_date.toISOString().split('T')[0]
+        : typeof expense.purchase_date === 'string'
+        ? expense.purchase_date.split('T')[0]
+        : new Date(expense.purchase_date).toISOString().split('T')[0];
+      
       const duplicateCheck = await this.checkDuplicateInvoice(
         expense.document_number,
         expense.supplier_id,
-        expense.purchase_date.toISOString().split('T')[0],
+        purchaseDateStr,
         expense.id,
       );
 
@@ -571,7 +577,12 @@ export class ExpensesService {
       throw new BadRequestException('Cannot create accounting record: user organization not found');
     }
 
-    const purchaseDate = new Date(expense.purchase_date);
+    if (!expense.purchase_date) {
+      throw new BadRequestException('Cannot create accounting record: expense purchase_date is missing');
+    }
+    const purchaseDate = expense.purchase_date instanceof Date 
+      ? expense.purchase_date 
+      : new Date(expense.purchase_date);
     
     // Build description from expense data
     const description = expense.observations 
@@ -834,13 +845,18 @@ export class ExpensesService {
       });
 
       await queryRunner.commitTransaction();
-      return savedExpense;
+      await queryRunner.release();
+
+      // Return expense with relations loaded
+      return await this.expenseRepository.findOne({
+        where: { id: savedExpense.id },
+        relations: ['work', 'supplier', 'rubric', 'created_by', 'val', 'contract'],
+      });
     } catch (error) {
       await queryRunner.rollbackTransaction();
+      await queryRunner.release();
       this.logger.error('Error rejecting expense', error);
       throw error;
-    } finally {
-      await queryRunner.release();
     }
   }
 
