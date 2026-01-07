@@ -11,7 +11,7 @@ El sistema implementa protección contra ataques de fuerza bruta que bloquea tem
 ### Parámetros Actuales
 
 ```typescript
-maxAttempts: 5        // Máximo de intentos fallidos antes de bloquear
+maxAttempts: 10       // Máximo de intentos fallidos antes de bloquear
 blockDuration: 15 min // Duración del bloqueo (15 minutos)
 windowDuration: 1h   // Ventana de tiempo para contar intentos (1 hora)
 ```
@@ -30,7 +30,7 @@ windowDuration: 1h   // Ventana de tiempo para contar intentos (1 hora)
 
 - Cada intento de login fallido incrementa un contador para la IP
 - El contador se resetea después de 1 hora sin intentos
-- Después de **5 intentos fallidos**, la IP se bloquea
+- Después de **10 intentos fallidos**, la IP se bloquea
 
 ### 2. **Bloqueo**
 
@@ -231,7 +231,7 @@ Edita `src/auth/services/brute-force.service.ts`:
 
 ```typescript
 // Cambiar máximo de intentos
-private readonly maxAttempts = 10; // Default: 5
+private readonly maxAttempts = 10; // Actual: 10
 
 // Cambiar duración del bloqueo (en milisegundos)
 private readonly blockDuration = 30 * 60 * 1000; // 30 minutos (Default: 15 min)
