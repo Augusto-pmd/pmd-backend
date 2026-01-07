@@ -106,6 +106,68 @@ export class AuthController {
     };
   }
 
+  @Post('brute-force-reset')
+  @SkipCsrf()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Reset brute force block for current IP',
+    description: 'Reset the brute force block for the current IP address. This endpoint can be used to unblock an IP that has been blocked due to too many failed login attempts. WARNING: This endpoint should be protected in production.'
+  })
+  @ApiResponse({ status: 200, description: 'Block reset successfully' })
+  @ApiResponse({ status: 404, description: 'IP not blocked' })
+  async resetBruteForceBlock(@Req() req: Request) {
+    const ipAddress = this.extractIpAddress(req);
+    const reset = this.bruteForceService.resetBlock(ipAddress);
+    
+    if (!reset) {
+      return {
+        message: 'IP address is not currently blocked',
+        ipAddress,
+      };
+    }
+
+    return {
+      message: 'Brute force block reset successfully',
+      ipAddress,
+    };
+  }
+
+  @Post('brute-force-reset-all')
+  @SkipCsrf()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Reset all brute force blocks (Admin)',
+    description: 'Reset all brute force blocks. This clears all blocked IP addresses. WARNING: This is an administrative endpoint and should be protected in production.'
+  })
+  @ApiResponse({ status: 200, description: 'All blocks reset successfully' })
+  async resetAllBruteForceBlocks(@Req() req: Request) {
+    const count = this.bruteForceService.resetAllBlocks();
+    return {
+      message: 'All brute force blocks reset successfully',
+      blocksReset: count,
+    };
+  }
+
+  @Get('brute-force-list')
+  @SkipCsrf()
+  @ApiOperation({ 
+    summary: 'List all blocked IPs (Admin)',
+    description: 'Get a list of all currently blocked IP addresses with their remaining block time. WARNING: This is an administrative endpoint and should be protected in production.'
+  })
+  @ApiResponse({ status: 200, description: 'List of blocked IPs' })
+  async listBlockedIPs(@Req() req: Request) {
+    const blocked = this.bruteForceService.getAllBlocked();
+    return {
+      blocked: blocked.map(b => ({
+        identifier: b.identifier,
+        blockedUntil: new Date(b.blockedUntil).toISOString(),
+        remainingTime: b.remainingTime,
+        remainingMinutes: Math.ceil(b.remainingTime / 60000),
+      })),
+      count: blocked.length,
+    };
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
