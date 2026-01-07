@@ -24,6 +24,9 @@ export class User {
   @Column()
   fullName: string;
 
+  @Column({ nullable: true })
+  phone: string | null;
+
   @Column({ default: true })
   isActive: boolean;
 
