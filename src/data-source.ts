@@ -11,6 +11,7 @@ import { SupplierDocument } from './supplier-documents/supplier-documents.entity
 import { Work } from './works/works.entity';
 import { WorkBudget } from './work-budgets/work-budgets.entity';
 import { WorkDocument } from './work-documents/work-documents.entity';
+import { WorkUser } from './work-users/work-users.entity';
 import { Contract } from './contracts/contracts.entity';
 import { Cashbox } from './cashboxes/cashboxes.entity';
 import { CashMovement } from './cash-movements/cash-movements.entity';
@@ -58,6 +59,7 @@ const baseOptions: Partial<DataSourceOptions> = {
     Work,
     WorkBudget,
     WorkDocument,
+    WorkUser,
     Contract,
     Cashbox,
     CashMovement,

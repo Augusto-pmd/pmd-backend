@@ -16,6 +16,7 @@ import { SupplierDocumentsModule } from './supplier-documents/supplier-documents
 import { WorksModule } from './works/works.module';
 import { WorkBudgetsModule } from './work-budgets/work-budgets.module';
 import { WorkDocumentsModule } from './work-documents/work-documents.module';
+import { WorkUsersModule } from './work-users/work-users.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { RubricsModule } from './rubrics/rubrics.module';
 import { ExpensesModule } from './expenses/expenses.module';
@@ -82,6 +83,7 @@ import { HealthModule } from './health/health.module';
     WorksModule,
     WorkBudgetsModule,
     WorkDocumentsModule,
+    WorkUsersModule,
     ContractsModule,
     RubricsModule,
     ExpensesModule,
