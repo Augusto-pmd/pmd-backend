@@ -20,6 +20,7 @@ const ROLE_PERMISSIONS_FALLBACK: Record<string, string[]> = {
     'contracts.create',
     'contracts.update',
     'cashboxes.read',
+    'cashboxes.update', // Puede actualizar movimientos de caja según cash-movements.controller.ts
     'cashboxes.approve',
     'accounting.read',
     'accounting.create',
