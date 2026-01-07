@@ -24,6 +24,8 @@ import { UserRole } from '../common/enums/user-role.enum';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth('JWT-auth')
@@ -69,6 +71,36 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getMe(@Request() req) {
     return this.usersService.findOne(req.user.id);
+  }
+
+  @Patch('me')
+  @Roles(UserRole.DIRECTION, UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.OPERATOR)
+  @ApiOperation({
+    summary: 'Update current user profile',
+    description: 'Update the currently authenticated user\'s profile (name, email, phone). Users can only update their own profile.',
+  })
+  @ApiBody({ type: UpdateProfileDto })
+  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Email already in use' })
+  updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
+    return this.usersService.updateProfile(req.user.id, updateProfileDto);
+  }
+
+  @Patch('me/password')
+  @Roles(UserRole.DIRECTION, UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.OPERATOR)
+  @ApiOperation({
+    summary: 'Change current user password',
+    description: 'Change the currently authenticated user\'s password. Requires current password for verification.',
+  })
+  @ApiBody({ type: ChangePasswordDto })
+  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Current password is incorrect' })
+  changePassword(@Request() req, @Body() changePasswordDto: ChangePasswordDto) {
+    return this.usersService.changePassword(req.user.id, changePasswordDto);
   }
 
   @Get(':id')

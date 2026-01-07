@@ -5,6 +5,8 @@ import { User } from './user.entity';
 import { Role } from '../roles/role.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import * as bcrypt from 'bcrypt';
 import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 import { getDefaultRole } from '../common/helpers/get-default-role.helper';
@@ -67,8 +69,13 @@ export class UsersService {
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
     const user = this.userRepository.create({
-      ...createUserDto,
+      fullName: createUserDto.name, // Mapear name del DTO a fullName de la entidad
+      email: createUserDto.email,
       password: hashedPassword,
+      phone: createUserDto.phone || null,
+      isActive: createUserDto.is_active !== undefined ? createUserDto.is_active : true,
+      role: role, // Asignar el rol encontrado
+      organizationId: getOrganizationId(currentUser),
     });
 
     const savedUser = await this.userRepository.save(user);
@@ -144,11 +151,37 @@ export class UsersService {
 
     const user = await this.findOneEntity(id);
 
+    // Mapear campos del DTO a la entidad
+    if (updateUserDto.name !== undefined) {
+      user.fullName = updateUserDto.name;
+    }
+    if (updateUserDto.email !== undefined) {
+      user.email = updateUserDto.email;
+    }
     if (updateUserDto.password) {
-      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
+      user.password = await bcrypt.hash(updateUserDto.password, 10);
+    }
+    if (updateUserDto.is_active !== undefined) {
+      user.isActive = updateUserDto.is_active;
+    }
+    if (updateUserDto.phone !== undefined) {
+      user.phone = updateUserDto.phone;
+    }
+    // Manejar role_id: buscar el rol y asignarlo a la relación
+    if (updateUserDto.role_id !== undefined) {
+      if (updateUserDto.role_id === null) {
+        user.role = null;
+      } else {
+        const role = await this.roleRepository.findOne({
+          where: { id: updateUserDto.role_id },
+        });
+        if (!role) {
+          throw new NotFoundException(`Role with ID ${updateUserDto.role_id} not found`);
+        }
+        user.role = role;
+      }
     }
 
-    Object.assign(user, updateUserDto);
     const savedUser = await this.userRepository.save(user);
 
     // Reload with fresh relations to ensure role and organization are up-to-date
@@ -191,6 +224,47 @@ export class UsersService {
 
     // Return normalized version for consistency
     return this.normalizeUserEntity(refreshedUser);
+  }
+
+  async updateProfile(userId: string, updateProfileDto: UpdateProfileDto): Promise<NormalizedUser> {
+    const user = await this.findOneEntity(userId);
+
+    // Solo permitir actualizar nombre, email y teléfono
+    if (updateProfileDto.name !== undefined) {
+      user.fullName = updateProfileDto.name;
+    }
+    if (updateProfileDto.email !== undefined) {
+      // Verificar que el email no esté en uso por otro usuario
+      const existingUser = await this.userRepository.findOne({
+        where: { email: updateProfileDto.email },
+      });
+      if (existingUser && existingUser.id !== userId) {
+        throw new ForbiddenException('Este email ya está en uso por otro usuario');
+      }
+      user.email = updateProfileDto.email;
+    }
+    if (updateProfileDto.phone !== undefined) {
+      user.phone = updateProfileDto.phone;
+    }
+
+    const savedUser = await this.userRepository.save(user);
+    const refreshedUser = await this.reloadUserWithRelations(savedUser.id);
+
+    return this.normalizeUserEntity(refreshedUser);
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<void> {
+    const user = await this.findOneEntity(userId);
+
+    // Verificar que la contraseña actual sea correcta
+    const isPasswordValid = await bcrypt.compare(changePasswordDto.currentPassword, user.password);
+    if (!isPasswordValid) {
+      throw new ForbiddenException('La contraseña actual es incorrecta');
+    }
+
+    // Actualizar con la nueva contraseña
+    user.password = await bcrypt.hash(changePasswordDto.newPassword, 10);
+    await this.userRepository.save(user);
   }
 }
 
