@@ -26,6 +26,16 @@ export class CreateWorkDocumentDto {
   @MaxLength(500)
   file_url: string;
 
+  @ApiPropertyOptional({
+    description: 'Document name. If not provided, will be extracted from the file name.',
+    example: 'Planta Baja - V1.2',
+    maxLength: 255,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  name?: string;
+
   @ApiProperty({
     description: 'Document type',
     enum: WorkDocumentType,
@@ -61,5 +71,14 @@ export class CreateWorkDocumentDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiPropertyOptional({
+    description: 'User ID of the person responsible for the document. If not provided, will use the authenticated user.',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    format: 'uuid',
+  })
+  @IsUUID()
+  @IsOptional()
+  created_by_id?: string;
 }
 

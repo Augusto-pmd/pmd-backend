@@ -9,7 +9,14 @@ import {
   UseGuards,
   Request,
   Query,
+  UseInterceptors,
+  UploadedFile,
+  Res,
+  ParseFilePipe,
+  MaxFileSizeValidator,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { WorkDocumentFileTypeValidator } from './validators/file-type.validator';
 import {
   ApiTags,
   ApiOperation,
@@ -18,7 +25,9 @@ import {
   ApiParam,
   ApiBody,
   ApiQuery,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -92,6 +101,76 @@ export class WorkDocumentsController {
   @ApiResponse({ status: 200, description: 'Work document deleted successfully' })
   remove(@Param('id') id: string, @Request() req) {
     return this.workDocumentsService.remove(id, req.user);
+  }
+
+  @Post('upload')
+  @Roles(UserRole.OPERATOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ 
+    summary: 'Upload file for work document',
+    description: 'Upload a file and get its URL. The file will be stored in cloud storage (Google Drive/Dropbox) or locally.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+        work_id: {
+          type: 'string',
+          format: 'uuid',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'File uploaded successfully', schema: { type: 'object', properties: { file_url: { type: 'string' } } } })
+  async uploadFile(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 50 * 1024 * 1024 }), // 50MB
+          new WorkDocumentFileTypeValidator({ fileType: /(pdf|doc|docx|xls|xlsx|jpg|jpeg|png|dwg|dxf)$/ }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @Body('work_id') workId: string,
+    @Body('name') documentName?: string,
+    @Request() req?: any,
+  ) {
+    const result = await this.workDocumentsService.uploadFile(file, workId, documentName);
+    return result;
+  }
+
+  @Get(':id/download')
+  @Roles(UserRole.OPERATOR, UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({ 
+    summary: 'Download work document file',
+    description: 'Download the file associated with a work document.',
+  })
+  @ApiParam({ name: 'id', description: 'Work document UUID', type: String, format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'File download' })
+  @ApiResponse({ status: 404, description: 'File not found' })
+  async downloadFile(
+    @Param('id') id: string,
+    @Request() req,
+    @Res() res: Response,
+  ) {
+    try {
+      const { stream, fileName } = await this.workDocumentsService.downloadFile(id, req.user);
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      stream.pipe(res);
+    } catch (error) {
+      // Si es una URL de cloud storage, redirigir
+      const document = await this.workDocumentsService.findOne(id, req.user);
+      if (document.file_url && (document.file_url.startsWith('http://') || document.file_url.startsWith('https://'))) {
+        return res.redirect(document.file_url);
+      }
+      throw error;
+    }
   }
 }
 

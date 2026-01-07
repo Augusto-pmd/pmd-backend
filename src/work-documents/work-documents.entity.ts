@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Work } from '../works/works.entity';
+import { User } from '../users/user.entity';
 
 export enum WorkDocumentType {
   CONTRACT = 'contract',
@@ -40,6 +41,9 @@ export class WorkDocument {
   @Column({ type: 'varchar', length: 500 })
   file_url: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  name: string;
+
   @Column({
     type: 'enum',
     enum: WorkDocumentType,
@@ -58,6 +62,13 @@ export class WorkDocument {
 
   @Column({ type: 'text', nullable: true })
   notes: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  created_by_id: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'created_by_id' })
+  created_by: User;
 
   @CreateDateColumn()
   created_at: Date;
