@@ -83,6 +83,10 @@ export function databaseConfig(configService: ConfigService): TypeOrmModuleOptio
     const parsed = parseDatabaseUrl(databaseUrl);
     const isProduction = nodeEnv === 'production';
     
+    // Render always requires SSL when using DATABASE_URL
+    // Force SSL in production or when sslmode is specified
+    const requiresSsl = isProduction || parsed.requiresSsl;
+    
     return {
       type: 'postgres',
       host: parsed.host,
@@ -100,7 +104,8 @@ export function databaseConfig(configService: ConfigService): TypeOrmModuleOptio
       migrations: getMigrationsPath(),
       retryAttempts: 3,
       retryDelay: 3000,
-      ssl: parsed.requiresSsl ? {
+      // Always use SSL in production (Render) or when explicitly required
+      ssl: requiresSsl ? {
         rejectUnauthorized: false,
       } : false,
     } as TypeOrmModuleOptions;

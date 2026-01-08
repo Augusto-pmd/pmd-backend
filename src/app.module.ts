@@ -61,6 +61,7 @@ import { HealthModule } from './health/health.module';
     }]),
     // Only load second TypeORM module in non-test environments when DATABASE_URL is set
     // Tests use TestDatabaseModule which overrides the first TypeORM module
+    // Note: This second module may be redundant - the first TypeOrmModule.forRootAsync already handles DATABASE_URL
     ...(process.env.NODE_ENV !== 'test' && 
         process.env.JEST_WORKER_ID === undefined &&
         process.env.DATABASE_URL
@@ -69,7 +70,8 @@ import { HealthModule } from './health/health.module';
           url: process.env.DATABASE_URL,
           autoLoadEntities: true,
           synchronize: false,
-          ssl: process.env.NODE_ENV === 'production' || process.env.DATABASE_URL
+          // Render always requires SSL when using DATABASE_URL
+          ssl: (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL?.includes('sslmode=require'))
             ? { rejectUnauthorized: false }
             : false,
         })]

@@ -34,15 +34,17 @@ const nodeEnv = process.env.NODE_ENV || 'development';
 const databaseUrl = process.env.DATABASE_URL;
 
 // Parse DATABASE_URL to check if SSL is required
+// Render always requires SSL in production when using DATABASE_URL
 let requiresSsl = false;
 if (databaseUrl) {
   try {
     const parsedUrl = new URL(databaseUrl);
     const sslMode = parsedUrl.searchParams.get('sslmode');
-    requiresSsl = sslMode === 'require' || sslMode === 'prefer';
+    // Force SSL in production (Render) or when explicitly required
+    requiresSsl = nodeEnv === 'production' || sslMode === 'require' || sslMode === 'prefer';
   } catch (error) {
-    // If URL parsing fails, assume no SSL for local development
-    requiresSsl = false;
+    // If URL parsing fails, force SSL in production (Render)
+    requiresSsl = nodeEnv === 'production';
   }
 }
 
