@@ -97,10 +97,10 @@ export function databaseConfig(configService: ConfigService): TypeOrmModuleOptio
       synchronize: false,
       logging: nodeEnv === 'development',
       autoLoadEntities: true,
-      // Ejecutar migraciones automáticamente en producción (Render)
-      // Las migraciones deben estar compiladas en dist/migrations/*.js durante el build
-      // Esto se ejecuta automáticamente cuando la aplicación inicia en Render
-      migrationsRun: isProduction,
+      // No ejecutar migraciones automáticamente en producción
+      // La base de datos en Render ya tiene las tablas creadas
+      // Las migraciones deben ejecutarse manualmente cuando sea necesario
+      migrationsRun: false,
       migrations: getMigrationsPath(),
       retryAttempts: 3,
       retryDelay: 3000,
