@@ -22,6 +22,10 @@ export class CreateAccountingRecordDto {
   expense_id?: string;
 
   @IsUUID()
+  @IsOptional()
+  income_id?: string;
+
+  @IsUUID()
   work_id: string;
 
   @IsUUID()

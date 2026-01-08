@@ -74,7 +74,7 @@ export class AccountingService {
 
       return await this.accountingRepository.find({
         where,
-        relations: ['expense', 'work', 'supplier'],
+        relations: ['expense', 'income', 'work', 'supplier'],
         order: { date: 'DESC', created_at: 'DESC' },
       });
     } catch (error) {
@@ -87,7 +87,7 @@ export class AccountingService {
     const organizationId = getOrganizationId(user);
     const record = await this.accountingRepository.findOne({
       where: { id },
-      relations: ['expense', 'work', 'supplier'],
+      relations: ['expense', 'income', 'work', 'supplier'],
     });
 
     if (!record) {
@@ -114,7 +114,7 @@ export class AccountingService {
 
     return await this.accountingRepository.find({
       where,
-      relations: ['expense', 'work', 'supplier'],
+      relations: ['expense', 'income', 'work', 'supplier'],
       order: { date: 'ASC' },
     });
   }
