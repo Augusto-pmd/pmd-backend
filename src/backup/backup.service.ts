@@ -444,7 +444,7 @@ export class BackupService {
     } catch (error) {
       // In test environment, silently fail only when called from cron jobs (no user)
       // When called directly with a user, throw the error normally for testing
-      const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined || typeof jest !== 'undefined';
+      const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
       
       if (!user && isTestEnv) {
         savedBackup.status = BackupStatus.FAILED;
@@ -612,7 +612,7 @@ export class BackupService {
     } catch (error) {
       // In test environment, silently fail only when called from cron jobs (no user)
       // When called directly with a user, throw the error normally for testing
-      const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined || typeof jest !== 'undefined';
+      const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
       
       if (!user && isTestEnv) {
         savedBackup.status = BackupStatus.FAILED;
@@ -772,8 +772,7 @@ export class BackupService {
     // Skip backups in test environment
     if (
       process.env.NODE_ENV === 'test' ||
-      process.env.JEST_WORKER_ID !== undefined ||
-      typeof jest !== 'undefined'
+      process.env.JEST_WORKER_ID !== undefined
     ) {
       return;
     }
@@ -839,8 +838,7 @@ export class BackupService {
     // Skip backups in test environment
     if (
       process.env.NODE_ENV === 'test' ||
-      process.env.JEST_WORKER_ID !== undefined ||
-      typeof jest !== 'undefined'
+      process.env.JEST_WORKER_ID !== undefined
     ) {
       return;
     }
@@ -906,8 +904,7 @@ export class BackupService {
     // Skip backups in test environment
     if (
       process.env.NODE_ENV === 'test' ||
-      process.env.JEST_WORKER_ID !== undefined ||
-      typeof jest !== 'undefined'
+      process.env.JEST_WORKER_ID !== undefined
     ) {
       return;
     }
