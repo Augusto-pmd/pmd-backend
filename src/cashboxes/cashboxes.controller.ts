@@ -102,6 +102,20 @@ export class CashboxesController {
     return this.cashboxesService.close(id, closeCashboxDto, req.user);
   }
 
+  @Post(':id/open')
+  @Roles(UserRole.OPERATOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Reopen cashbox',
+    description: 'Reopen a closed cashbox. Business rule: One open cashbox per user at a time. Operators can only reopen their own cashboxes.',
+  })
+  @ApiParam({ name: 'id', description: 'Cashbox UUID', type: String, format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Cashbox reopened successfully' })
+  @ApiResponse({ status: 400, description: 'Cashbox is already open or user has another open cashbox' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  open(@Param('id') id: string, @Request() req) {
+    return this.cashboxesService.open(id, req.user);
+  }
+
   @Post(':id/refill')
   @Roles(UserRole.OPERATOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
   @ApiOperation({

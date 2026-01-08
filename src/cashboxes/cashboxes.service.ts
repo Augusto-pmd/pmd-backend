@@ -218,6 +218,47 @@ export class CashboxesService {
   }
 
   /**
+   * Business Rule: Reopen a closed cashbox
+   * Business Rule: One open cashbox per user at a time
+   */
+  async open(id: string, user: User): Promise<Cashbox> {
+    const cashbox = await this.findOne(id, user);
+
+    // Validate cashbox is closed
+    if (cashbox.status !== CashboxStatus.CLOSED) {
+      throw new BadRequestException('Cashbox is already open');
+    }
+
+    // Business Rule: Check if user already has an open cashbox
+    const existingOpenCashbox = await this.cashboxRepository.findOne({
+      where: {
+        user_id: cashbox.user_id,
+        status: CashboxStatus.OPEN,
+      },
+    });
+
+    if (existingOpenCashbox && existingOpenCashbox.id !== id) {
+      throw new BadRequestException(
+        'El usuario ya tiene una caja abierta. Por favor, cierre la caja antes de volver a abrir esta.',
+      );
+    }
+
+    // Business Rule: Operators can only reopen their own cashbox
+    if (user.role.name === UserRole.OPERATOR && cashbox.user_id !== user.id) {
+      throw new ForbiddenException('Operators can only reopen their own cashbox');
+    }
+
+    // Reopen the cashbox
+    cashbox.status = CashboxStatus.OPEN;
+    // Reset closing date when reopening
+    cashbox.closing_date = null;
+    // Keep closing balances as they were, but they will be recalculated on next close
+    // Optionally, you could reset them here if needed
+
+    return await this.cashboxRepository.save(cashbox);
+  }
+
+  /**
    * Business Rule: Difference approval - only Administration and Direction can approve
    */
   async approveDifference(
@@ -364,7 +405,7 @@ export class CashboxesService {
 
     const hasDifference = Number(cashbox.difference_ars) !== 0 || Number(cashbox.difference_usd) !== 0;
     if (!hasDifference) {
-      throw new BadRequestException('Cashbox has no difference to explain');
+      throw new BadRequestException('La caja no tiene diferencia para explicar');
     }
 
     // Generate alert for explanation request
@@ -403,7 +444,7 @@ export class CashboxesService {
 
     const hasDifference = Number(cashbox.difference_ars) !== 0 || Number(cashbox.difference_usd) !== 0;
     if (!hasDifference) {
-      throw new BadRequestException('Cashbox has no difference to reject');
+      throw new BadRequestException('La caja no tiene diferencia para rechazar');
     }
 
     // Reset approval status
@@ -458,16 +499,19 @@ export class CashboxesService {
         ? `Ajuste manual: ${adjustmentDto.reason}`
         : 'Ajuste manual realizado por Dirección';
 
-      const movement = queryRunner.manager.create(CashMovement, {
-        cashbox_id: id,
-        type: adjustmentDto.amount >= 0 ? CashMovementType.INCOME : CashMovementType.EXPENSE,
-        amount: Math.abs(adjustmentDto.amount),
-        currency: adjustmentDto.currency,
-        description: adjustmentDescription,
-        date: new Date(),
-      });
-
-      await queryRunner.manager.save(CashMovement, movement);
+      // Insert new movement directly using raw query to avoid TypeORM relation issues
+      await queryRunner.query(
+        `INSERT INTO cash_movements (id, cashbox_id, type, amount, currency, description, date, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        [
+          id,
+          adjustmentDto.amount >= 0 ? CashMovementType.INCOME : CashMovementType.EXPENSE,
+          Math.abs(adjustmentDto.amount),
+          adjustmentDto.currency,
+          adjustmentDescription,
+          new Date(),
+        ],
+      );
 
       // Update closing balance based on currency
       if (adjustmentDto.currency === Currency.ARS) {
@@ -515,7 +559,24 @@ export class CashboxesService {
       cashbox.difference_approved_by_id = null;
       cashbox.difference_approved_at = null;
 
-      await queryRunner.manager.save(Cashbox, cashbox);
+      // Reload cashbox without movements relation to avoid TypeORM trying to update movements
+      const cashboxToUpdate = await queryRunner.manager.findOne(Cashbox, {
+        where: { id },
+      });
+      if (!cashboxToUpdate) {
+        throw new NotFoundException(`Cashbox with ID ${id} not found`);
+      }
+      
+      // Update only the necessary fields
+      cashboxToUpdate.closing_balance_ars = cashbox.closing_balance_ars;
+      cashboxToUpdate.closing_balance_usd = cashbox.closing_balance_usd;
+      cashboxToUpdate.difference_ars = cashbox.difference_ars;
+      cashboxToUpdate.difference_usd = cashbox.difference_usd;
+      cashboxToUpdate.difference_approved = false;
+      cashboxToUpdate.difference_approved_by_id = null;
+      cashboxToUpdate.difference_approved_at = null;
+
+      await queryRunner.manager.save(Cashbox, cashboxToUpdate);
 
       await queryRunner.commitTransaction();
 
