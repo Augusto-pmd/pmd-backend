@@ -352,15 +352,20 @@ async function seed() {
   }
 }
 
-// Ejecutar seed
-seed()
-  .then(() => {
-    console.log('✨ Proceso de seed finalizado');
-    process.exit(0);
-  })
-  .catch((error) => {
-    // Los errores fatales en seed siempre se muestran ya que es un script de inicialización
-    console.error('💥 Error fatal en seed:', error);
-    process.exit(1);
-  });
+// Exportar la función seed para uso programático
+export { seed };
+
+// Ejecutar seed solo si se llama directamente (no cuando se importa)
+if (require.main === module) {
+  seed()
+    .then(() => {
+      console.log('✨ Proceso de seed finalizado');
+      process.exit(0);
+    })
+    .catch((error) => {
+      // Los errores fatales en seed siempre se muestran ya que es un script de inicialización
+      console.error('💥 Error fatal en seed:', error);
+      process.exit(1);
+    });
+}
 

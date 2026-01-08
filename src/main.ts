@@ -5,8 +5,18 @@ import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { autoSeedIfNeeded } from './utils/auto-seed';
 
 async function bootstrap() {
+  // Ejecutar seed automático si no hay usuarios (útil para producción en Render)
+  // Esto se ejecuta antes de crear la aplicación NestJS para evitar problemas de inicialización
+  try {
+    await autoSeedIfNeeded();
+  } catch (error) {
+    // No bloquear el inicio del servidor si hay error en el seed
+    console.warn('⚠️  No se pudo ejecutar auto-seed, pero el servidor continuará iniciando');
+  }
+
   const app = await NestFactory.create(AppModule);
 
   // Get Express instance to register global OPTIONS handler
