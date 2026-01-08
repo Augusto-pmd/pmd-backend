@@ -22,17 +22,37 @@ export class SeedDefaultOrganization1700000000038 implements MigrationInterface 
     }
 
     // Crear organización por defecto
-    await queryRunner.query(`
-      INSERT INTO organizations (id, name, description, created_at, updated_at)
-      VALUES (
-        '00000000-0000-0000-0000-000000000001',
-        'PMD Arquitectura',
-        'Organización por defecto PMD',
-        NOW(),
-        NOW()
-      )
-      ON CONFLICT (id) DO NOTHING
-    `);
+    // Nota: Ya verificamos arriba si existe, así que intentamos insertar directamente
+    // Si por alguna razón existe (race condition), simplemente no hacemos nada
+    try {
+      await queryRunner.query(`
+        INSERT INTO organizations (id, name, description, created_at, updated_at)
+        VALUES (
+          '00000000-0000-0000-0000-000000000001',
+          'PMD Arquitectura',
+          'Organización por defecto PMD',
+          NOW(),
+          NOW()
+        )
+      `);
+    } catch (insertError: any) {
+      // Si el error es que el registro ya existe (código 23505 = unique_violation),
+      // simplemente actualizamos en su lugar
+      if (insertError.code === '23505' || insertError.message?.includes('duplicate key') || insertError.message?.includes('already exists')) {
+        // Registro ya existe, actualizar en su lugar
+        await queryRunner.query(`
+          UPDATE organizations 
+          SET 
+            name = 'PMD Arquitectura',
+            description = 'Organización por defecto PMD',
+            updated_at = NOW()
+          WHERE id = '00000000-0000-0000-0000-000000000001'
+        `);
+      } else {
+        // Otro tipo de error, re-lanzarlo
+        throw insertError;
+      }
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
