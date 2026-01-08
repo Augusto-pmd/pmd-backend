@@ -1,5 +1,7 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Parse DATABASE_URL into connection parameters
@@ -29,6 +31,32 @@ function parseDatabaseUrl(url: string): {
   }
 }
 
+/**
+ * Determine migrations path based on environment
+ * In production (Render): use compiled migrations from dist/migrations/*.js
+ * In development: use source migrations from src/migrations/*.ts
+ */
+function getMigrationsPath(): string[] {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  
+  if (nodeEnv === 'production') {
+    // In production, check if compiled migrations exist
+    const distMigrationsPath = path.join(process.cwd(), 'dist', 'migrations');
+    if (fs.existsSync(distMigrationsPath)) {
+      const files = fs.readdirSync(distMigrationsPath);
+      if (files.some(f => f.endsWith('.js'))) {
+        return ['dist/migrations/*.js'];
+      }
+    }
+    // Fallback to source if compiled don't exist (shouldn't happen in production)
+    console.warn('⚠️  Warning: Compiled migrations not found in dist/migrations, falling back to source');
+    return ['src/migrations/*.ts'];
+  }
+  
+  // Development: always use source
+  return ['src/migrations/*.ts'];
+}
+
 export function databaseConfig(configService: ConfigService): TypeOrmModuleOptions {
   const databaseUrl = configService.get<string>('DATABASE_URL');
   const nodeEnv = configService.get<string>('NODE_ENV', 'development');
@@ -53,6 +81,8 @@ export function databaseConfig(configService: ConfigService): TypeOrmModuleOptio
   // If DATABASE_URL exists, use it (production mode - Render)
   if (databaseUrl) {
     const parsed = parseDatabaseUrl(databaseUrl);
+    const isProduction = nodeEnv === 'production';
+    
     return {
       type: 'postgres',
       host: parsed.host,
@@ -63,6 +93,11 @@ export function databaseConfig(configService: ConfigService): TypeOrmModuleOptio
       synchronize: false,
       logging: nodeEnv === 'development',
       autoLoadEntities: true,
+      // Ejecutar migraciones automáticamente en producción (Render)
+      // Las migraciones deben estar compiladas en dist/migrations/*.js durante el build
+      // Esto se ejecuta automáticamente cuando la aplicación inicia en Render
+      migrationsRun: isProduction,
+      migrations: getMigrationsPath(),
       retryAttempts: 3,
       retryDelay: 3000,
       ssl: parsed.requiresSsl ? {
