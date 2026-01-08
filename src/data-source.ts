@@ -2,29 +2,6 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Role } from './roles/role.entity';
-import { User } from './users/user.entity';
-import { Organization } from './organizations/organization.entity';
-import { Rubric } from './rubrics/rubrics.entity';
-import { Supplier } from './suppliers/suppliers.entity';
-import { SupplierDocument } from './supplier-documents/supplier-documents.entity';
-import { Work } from './works/works.entity';
-import { WorkBudget } from './work-budgets/work-budgets.entity';
-import { WorkDocument } from './work-documents/work-documents.entity';
-import { WorkUser } from './work-users/work-users.entity';
-import { Contract } from './contracts/contracts.entity';
-import { Cashbox } from './cashboxes/cashboxes.entity';
-import { CashMovement } from './cash-movements/cash-movements.entity';
-import { Expense } from './expenses/expenses.entity';
-import { Val } from './val/val.entity';
-import { Income } from './incomes/incomes.entity';
-import { Schedule } from './schedule/schedule.entity';
-import { Alert } from './alerts/alerts.entity';
-import { AccountingRecord } from './accounting/accounting.entity';
-import { AuditLog } from './audit/audit.entity';
-import { ExchangeRate } from './exchange-rates/exchange-rates.entity';
-import { OfflineItem } from './offline/offline-items.entity';
-import { Backup } from './backup/backup.entity';
 
 // Load environment variables
 config();
@@ -48,34 +25,28 @@ if (databaseUrl) {
   }
 }
 
+// Determine entities path based on environment
+// In production: use compiled entities from dist/**/*.entity.js
+// In development: use source entities from src/**/*.entity.ts
+const getEntitiesPath = (): string[] => {
+  if (nodeEnv === 'production') {
+    // In production, check if compiled entities exist
+    const distPath = path.join(process.cwd(), 'dist');
+    if (fs.existsSync(distPath)) {
+      return ['dist/**/*.entity.js'];
+    }
+    // Fallback to source if compiled don't exist (shouldn't happen in production)
+    console.warn('⚠️  Warning: Compiled entities not found in dist, falling back to source');
+    return ['src/**/*.entity.ts'];
+  }
+  // Development: always use source
+  return ['src/**/*.entity.ts'];
+};
+
 // For local development without DATABASE_URL, use individual variables
 const baseOptions: Partial<DataSourceOptions> = {
   type: 'postgres' as const,
-  entities: [
-    Role,
-    User,
-    Organization,
-    Rubric,
-    Supplier,
-    SupplierDocument,
-    Work,
-    WorkBudget,
-    WorkDocument,
-    WorkUser,
-    Contract,
-    Cashbox,
-    CashMovement,
-    Expense,
-    Val,
-    Income,
-    Schedule,
-    Alert,
-    AccountingRecord,
-    AuditLog,
-    ExchangeRate,
-    OfflineItem,
-    Backup,
-  ],
+  entities: getEntitiesPath(),
   // Determinar qué ruta de migraciones usar
   // En producción: intentar usar compiladas, si no existen, usar fuente
   // En desarrollo: siempre usar fuente
