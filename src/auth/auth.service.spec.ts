@@ -53,6 +53,7 @@ describe('AuthService', () => {
     fullName: 'Test User',
     email: 'test@example.com',
     password: 'hashedPassword',
+    phone: null,
     isActive: true,
     role: mockRole,
     organizationId: null,
