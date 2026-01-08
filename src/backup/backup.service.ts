@@ -19,7 +19,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 
 const execAsync = promisify(exec);
 
-interface BackupStatusResponse {
+export interface BackupStatusResponse {
   total: number;
   completed: number;
   failed: number;

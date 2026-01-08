@@ -25,7 +25,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
-import { BackupService } from './backup.service';
+import { BackupService, BackupStatusResponse } from './backup.service';
 import { CreateBackupDto, CleanupBackupsDto } from './dto/create-backup.dto';
 import { BackupType } from './backup.entity';
 
@@ -98,7 +98,7 @@ export class BackupController {
     description: 'Get status of scheduled backups and statistics',
   })
   @ApiResponse({ status: 200, description: 'Backup status and statistics' })
-  async getStatus() {
+  async getStatus(): Promise<BackupStatusResponse> {
     return await this.backupService.getStatus();
   }
 
