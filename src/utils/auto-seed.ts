@@ -1,9 +1,9 @@
+import { DataSource } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Role } from '../roles/role.entity';
 import { Organization } from '../organizations/organization.entity';
 import { UserRole } from '../common/enums/user-role.enum';
 import * as bcrypt from 'bcrypt';
-import dataSource from '../data-source';
 
 /**
  * Verifica si hay usuarios en la base de datos y ejecuta el seed si no hay ninguno.
@@ -12,16 +12,17 @@ import dataSource from '../data-source';
  * Esta función ejecuta solo la parte esencial del seed (roles y usuarios)
  * sin cerrar el servidor (no hace process.exit()).
  * 
+ * @param appDataSource - El DataSource de NestJS (ya inicializado)
  * @returns Promise<boolean> - true si se ejecutó el seed, false si ya había usuarios
  */
-export async function autoSeedIfNeeded(): Promise<boolean> {
-  const AppDataSource = dataSource;
-  
+export async function autoSeedIfNeeded(appDataSource: DataSource): Promise<boolean> {
   try {
-    // Verificar si la conexión ya está inicializada
-    if (!AppDataSource.isInitialized) {
-      await AppDataSource.initialize();
+    // Verificar que el DataSource esté inicializado
+    if (!appDataSource || !appDataSource.isInitialized) {
+      throw new Error('DataSource no está inicializado. Asegúrate de pasar el DataSource de NestJS.');
     }
+    
+    const AppDataSource = appDataSource;
 
     const userRepository = AppDataSource.getRepository(User);
     

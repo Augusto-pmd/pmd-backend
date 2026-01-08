@@ -3,21 +3,49 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
+import { DataSource } from 'typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { autoSeedIfNeeded } from './utils/auto-seed';
 
 async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  
   // Ejecutar seed automático si no hay usuarios (útil para producción en Render)
-  // Esto se ejecuta antes de crear la aplicación NestJS para evitar problemas de inicialización
+  // Usar el DataSource que NestJS ya ha inicializado
   try {
-    await autoSeedIfNeeded();
-  } catch (error) {
+    // Obtener el DataSource de NestJS
+    // Esperar un momento para asegurar que TypeORM esté completamente inicializado
+    await new Promise(resolve => setImmediate(resolve));
+    
+    let dataSource: DataSource;
+    try {
+      // Intentar obtener el DataSource usando getDataSourceToken
+      const token = getDataSourceToken();
+      dataSource = app.get<DataSource>(token || DataSource);
+    } catch (error) {
+      // Si falla, intentar obtener directamente
+      dataSource = app.get<DataSource>(DataSource);
+    }
+    
+    // Verificar que el DataSource esté inicializado
+    if (!dataSource || !dataSource.isInitialized) {
+      throw new Error('DataSource obtenido pero no está inicializado');
+    }
+    
+    await autoSeedIfNeeded(dataSource);
+  } catch (error: any) {
     // No bloquear el inicio del servidor si hay error en el seed
     console.warn('⚠️  No se pudo ejecutar auto-seed, pero el servidor continuará iniciando');
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error details:', error?.message || error);
+      if (error?.stack) {
+        console.error('Stack:', error.stack);
+      }
+    }
+    console.log('💡 Para ejecutar el seed manualmente, usa: npm run seed');
   }
-
-  const app = await NestFactory.create(AppModule);
 
   // Get Express instance to register global OPTIONS handler
   const expressApp = app.getHttpAdapter().getInstance();
