@@ -25,45 +25,19 @@ if (databaseUrl) {
   }
 }
 
-// Determine entities path based on environment
-// In production: use compiled entities from dist/**/*.entity.js
-// In development: use source entities from src/**/*.entity.ts
-const getEntitiesPath = (): string[] => {
-  if (nodeEnv === 'production') {
-    // In production, check if compiled entities exist
-    const distPath = path.join(process.cwd(), 'dist');
-    if (fs.existsSync(distPath)) {
-      return ['dist/**/*.entity.js'];
-    }
-    // Fallback to source if compiled don't exist (shouldn't happen in production)
-    console.warn('⚠️  Warning: Compiled entities not found in dist, falling back to source');
-    return ['src/**/*.entity.ts'];
-  }
-  // Development: always use source
-  return ['src/**/*.entity.ts'];
-};
-
 // For local development without DATABASE_URL, use individual variables
 const baseOptions: Partial<DataSourceOptions> = {
   type: 'postgres' as const,
-  entities: getEntitiesPath(),
-  // Determinar qué ruta de migraciones usar
-  // En producción: intentar usar compiladas, si no existen, usar fuente
-  // En desarrollo: siempre usar fuente
-  migrations: (() => {
-    if (process.env.NODE_ENV === 'production') {
-      const distMigrationsPath = path.join(process.cwd(), 'dist', 'migrations');
-      if (fs.existsSync(distMigrationsPath)) {
-        const files = fs.readdirSync(distMigrationsPath);
-        if (files.some(f => f.endsWith('.js'))) {
-          return ['dist/migrations/*.js'];
-        }
-      }
-      // Fallback a fuente si no hay compiladas
-      return ['src/migrations/*.ts'];
-    }
-    return ['src/migrations/*.ts'];
-  })(),
+  entities: [
+    process.env.NODE_ENV === 'production'
+      ? 'dist/**/*.entity.js'
+      : 'src/**/*.entity.ts'
+  ],
+  migrations: [
+    process.env.NODE_ENV === 'production'
+      ? 'dist/migrations/*.js'
+      : 'src/migrations/*.ts'
+  ],
   synchronize: false,
   logging: nodeEnv === 'development',
 };
