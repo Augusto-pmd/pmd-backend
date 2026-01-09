@@ -29,6 +29,29 @@ export class AuthService {
     private readonly auditService: AuditService,
   ) {}
 
+  /**
+   * Get full permissions for ADMINISTRATION role
+   * Based on migration 1700000000039-SeedRoles.ts
+   * Note: ADMINISTRATION should NOT have 'users' or 'audit' permissions
+   */
+  private getAdministrationPermissions(): Record<string, string[]> {
+    return {
+      dashboard: ['read'],
+      works: ['create', 'read'],
+      expenses: ['read', 'validate'],
+      suppliers: ['read', 'approve', 'reject'],
+      contracts: ['create', 'read', 'update'],
+      cashboxes: ['read', 'approve'],
+      accounting: ['create', 'read', 'update', 'close'],
+      incomes: ['read', 'create'],
+      documents: ['read', 'create', 'update'],
+      alerts: ['read', 'create', 'update'],
+      reports: ['read'],
+      settings: ['read'],
+      schedule: ['read'],
+    };
+  }
+
   async ensureAdminUser(): Promise<void> {
     const adminEmail = 'admin@pmd.com';
     const adminPlainPassword = '1102Pequ';
@@ -38,15 +61,57 @@ export class AuthService {
       relations: ['role', 'organization'],
     });
 
-    // Buscar rol DIRECTION como fallback (para usuarios nuevos)
-    let adminRole = await this.roleRepository.findOne({ where: { name: UserRole.DIRECTION }});
+    // Ensure ADMINISTRATION role exists with full permissions
+    let adminRole = await this.roleRepository.findOne({ where: { name: UserRole.ADMINISTRATION }});
+    const requiredPermissions = this.getAdministrationPermissions();
+    
     if (!adminRole) {
+      // Create ADMINISTRATION role with full permissions
       adminRole = this.roleRepository.create({
-        name: UserRole.DIRECTION,
-        description: 'Rol de dirección con acceso completo al sistema',
-        permissions: { all: true },
+        name: UserRole.ADMINISTRATION,
+        description: 'Rol de administración con permisos de validación y aprobación',
+        permissions: requiredPermissions,
       });
       adminRole = await this.roleRepository.save(adminRole);
+      this.logger.log('✅ ADMINISTRATION role created with full permissions');
+    } else {
+      // Update role if permissions are missing or empty
+      const hasPermissions = adminRole.permissions && 
+                            typeof adminRole.permissions === 'object' && 
+                            Object.keys(adminRole.permissions).length > 0;
+      
+      if (!hasPermissions) {
+        adminRole.permissions = requiredPermissions;
+        adminRole.description = 'Rol de administración con permisos de validación y aprobación';
+        await this.roleRepository.save(adminRole);
+        this.logger.log('✅ ADMINISTRATION role permissions updated');
+      } else {
+        // Ensure all required permissions are present (merge, don't overwrite)
+        const currentPermissions = adminRole.permissions as Record<string, string[]>;
+        let needsUpdate = false;
+        
+        for (const [module, actions] of Object.entries(requiredPermissions)) {
+          if (!currentPermissions[module] || 
+              !Array.isArray(currentPermissions[module]) || 
+              currentPermissions[module].length === 0) {
+            currentPermissions[module] = actions;
+            needsUpdate = true;
+          }
+        }
+        
+        // Remove users and audit if present (ADMINISTRATION should not have these)
+        if (currentPermissions.users || currentPermissions.audit) {
+          delete currentPermissions.users;
+          delete currentPermissions.audit;
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+          adminRole.permissions = currentPermissions;
+          await this.roleRepository.save(adminRole);
+          this.logger.log('✅ ADMINISTRATION role permissions merged and cleaned');
+        }
+      }
     }
 
     const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
@@ -61,7 +126,7 @@ export class AuthService {
     }
 
     if (!admin) {
-      // Solo crear usuario si no existe - usar DIRECTION como fallback
+      // Create admin user with ADMINISTRATION role
       const hashed = await bcrypt.hash(adminPlainPassword, 10);
       admin = this.userRepository.create({
         email: adminEmail,
@@ -72,20 +137,18 @@ export class AuthService {
         isActive: true,
       });
       await this.userRepository.save(admin);
-      this.logger.log('Admin user created with DIRECTION role (fallback)');
+      this.logger.log('✅ Admin user created with ADMINISTRATION role');
       return;
     }
 
-    // Si el usuario ya existe, NO sobrescribir su rol
-    // El seed.ts es responsable de asignar el rol correcto (ADMINISTRATION para tests E2E)
-    // Solo actualizar organización, estado activo y contraseña si es necesario
+    // If user exists, ensure role and permissions are correct
     let updated = false;
 
-    // NO actualizar el rol si el usuario ya existe - respetar el rol asignado por seed
-    // if (!admin.role || admin.role.name !== UserRole.DIRECTION) { 
-    //   admin.role = adminRole; 
-    //   updated = true; 
-    // }
+    // Ensure user has ADMINISTRATION role
+    if (!admin.role || admin.role.name !== UserRole.ADMINISTRATION) {
+      admin.role = adminRole;
+      updated = true;
+    }
     
     if (!admin.organization) { 
       admin.organization = defaultOrg; 
@@ -104,9 +167,9 @@ export class AuthService {
 
     if (updated) {
       await this.userRepository.save(admin);
-      this.logger.log(`Admin user repaired (rol actual: ${admin.role?.name || 'sin rol'})`);
+      this.logger.log(`✅ Admin user repaired (role: ${admin.role?.name || 'sin rol'})`);
     } else {
-      this.logger.debug(`Admin user exists (rol: ${admin.role?.name || 'sin rol'}) - no changes needed`);
+      this.logger.debug(`Admin user exists (role: ${admin.role?.name || 'sin rol'}) - no changes needed`);
     }
   }
 
