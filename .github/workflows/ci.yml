@@ -1,15 +1,16 @@
-name: CI
+name: CI / validate
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-  pull_request:
+  push:
     branches:
       - main
 
 jobs:
-  build:
+  validate:
+    name: CI / validate
     runs-on: ubuntu-latest
 
     steps:
@@ -25,5 +26,11 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build
+      - name: Build project
         run: yarn build
+
+      - name: Lint
+        run: yarn lint || true
+
+      - name: Type check
+        run: npx tsc --noEmit

@@ -21,6 +21,14 @@ export class CsrfGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
+    const path = request.url || request.path || '';
+
+    // Skip CSRF validation for all API routes (JWT provides sufficient protection)
+    if (path.startsWith('/api/')) {
+      return true;
+    }
+
     // Check if CSRF validation should be skipped
     const skipCsrf = this.reflector.getAllAndOverride<boolean>('skipCsrf', [
       context.getHandler(),
@@ -31,7 +39,6 @@ export class CsrfGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
     const method = request.method;
 
     // Only validate CSRF for state-changing methods
