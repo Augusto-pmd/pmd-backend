@@ -47,11 +47,15 @@ export class WorksService {
       throw new BadRequestException('User has no organization assigned');
     }
     
+    // Set supervisor_id if user is a SUPERVISOR and supervisor_id is not explicitly provided
+    const supervisorId = createWorkDto.supervisor_id || (user?.role?.name === UserRole.SUPERVISOR ? user.id : null);
+    
     const work = this.workRepository.create({
       ...createWorkDto,
       start_date: new Date(createWorkDto.start_date),
       end_date: createWorkDto.end_date ? new Date(createWorkDto.end_date) : null,
       organization_id: organizationId,
+      supervisor_id: supervisorId,
     });
 
     const savedWork = await this.workRepository.save(work);
