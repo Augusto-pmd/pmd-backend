@@ -42,6 +42,11 @@ export class WorksService {
 
   async create(createWorkDto: CreateWorkDto, user: User): Promise<Work> {
     const organizationId = getOrganizationId(user);
+    
+    if (!organizationId) {
+      throw new BadRequestException('User has no organization assigned');
+    }
+    
     const work = this.workRepository.create({
       ...createWorkDto,
       start_date: new Date(createWorkDto.start_date),
