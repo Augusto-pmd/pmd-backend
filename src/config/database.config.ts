@@ -97,10 +97,10 @@ export function databaseConfig(configService: ConfigService): TypeOrmModuleOptio
       synchronize: false,
       logging: nodeEnv === 'development',
       autoLoadEntities: true,
-      // No ejecutar migraciones automáticamente en producción
-      // La base de datos en Render ya tiene las tablas creadas
-      // Las migraciones deben ejecutarse manualmente cuando sea necesario
-      migrationsRun: false,
+      // ⚠️ TEMPORAL: Habilitado para ejecutar migración pendiente (post_closure_enabled_by_id)
+      // ⚠️ IMPORTANTE: Revertir a false después del deploy exitoso
+      // ⚠️ Las migraciones deben ejecutarse manualmente en producción normalmente
+      migrationsRun: true,
       migrations: getMigrationsPath(),
       retryAttempts: 3,
       retryDelay: 3000,
