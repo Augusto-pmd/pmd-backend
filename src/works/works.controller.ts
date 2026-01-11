@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Request,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -42,7 +43,11 @@ export class WorksController {
   @ApiResponse({ status: 201, description: 'Work created successfully' })
   @ApiResponse({ status: 400, description: 'Validation error' })
   @ApiResponse({ status: 403, description: 'Only Direction, Administration and Supervisor can create works' })
-  create(@Body() createWorkDto: CreateWorkDto, @Request() req) {
+  create(@Request() req, @Body() createWorkDto: CreateWorkDto) {
+    // Ensure authenticated user is passed explicitly to service
+    if (!req.user || !req.user.id) {
+      throw new BadRequestException('Authenticated user not found');
+    }
     return this.worksService.create(createWorkDto, req.user);
   }
 

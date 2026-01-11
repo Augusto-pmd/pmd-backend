@@ -41,6 +41,11 @@ export class WorksService {
   ) {}
 
   async create(createWorkDto: CreateWorkDto, user: User): Promise<Work> {
+    // Ensure user is provided
+    if (!user || !user.id) {
+      throw new BadRequestException('Authenticated user is required');
+    }
+    
     const organizationId = getOrganizationId(user);
     
     if (!organizationId) {
@@ -53,20 +58,24 @@ export class WorksService {
       : user?.role;
     const userRole = userRoleRaw ? String(userRoleRaw).toLowerCase() : null;
     
-    // Set supervisor_id if user is a SUPERVISOR and supervisor_id is not explicitly provided
-    // If supervisor_id is provided in DTO, use it; otherwise, if user is SUPERVISOR, set to user.id
-    const isSupervisor = userRole === UserRole.SUPERVISOR.toLowerCase();
-    const supervisorId = createWorkDto.supervisor_id ?? (isSupervisor && user?.id ? user.id : undefined);
+    // Determine supervisor_id: use DTO value if provided, otherwise set to user.id if user is SUPERVISOR
+    let supervisorId: string | undefined = undefined;
+    if (createWorkDto.supervisor_id) {
+      supervisorId = createWorkDto.supervisor_id;
+    } else if (userRole === UserRole.SUPERVISOR.toLowerCase() && user.id) {
+      supervisorId = user.id;
+    }
     
     // Exclude supervisor_id from spread to avoid undefined values
     const { supervisor_id: _, ...dtoWithoutSupervisorId } = createWorkDto;
     
+    // Create work entity with supervisor_id set explicitly
     const work = this.workRepository.create({
       ...dtoWithoutSupervisorId,
       start_date: new Date(createWorkDto.start_date),
       end_date: createWorkDto.end_date ? new Date(createWorkDto.end_date) : null,
       organization_id: organizationId,
-      ...(supervisorId !== undefined && { supervisor_id: supervisorId }),
+      supervisor_id: supervisorId,
     });
 
     const savedWork = await this.workRepository.save(work);
