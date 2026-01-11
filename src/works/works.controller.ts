@@ -56,7 +56,8 @@ export class WorksController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   findAll(@Request() req) {
-    return this.worksService.findAll(req.user);
+    // TEMPORAL: Respuesta estática para aislar el problema del 500
+    return [];
   }
 
   @Get(':id')
