@@ -73,12 +73,14 @@ export class WorksService {
       const organizationId = getOrganizationId(user);
       const queryBuilder = this.workRepository.createQueryBuilder('work');
 
+      // Filter by organization if user belongs to one
       if (organizationId) {
         queryBuilder.where('work.organization_id = :organizationId', {
           organizationId,
         });
       }
 
+      // Filter by supervisor if user is a SUPERVISOR
       if (user?.role?.name === UserRole.SUPERVISOR) {
         if (organizationId) {
           queryBuilder.andWhere('work.supervisor_id = :supervisorId', {
