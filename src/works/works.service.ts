@@ -69,37 +69,32 @@ export class WorksService {
   }
 
   async findAll(user: User): Promise<Work[]> {
-    try {
-      const organizationId = getOrganizationId(user);
-      const queryBuilder = this.workRepository.createQueryBuilder('work');
+    const organizationId = getOrganizationId(user);
+    const queryBuilder = this.workRepository.createQueryBuilder('work');
 
+    if (organizationId) {
+      queryBuilder.where('work.organization_id = :organizationId', {
+        organizationId,
+      });
+    }
+
+    if (user?.role?.name === UserRole.SUPERVISOR) {
       if (organizationId) {
-        queryBuilder.where('work.organization_id = :organizationId', {
-          organizationId,
+        queryBuilder.andWhere('work.supervisor_id = :supervisorId', {
+          supervisorId: user.id,
+        });
+      } else {
+        queryBuilder.where('work.supervisor_id = :supervisorId', {
+          supervisorId: user.id,
         });
       }
-
-      if (user?.role?.name === UserRole.SUPERVISOR) {
-        if (organizationId) {
-          queryBuilder.andWhere('work.supervisor_id = :supervisorId', {
-            supervisorId: user.id,
-          });
-        } else {
-          queryBuilder.where('work.supervisor_id = :supervisorId', {
-            supervisorId: user.id,
-          });
-        }
-      }
-
-      return await queryBuilder
-        .leftJoinAndSelect('work.supervisor', 'supervisor')
-        .leftJoinAndSelect('work.budgets', 'budgets')
-        .leftJoinAndSelect('work.contracts', 'contracts')
-        .getMany();
-    } catch (error) {
-      this.logger.error('Error fetching works', error);
-      return [];
     }
+
+    return await queryBuilder
+      .leftJoinAndSelect('work.supervisor', 'supervisor')
+      .leftJoinAndSelect('work.budgets', 'budgets')
+      .leftJoinAndSelect('work.contracts', 'contracts')
+      .getMany();
   }
 
   async findOne(id: string, user: User): Promise<Work> {
