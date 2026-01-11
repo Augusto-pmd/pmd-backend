@@ -47,9 +47,16 @@ export class WorksService {
       throw new BadRequestException('User has no organization assigned');
     }
     
+    // Normalize user role (handle both object { id, name } and string formats)
+    const userRoleRaw = typeof user?.role === 'object' && user?.role !== null 
+      ? user.role.name 
+      : user?.role;
+    const userRole = userRoleRaw ? String(userRoleRaw).toLowerCase() : null;
+    
     // Set supervisor_id if user is a SUPERVISOR and supervisor_id is not explicitly provided
     // If supervisor_id is provided in DTO, use it; otherwise, if user is SUPERVISOR, set to user.id
-    const supervisorId = createWorkDto.supervisor_id ?? (user?.role?.name === UserRole.SUPERVISOR ? user.id : undefined);
+    const isSupervisor = userRole === UserRole.SUPERVISOR.toLowerCase();
+    const supervisorId = createWorkDto.supervisor_id ?? (isSupervisor && user?.id ? user.id : undefined);
     
     // Exclude supervisor_id from spread to avoid undefined values
     const { supervisor_id: _, ...dtoWithoutSupervisorId } = createWorkDto;
