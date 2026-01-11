@@ -97,11 +97,10 @@ export function databaseConfig(configService: ConfigService): TypeOrmModuleOptio
       synchronize: false,
       logging: nodeEnv === 'development',
       autoLoadEntities: true,
-      // ⚠️ TEMPORAL: Habilitado para ejecutar migración pendiente (post_closure_enabled_by_id)
-      // ⚠️ IMPORTANTE: Revertir a false después del deploy exitoso
-      // ⚠️ Las migraciones deben ejecutarse manualmente en producción normalmente
-      migrationsRun: true,
-      migrations: getMigrationsPath(),
+      // PRODUCCIÓN VIVA: Migraciones deshabilitadas completamente
+      // La base de datos ya existe y NO debe modificarse automáticamente
+      migrationsRun: false,
+      migrations: [],
       retryAttempts: 3,
       retryDelay: 3000,
       // Always use SSL in production (Render) or when explicitly required
