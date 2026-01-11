@@ -48,14 +48,18 @@ export class WorksService {
     }
     
     // Set supervisor_id if user is a SUPERVISOR and supervisor_id is not explicitly provided
-    const supervisorId = createWorkDto.supervisor_id || (user?.role?.name === UserRole.SUPERVISOR ? user.id : null);
+    // If supervisor_id is provided in DTO, use it; otherwise, if user is SUPERVISOR, set to user.id
+    const supervisorId = createWorkDto.supervisor_id ?? (user?.role?.name === UserRole.SUPERVISOR ? user.id : undefined);
+    
+    // Exclude supervisor_id from spread to avoid undefined values
+    const { supervisor_id: _, ...dtoWithoutSupervisorId } = createWorkDto;
     
     const work = this.workRepository.create({
-      ...createWorkDto,
+      ...dtoWithoutSupervisorId,
       start_date: new Date(createWorkDto.start_date),
       end_date: createWorkDto.end_date ? new Date(createWorkDto.end_date) : null,
       organization_id: organizationId,
-      supervisor_id: supervisorId,
+      ...(supervisorId !== undefined && { supervisor_id: supervisorId }),
     });
 
     const savedWork = await this.workRepository.save(work);
