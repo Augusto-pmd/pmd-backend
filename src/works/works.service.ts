@@ -15,6 +15,7 @@ import { Income } from '../incomes/incomes.entity';
 import { Schedule } from '../schedule/schedule.entity';
 import { CreateWorkDto } from './dto/create-work.dto';
 import { UpdateWorkDto } from './dto/update-work.dto';
+import { WorkStatsDto } from './dto/work-stats.dto';
 import { User } from '../users/user.entity';
 import { UserRole } from '../common/enums/user-role.enum';
 import { ExpenseState } from '../common/enums/expense-state.enum';
@@ -437,6 +438,41 @@ export class WorksService {
     updatedWork.financial_progress = work.financial_progress;
 
     return await this.workRepository.save(updatedWork);
+  }
+
+  /**
+   * Get comprehensive statistics for a work
+   * Adapted from PMD-asistencias Contractor stats logic.
+   * 
+   * Provides:
+   * - Remaining balance (budget - expenses)
+   * - Profitability (incomes - expenses)
+   * - All progress indicators
+   */
+  async getWorkStats(id: string, user: User): Promise<WorkStatsDto> {
+    const work = await this.findOne(id, user);
+    
+    // Calculate remaining balance (adapted from Contractor.remaining_balance)
+    const totalBudget = Number(work.total_budget) || 0;
+    const totalExpenses = Number(work.total_expenses) || 0;
+    const remainingBalance = Math.max(0, totalBudget - totalExpenses);
+    
+    // Calculate profitability (incomes - expenses)
+    const totalIncomes = Number(work.total_incomes) || 0;
+    const profitability = totalIncomes - totalExpenses;
+    
+    return {
+      work_id: work.id,
+      work_name: work.name,
+      total_budget: totalBudget,
+      total_expenses: totalExpenses,
+      total_incomes: totalIncomes,
+      remaining_balance: remainingBalance,
+      physical_progress: Number(work.physical_progress) || 0,
+      economic_progress: Number(work.economic_progress) || 0,
+      financial_progress: Number(work.financial_progress) || 0,
+      profitability,
+    };
   }
 }
 

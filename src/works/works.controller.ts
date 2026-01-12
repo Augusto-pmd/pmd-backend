@@ -25,6 +25,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 import { WorksService } from './works.service';
 import { CreateWorkDto } from './dto/create-work.dto';
 import { UpdateWorkDto } from './dto/update-work.dto';
+import { WorkStatsDto } from './dto/work-stats.dto';
 
 @ApiTags('Works')
 @ApiBearerAuth('JWT-auth')
@@ -77,6 +78,21 @@ export class WorksController {
   @ApiResponse({ status: 404, description: 'Work not found' })
   findOne(@Param('id') id: string, @Request() req) {
     return this.worksService.findOne(id, req.user);
+  }
+
+  @Get(':id/stats')
+  @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Get work statistics',
+    description: 'Get comprehensive statistics for a work including remaining balance and profitability. Adapted from PMD-asistencias Contractor stats logic.',
+  })
+  @ApiParam({ name: 'id', description: 'Work UUID', type: String, format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Work statistics', type: WorkStatsDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Work does not belong to your organization' })
+  @ApiResponse({ status: 404, description: 'Work not found' })
+  getWorkStats(@Param('id') id: string, @Request() req): Promise<WorkStatsDto> {
+    return this.worksService.getWorkStats(id, req.user);
   }
 
   @Patch(':id')
