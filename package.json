@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/build-migrations.js",
+    "build": "tsc -p tsconfig.build.json && npm run build:migrations && npm run migration:run:prod",
     "build:migrations": "node scripts/build-migrations.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node dist/main.js",
@@ -22,6 +22,7 @@
     "test:e2e:setup": "ts-node scripts/setup-test-db.ts",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/data-source.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/data-source.ts",
+    "migration:run:prod": "node scripts/run-migrations.js",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/data-source.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/data-source.ts",
     "reset-admin-password": "ts-node scripts/reset-admin-password.ts",
