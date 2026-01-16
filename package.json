@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && npm run build:migrations",
+    "build": "tsc -p tsconfig.build.json && node scripts/build-migrations.js",
     "build:migrations": "node scripts/build-migrations.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node dist/main.js",
