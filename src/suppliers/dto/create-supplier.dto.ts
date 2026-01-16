@@ -54,6 +54,16 @@ export class CreateSupplierDto {
   phone?: string;
 
   @ApiPropertyOptional({
+    description: 'Contact person name',
+    example: 'Juan Pérez',
+    maxLength: 255,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  contact?: string;
+
+  @ApiPropertyOptional({
     description: 'Supplier category',
     example: 'Materiales',
     maxLength: 255,

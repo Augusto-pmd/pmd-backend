@@ -34,6 +34,9 @@ export class Supplier {
   phone: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
+  contact: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
   category: string;
 
   @Column({
