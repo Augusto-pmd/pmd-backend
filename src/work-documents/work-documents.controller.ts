@@ -14,6 +14,7 @@ import {
   Res,
   ParseFilePipe,
   MaxFileSizeValidator,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { WorkDocumentFileTypeValidator } from './validators/file-type.validator';
