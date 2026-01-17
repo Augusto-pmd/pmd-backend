@@ -259,8 +259,17 @@ export class WorkDocumentsService {
     this.logger.log(`[downloadFile] Document ${id} file_url (original): ${document.file_url}`);
     this.logger.log(`[downloadFile] Document ${id} file_url (decoded): ${decodedFileUrl}`);
 
-    // Si es una URL de cloud storage, retornar la URL para redirección
+    // Si es una URL de cloud storage, convertir a URL de descarga directa si es necesario
     if (decodedFileUrl.startsWith('http://') || decodedFileUrl.startsWith('https://')) {
+      // Convertir webViewLink de Google Drive a URL de descarga directa
+      const googleDriveViewMatch = decodedFileUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (googleDriveViewMatch) {
+        const fileId = googleDriveViewMatch[1];
+        const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+        this.logger.log(`[downloadFile] Google Drive webViewLink detected, converting to download URL: ${downloadUrl}`);
+        return { redirectUrl: downloadUrl };
+      }
+      
       this.logger.log(`[downloadFile] Cloud storage URL detected, redirecting to: ${decodedFileUrl}`);
       return { redirectUrl: decodedFileUrl };
     }
