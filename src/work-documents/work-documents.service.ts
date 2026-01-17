@@ -261,12 +261,32 @@ export class WorkDocumentsService {
 
     // Si es una URL de cloud storage, intentar descargar usando la API
     if (decodedFileUrl.startsWith('http://') || decodedFileUrl.startsWith('https://')) {
+      let fileId: string | null = null;
+      
       // Detectar si es una URL de Google Drive
       const googleDriveViewMatch = decodedFileUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
       if (googleDriveViewMatch) {
+        fileId = googleDriveViewMatch[1];
+      }
+      
+      // Detectar si es una URL de Google Sheets/Docs (docs.google.com)
+      if (!fileId) {
+        const googleDocsMatch = decodedFileUrl.match(/docs\.google\.com\/(?:spreadsheets|document|presentation|drawings|forms)\/d\/([a-zA-Z0-9_-]+)/);
+        if (googleDocsMatch) {
+          fileId = googleDocsMatch[1];
+          this.logger.log(`[downloadFile] Google Docs/Sheets URL detected, extracted file ID: ${fileId}`);
+        }
+      }
+      
+      // Si encontramos un fileId (ya sea de Drive o Docs/Sheets), usar la API
+      if (fileId) {
         try {
+          // Construir una URL de Google Drive usando el fileId
+          const driveUrl = `https://drive.google.com/file/d/${fileId}/view`;
+          this.logger.log(`[downloadFile] Using Google Drive API to download file ID: ${fileId}`);
+          
           // Usar la API de Google Drive para descargar el archivo directamente
-          const downloadResult = await this.storageService.downloadFile(decodedFileUrl);
+          const downloadResult = await this.storageService.downloadFile(driveUrl);
           if (downloadResult) {
             this.logger.log(`[downloadFile] Google Drive file downloaded via API: ${downloadResult.fileName}`);
             // El stream de Google Drive es un NodeJS.ReadableStream, compatible con .pipe()
@@ -278,12 +298,15 @@ export class WorkDocumentsService {
           }
         } catch (error) {
           this.logger.error(`[downloadFile] Failed to download from Google Drive API: ${error.message}`, error.stack);
-          // Fallback: intentar redirección directa
-          this.logger.warn(`[downloadFile] Falling back to direct download URL for Google Drive`);
+          // No hacer fallback a redirección - si la API falla, lanzar el error
+          // porque redirigir a Google Sheets requiere autenticación y no funcionará
+          throw new NotFoundException(
+            `Failed to download file from Google Drive. The file may not be accessible or the credentials may be incorrect. Error: ${error.message}`
+          );
         }
       }
       
-      // Para otros servicios de cloud storage o si la API falla, redirigir
+      // Para otros servicios de cloud storage (Dropbox, etc.), redirigir
       this.logger.log(`[downloadFile] Cloud storage URL detected, redirecting to: ${decodedFileUrl}`);
       return { redirectUrl: decodedFileUrl };
     }
