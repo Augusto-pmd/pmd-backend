@@ -160,14 +160,26 @@ export class WorkDocumentsController {
     @Res() res: Response,
   ) {
     try {
-      const { stream, fileName } = await this.workDocumentsService.downloadFile(id, req.user);
-      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-      stream.pipe(res);
+      const result = await this.workDocumentsService.downloadFile(id, req.user);
+      
+      // Si es una redirección a cloud storage
+      if ('redirectUrl' in result) {
+        return res.redirect(result.redirectUrl);
+      }
+      
+      // Si es un archivo local
+      if ('stream' in result && 'fileName' in result) {
+        res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+        result.stream.pipe(res);
+      }
     } catch (error) {
-      // Si es una URL de cloud storage, redirigir
-      const document = await this.workDocumentsService.findOne(id, req.user);
-      if (document.file_url && (document.file_url.startsWith('http://') || document.file_url.startsWith('https://'))) {
-        return res.redirect(document.file_url);
+      // Si el error es NotFoundException, retornar 404 con mensaje descriptivo
+      if (error instanceof NotFoundException) {
+        return res.status(404).json({
+          statusCode: 404,
+          message: error.message,
+          error: 'Not Found',
+        });
       }
       throw error;
     }
