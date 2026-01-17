@@ -34,17 +34,23 @@ export class GoogleDriveService {
   private isEnabled: boolean = false;
 
   constructor(private configService: ConfigService) {
-    this.clientId = this.configService.get<string>('GOOGLE_DRIVE_CLIENT_ID') || null;
-    this.clientSecret = this.configService.get<string>('GOOGLE_DRIVE_CLIENT_SECRET') || null;
-    this.refreshToken = this.configService.get<string>('GOOGLE_DRIVE_REFRESH_TOKEN') || null;
-    this.folderId = this.configService.get<string>('GOOGLE_DRIVE_FOLDER_ID') || null;
+    this.clientId = this.configService.get<string>('GOOGLE_DRIVE_CLIENT_ID')?.trim() || null;
+    this.clientSecret = this.configService.get<string>('GOOGLE_DRIVE_CLIENT_SECRET')?.trim() || null;
+    this.refreshToken = this.configService.get<string>('GOOGLE_DRIVE_REFRESH_TOKEN')?.trim() || null;
+    this.folderId = this.configService.get<string>('GOOGLE_DRIVE_FOLDER_ID')?.trim() || null;
 
     this.isEnabled = !!(this.clientId && this.clientSecret && this.refreshToken);
 
     if (this.isEnabled) {
       this.logger.log('Google Drive storage is enabled');
+      // Log partial credentials for debugging (don't log full secrets)
+      this.logger.debug(`Client ID: ${this.clientId?.substring(0, 20)}...`);
+      this.logger.debug(`Refresh Token: ${this.refreshToken?.substring(0, 20)}...`);
     } else {
-      this.logger.debug('Google Drive storage is disabled (missing credentials)');
+      this.logger.warn('Google Drive storage is disabled (missing credentials)');
+      if (!this.clientId) this.logger.warn('  - GOOGLE_DRIVE_CLIENT_ID is missing');
+      if (!this.clientSecret) this.logger.warn('  - GOOGLE_DRIVE_CLIENT_SECRET is missing');
+      if (!this.refreshToken) this.logger.warn('  - GOOGLE_DRIVE_REFRESH_TOKEN is missing');
     }
   }
 
@@ -73,14 +79,34 @@ export class GoogleDriveService {
       }
       const { google } = googleapis;
       
+      // Validate credentials format before creating OAuth2 client
+      if (!this.clientId || !this.clientSecret || !this.refreshToken) {
+        throw new Error('Google Drive credentials are incomplete. Please check environment variables.');
+      }
+
+      // Remove any leading/trailing whitespace that might cause issues
+      const clientId = this.clientId.trim();
+      const clientSecret = this.clientSecret.trim();
+      const refreshToken = this.refreshToken.trim();
+
+      // Validate Client ID format (should end with .apps.googleusercontent.com)
+      if (!clientId.includes('.apps.googleusercontent.com')) {
+        this.logger.warn(`Client ID format may be incorrect: ${clientId.substring(0, 30)}...`);
+      }
+
+      // Validate Refresh Token format (should start with 1//)
+      if (!refreshToken.startsWith('1//')) {
+        this.logger.warn(`Refresh Token format may be incorrect: ${refreshToken.substring(0, 20)}...`);
+      }
+
       const auth = new google.auth.OAuth2(
-        this.clientId!,
-        this.clientSecret!,
+        clientId,
+        clientSecret,
         'urn:ietf:wg:oauth:2.0:oob', // Redirect URI (not used for refresh token)
       );
 
       auth.setCredentials({
-        refresh_token: this.refreshToken!,
+        refresh_token: refreshToken,
       });
 
       const drive = google.drive({ version: 'v3', auth });
@@ -142,14 +168,18 @@ export class GoogleDriveService {
       }
       const { google } = googleapis;
       
+      const clientId = this.clientId!.trim();
+      const clientSecret = this.clientSecret!.trim();
+      const refreshToken = this.refreshToken!.trim();
+
       const auth = new google.auth.OAuth2(
-        this.clientId!,
-        this.clientSecret!,
+        clientId,
+        clientSecret,
         'urn:ietf:wg:oauth:2.0:oob',
       );
 
       auth.setCredentials({
-        refresh_token: this.refreshToken!,
+        refresh_token: refreshToken,
       });
 
       const drive = google.drive({ version: 'v3', auth });
@@ -183,14 +213,18 @@ export class GoogleDriveService {
       }
       const { google } = googleapis;
       
+      const clientId = this.clientId!.trim();
+      const clientSecret = this.clientSecret!.trim();
+      const refreshToken = this.refreshToken!.trim();
+
       const auth = new google.auth.OAuth2(
-        this.clientId!,
-        this.clientSecret!,
+        clientId,
+        clientSecret,
         'urn:ietf:wg:oauth:2.0:oob',
       );
 
       auth.setCredentials({
-        refresh_token: this.refreshToken!,
+        refresh_token: refreshToken,
       });
 
       const drive = google.drive({ version: 'v3', auth });
