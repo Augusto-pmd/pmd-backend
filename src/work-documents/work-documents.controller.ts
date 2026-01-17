@@ -168,9 +168,13 @@ export class WorkDocumentsController {
         return res.redirect(result.redirectUrl);
       }
       
-      // Si es un archivo local
+      // Si es un archivo (local o descargado de cloud storage)
       if ('stream' in result && 'fileName' in result) {
         res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+        // Si hay mimeType (archivos de cloud storage), establecer Content-Type
+        if ('mimeType' in result && result.mimeType) {
+          res.setHeader('Content-Type', result.mimeType);
+        }
         result.stream.pipe(res);
       }
     } catch (error) {

@@ -235,7 +235,7 @@ export class WorkDocumentsService {
     }
   }
 
-  async downloadFile(id: string, user: User): Promise<{ stream: fs.ReadStream; fileName: string } | { redirectUrl: string }> {
+  async downloadFile(id: string, user: User): Promise<{ stream: fs.ReadStream | NodeJS.ReadableStream; fileName: string; mimeType?: string } | { redirectUrl: string }> {
     const document = await this.findOne(id, user);
     
     if (!document.file_url) {
@@ -259,17 +259,31 @@ export class WorkDocumentsService {
     this.logger.log(`[downloadFile] Document ${id} file_url (original): ${document.file_url}`);
     this.logger.log(`[downloadFile] Document ${id} file_url (decoded): ${decodedFileUrl}`);
 
-    // Si es una URL de cloud storage, convertir a URL de descarga directa si es necesario
+    // Si es una URL de cloud storage, intentar descargar usando la API
     if (decodedFileUrl.startsWith('http://') || decodedFileUrl.startsWith('https://')) {
-      // Convertir webViewLink de Google Drive a URL de descarga directa
+      // Detectar si es una URL de Google Drive
       const googleDriveViewMatch = decodedFileUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
       if (googleDriveViewMatch) {
-        const fileId = googleDriveViewMatch[1];
-        const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-        this.logger.log(`[downloadFile] Google Drive webViewLink detected, converting to download URL: ${downloadUrl}`);
-        return { redirectUrl: downloadUrl };
+        try {
+          // Usar la API de Google Drive para descargar el archivo directamente
+          const downloadResult = await this.storageService.downloadFile(decodedFileUrl);
+          if (downloadResult) {
+            this.logger.log(`[downloadFile] Google Drive file downloaded via API: ${downloadResult.fileName}`);
+            // El stream de Google Drive es un NodeJS.ReadableStream, compatible con .pipe()
+            return {
+              stream: downloadResult.stream,
+              fileName: downloadResult.fileName,
+              mimeType: downloadResult.mimeType,
+            };
+          }
+        } catch (error) {
+          this.logger.error(`[downloadFile] Failed to download from Google Drive API: ${error.message}`, error.stack);
+          // Fallback: intentar redirección directa
+          this.logger.warn(`[downloadFile] Falling back to direct download URL for Google Drive`);
+        }
       }
       
+      // Para otros servicios de cloud storage o si la API falla, redirigir
       this.logger.log(`[downloadFile] Cloud storage URL detected, redirecting to: ${decodedFileUrl}`);
       return { redirectUrl: decodedFileUrl };
     }

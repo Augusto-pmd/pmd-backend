@@ -109,6 +109,40 @@ export class StorageService {
   }
 
   /**
+   * Download a file from cloud storage as a stream
+   * @param fileUrl - URL of the file to download
+   * @returns Promise resolving to { stream: Readable, fileName: string, mimeType: string } or null if not supported
+   */
+  async downloadFile(fileUrl: string): Promise<{ stream: NodeJS.ReadableStream; fileName: string; mimeType: string } | null> {
+    // If it's a local path, return null (let caller handle it)
+    if (!fileUrl.startsWith('http://') && !fileUrl.startsWith('https://')) {
+      return null;
+    }
+
+    try {
+      switch (this.storageType) {
+        case 'google-drive':
+          if (fileUrl.includes('drive.google.com')) {
+            return await this.googleDriveService.downloadFile(fileUrl);
+          }
+          break;
+        case 'dropbox':
+          if (fileUrl.includes('dropbox.com')) {
+            // Dropbox download would be implemented here if needed
+            throw new Error('Dropbox download not yet implemented');
+          }
+          break;
+        default:
+          break;
+      }
+      return null;
+    } catch (error) {
+      this.logger.error(`Failed to download file from ${this.storageType}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
    * Check if cloud storage is configured
    */
   isCloudStorageEnabled(): boolean {

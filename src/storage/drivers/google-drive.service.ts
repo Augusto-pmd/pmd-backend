@@ -143,6 +143,85 @@ export class GoogleDriveService {
   }
 
   /**
+   * Download a file from Google Drive as a stream
+   * @param fileUrl - Google Drive file URL (webViewLink or file ID)
+   * @returns Promise resolving to { stream: Readable, fileName: string, mimeType: string }
+   */
+  async downloadFile(fileUrl: string): Promise<{ stream: NodeJS.ReadableStream; fileName: string; mimeType: string }> {
+    if (!this.isEnabled) {
+      throw new Error('Google Drive is not configured');
+    }
+
+    try {
+      // Extract file ID from URL
+      let fileId: string;
+      const fileIdMatch = fileUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (fileIdMatch) {
+        fileId = fileIdMatch[1];
+      } else if (/^[a-zA-Z0-9_-]+$/.test(fileUrl)) {
+        // If it's already just a file ID
+        fileId = fileUrl;
+      } else {
+        throw new Error('Invalid Google Drive URL');
+      }
+
+      // Dynamic import
+      let googleapis;
+      try {
+        googleapis = await import('googleapis');
+      } catch (importError) {
+        throw new Error('googleapis package is not installed. Run: npm install googleapis');
+      }
+      const { google } = googleapis;
+      
+      const clientId = this.clientId!.trim();
+      const clientSecret = this.clientSecret!.trim();
+      const refreshToken = this.refreshToken!.trim();
+
+      const auth = new google.auth.OAuth2(
+        clientId,
+        clientSecret,
+        'urn:ietf:wg:oauth:2.0:oob',
+      );
+
+      auth.setCredentials({
+        refresh_token: refreshToken,
+      });
+
+      const drive = google.drive({ version: 'v3', auth });
+
+      // Get file metadata to get the file name and MIME type
+      const fileMetadata = await drive.files.get({
+        fileId: fileId,
+        fields: 'name, mimeType',
+      });
+
+      const fileName = fileMetadata.data.name || 'file';
+      const mimeType = fileMetadata.data.mimeType || 'application/octet-stream';
+
+      // Download the file as a stream
+      const response = await drive.files.get(
+        {
+          fileId: fileId,
+          alt: 'media',
+        },
+        { responseType: 'stream' },
+      );
+
+      this.logger.log(`File downloaded from Google Drive: ${fileId} (${fileName})`);
+
+      return {
+        stream: response.data,
+        fileName,
+        mimeType,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to download file from Google Drive: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
    * Delete a file from Google Drive
    */
   async deleteFile(fileUrl: string): Promise<void> {
