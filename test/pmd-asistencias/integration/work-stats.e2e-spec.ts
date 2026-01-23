@@ -4,6 +4,8 @@ import { TestApp, TestDataBuilder } from '../../integration/test-helpers';
 import { UserRole } from '../../../src/common/enums/user-role.enum';
 import { Currency } from '../../../src/common/enums/currency.enum';
 import { ExpenseState } from '../../../src/common/enums/expense-state.enum';
+import { BudgetType } from '../../../src/common/enums/budget-type.enum';
+import { DocumentType } from '../../../src/common/enums/document-type.enum';
 
 /**
  * Integration tests for GET /api/works/:id/stats endpoint
@@ -113,7 +115,7 @@ describe('Work Stats Endpoint (PMD Asistencias) - E2E', () => {
     const workBudgetRepo = testApp.getDataSource().getRepository(WorkBudget);
     workBudget = workBudgetRepo.create({
       work_id: work.id,
-      type: 'initial',
+      type: BudgetType.INITIAL,
       amount: 1000000,
       description: 'Initial budget',
       date: new Date(),
@@ -134,9 +136,10 @@ describe('Work Stats Endpoint (PMD Asistencias) - E2E', () => {
       amount: 200000,
       currency: Currency.ARS,
       purchase_date: new Date(),
-      document_type: 'invoice_a',
+      document_type: DocumentType.INVOICE_A,
       document_number: '0001-00001234',
       state: ExpenseState.VALIDATED,
+      created_by_id: adminUser.id,
     });
     await expenseRepo.save(expense1);
 
@@ -146,9 +149,10 @@ describe('Work Stats Endpoint (PMD Asistencias) - E2E', () => {
       amount: 150000,
       currency: Currency.ARS,
       purchase_date: new Date(),
-      document_type: 'invoice_a',
+      document_type: DocumentType.INVOICE_A,
       document_number: '0001-00001235',
       state: ExpenseState.VALIDATED,
+      created_by_id: adminUser.id,
     });
     await expenseRepo.save(expense2);
   });

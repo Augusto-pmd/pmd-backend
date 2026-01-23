@@ -11,6 +11,8 @@ import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
+import { EmployeesModule } from './employees/employees.module';
+import { AttendanceModule } from './attendance/attendance.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { SupplierDocumentsModule } from './supplier-documents/supplier-documents.module';
 import { WorksModule } from './works/works.module';
@@ -80,6 +82,8 @@ import { HealthModule } from './health/health.module';
     AuthModule,
     UsersModule,
     RolesModule,
+    EmployeesModule,
+    AttendanceModule,
     SuppliersModule,
     SupplierDocumentsModule,
     WorksModule,

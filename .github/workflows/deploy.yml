@@ -39,19 +39,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            ${{ env.FRONTEND_DIR }}/package-lock.json
-            ${{ env.FRONTEND_DIR }}/yarn.lock
-            ${{ env.FRONTEND_DIR }}/pnpm-lock.yaml
+          cache: 'yarn'
 
       # 3. Instalar dependencias Backend
       - name: Install backend dependencies
         id: backend-install
         run: |
           echo "📦 Installing backend dependencies..."
-          npm ci
+          yarn install --frozen-lockfile
           echo "✅ Backend dependencies installed"
         continue-on-error: false
 
@@ -69,7 +64,7 @@ jobs:
         id: backend-lint
         run: |
           echo "🔍 Running ESLint for backend..."
-          npm run lint || (echo "⚠️ Lint issues found but continuing..." && exit 0)
+          yarn lint || (echo "⚠️ Lint issues found but continuing..." && exit 0)
           echo "✅ Backend lint completed"
         continue-on-error: true
 
@@ -78,7 +73,7 @@ jobs:
         id: backend-build
         run: |
           echo "🏗️ Building backend..."
-          npm run build
+          yarn build
           echo "✅ Backend build completed successfully"
           echo "build_output=dist" >> $GITHUB_OUTPUT
         continue-on-error: false
