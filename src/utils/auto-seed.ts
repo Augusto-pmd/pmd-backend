@@ -78,6 +78,8 @@ export async function autoSeedIfNeeded(appDataSource: DataSource): Promise<boole
             reports: ['read'],
             settings: ['read', 'update', 'manage'],
             schedule: ['create', 'read', 'update', 'delete', 'manage'], // Control total sobre cronograma
+            employees: ['create', 'read', 'update', 'delete', 'manage'], // Gestión de empleados (RRHH)
+            attendance: ['create', 'read', 'update', 'delete', 'manage'], // Control de asistencia
           },
         },
         {
@@ -95,6 +97,8 @@ export async function autoSeedIfNeeded(appDataSource: DataSource): Promise<boole
             alerts: ['read'], // Solo lectura
             reports: ['read'], // Solo lectura
             schedule: ['read', 'update'], // Puede marcar etapas como completadas, no puede editar estructura
+            employees: ['read'], // Puede ver empleados
+            attendance: ['read', 'create', 'update'], // Puede registrar y ver asistencia
             // NO users, NO roles, NO accounting, NO audit, NO puede crear/validar expenses
           },
         },
@@ -115,6 +119,8 @@ export async function autoSeedIfNeeded(appDataSource: DataSource): Promise<boole
             reports: ['read'],
             settings: ['read'],
             schedule: ['read'], // Solo consulta, no puede editar cronograma
+            employees: ['create', 'read', 'update', 'delete', 'manage'], // Gestión completa de empleados
+            attendance: ['create', 'read', 'update', 'delete', 'manage'], // Gestión completa de asistencia
             // NO users, NO roles, NO audit, NO puede reopen meses, NO puede override contratos bloqueados
           },
         },
@@ -130,6 +136,8 @@ export async function autoSeedIfNeeded(appDataSource: DataSource): Promise<boole
             documents: ['read', 'create'], // Puede crear documentos
             alerts: ['read'], // Solo lectura
             schedule: ['read'], // Solo consulta básica de cronogramas de obras asignadas
+            employees: ['read'], // Solo lectura de empleados
+            attendance: ['read', 'create'], // Puede registrar su propia asistencia
             // NO accounting, NO contracts, NO users, NO roles
           },
         },
