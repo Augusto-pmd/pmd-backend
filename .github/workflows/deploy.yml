@@ -40,11 +40,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            ${{ env.FRONTEND_DIR }}/package-lock.json
-            ${{ env.FRONTEND_DIR }}/yarn.lock
-            ${{ env.FRONTEND_DIR }}/pnpm-lock.yaml
+          cache-dependency-path: package-lock.json
 
       # 3. Instalar dependencias Backend
       - name: Install backend dependencies

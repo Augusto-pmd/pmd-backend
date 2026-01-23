@@ -21,16 +21,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'yarn'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: Build project
-        run: yarn build
+        run: npm run build
 
       - name: Lint
-        run: yarn lint || true
+        run: npm run lint || true
 
       - name: Type check
         run: npx tsc --noEmit
