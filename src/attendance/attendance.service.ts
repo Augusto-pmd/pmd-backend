@@ -51,6 +51,7 @@ export class AttendanceService {
       const organizationId = getOrganizationId(user);
       const qb = this.attendanceRepository
         .createQueryBuilder('attendance')
+        .leftJoinAndSelect('attendance.employee', 'employee')
         .orderBy('attendance.date', 'DESC')
         .addOrderBy('attendance.created_at', 'DESC');
 
@@ -61,9 +62,6 @@ export class AttendanceService {
       }
 
       if (filters?.week_start_date) {
-        const weekStart = new Date(filters.week_start_date);
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
         qb.andWhere('attendance.week_start_date = :week_start_date', {
           week_start_date: filters.week_start_date,
         });
@@ -75,8 +73,11 @@ export class AttendanceService {
         });
       }
 
-      // Note: work_id filter would require joining with Employee table
-      // This will be implemented when Employee entity exists
+      if (filters?.work_id) {
+        qb.andWhere('employee.work_id = :work_id', {
+          work_id: filters.work_id,
+        });
+      }
 
       return await qb.getMany();
     } catch (error) {
@@ -92,6 +93,7 @@ export class AttendanceService {
     const organizationId = getOrganizationId(user);
     const qb = this.attendanceRepository
       .createQueryBuilder('attendance')
+      .leftJoinAndSelect('attendance.employee', 'employee')
       .where('attendance.week_start_date = :week_start_date', {
         week_start_date: weekStartDate,
       })
@@ -112,6 +114,7 @@ export class AttendanceService {
   async findOne(id: string, user: User): Promise<Attendance> {
     const attendance = await this.attendanceRepository.findOne({
       where: { id },
+      relations: ['employee', 'organization'],
     });
 
     if (!attendance) {

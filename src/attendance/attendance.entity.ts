@@ -8,10 +8,9 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Organization } from '../organizations/organization.entity';
+import { Employee } from '../employees/employees.entity';
 import { AttendanceStatus } from '../common/enums/attendance-status.enum';
 
-// Forward reference to Employee (will be resolved when Employee entity exists)
-// For now, we use string type for employee_id
 @Entity('attendance')
 export class Attendance {
   @PrimaryGeneratedColumn('uuid')
@@ -20,10 +19,9 @@ export class Attendance {
   @Column({ type: 'uuid', name: 'employee_id' })
   employee_id: string;
 
-  // ManyToOne relation will be added when Employee entity exists
-  // @ManyToOne(() => Employee, { onDelete: 'CASCADE' })
-  // @JoinColumn({ name: 'employee_id' })
-  // employee: Employee;
+  @ManyToOne(() => Employee, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'employee_id' })
+  employee: Employee;
 
   @Column({ type: 'date' })
   date: Date;
