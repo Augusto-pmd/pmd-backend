@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DataSource, DataSourceOptions } from 'typeorm';
+import { Organization } from '../../src/organizations/organization.entity';
 import { Role } from '../../src/roles/role.entity';
 import { User } from '../../src/users/user.entity';
 import { Rubric } from '../../src/rubrics/rubrics.entity';
@@ -19,6 +20,9 @@ import { Schedule } from '../../src/schedule/schedule.entity';
 import { Alert } from '../../src/alerts/alerts.entity';
 import { AccountingRecord } from '../../src/accounting/accounting.entity';
 import { AuditLog } from '../../src/audit/audit.entity';
+import { Employee } from '../../src/employees/employees.entity';
+import { Attendance } from '../../src/attendance/attendance.entity';
+import { EmployeeAdvance } from '../../src/employee-advances/employee-advances.entity';
 
 export const getTestDataSource = (): DataSourceOptions => ({
   type: 'postgres',
@@ -28,6 +32,7 @@ export const getTestDataSource = (): DataSourceOptions => ({
   password: process.env.TEST_DB_PASSWORD || 'postgres',
   database: process.env.TEST_DB_DATABASE || 'pmd_management_test',
   entities: [
+    Organization,
     Role,
     User,
     Rubric,
@@ -45,6 +50,9 @@ export const getTestDataSource = (): DataSourceOptions => ({
     Alert,
     AccountingRecord,
     AuditLog,
+    Employee,
+    Attendance,
+    EmployeeAdvance,
   ],
   // Use migrations instead of synchronize to ensure enums are created correctly
   migrations: ['src/migrations/*.ts'],

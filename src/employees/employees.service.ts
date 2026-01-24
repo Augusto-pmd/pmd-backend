@@ -83,17 +83,6 @@ export class EmployeesService {
       throw new NotFoundException(`Employee with ID ${id} not found`);
     }
 
-    const organizationId = getOrganizationId(user);
-    if (
-      organizationId &&
-      employee.organization_id &&
-      employee.organization_id !== organizationId
-    ) {
-      throw new ForbiddenException(
-        'El empleado no pertenece a tu organización',
-      );
-    }
-
     return employee;
   }
 
