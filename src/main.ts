@@ -134,6 +134,7 @@ async function bootstrap() {
     .addTag('Roles', 'Role management endpoints')
     .addTag('Employees', 'Employee (RRHH) management endpoints')
     .addTag('Attendance', 'Employee attendance management endpoints')
+    .addTag('Employee Advances', 'Employee advances management endpoints')
     .addTag('Suppliers', 'Supplier management endpoints')
     .addTag('Supplier Documents', 'Supplier document management endpoints')
     .addTag('Works', 'Work/Project management endpoints')

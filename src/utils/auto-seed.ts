@@ -80,6 +80,7 @@ export async function autoSeedIfNeeded(appDataSource: DataSource): Promise<boole
             schedule: ['create', 'read', 'update', 'delete', 'manage'], // Control total sobre cronograma
             employees: ['create', 'read', 'update', 'delete', 'manage'], // Gestión de empleados (RRHH)
             attendance: ['create', 'read', 'update', 'delete', 'manage'], // Control de asistencia
+            employee_advances: ['create', 'read', 'update', 'delete', 'manage'], // Adelantos de empleados
           },
         },
         {
@@ -99,6 +100,7 @@ export async function autoSeedIfNeeded(appDataSource: DataSource): Promise<boole
             schedule: ['read', 'update'], // Puede marcar etapas como completadas, no puede editar estructura
             employees: ['read'], // Puede ver empleados
             attendance: ['read', 'create', 'update'], // Puede registrar y ver asistencia
+            employee_advances: ['read', 'create', 'update'], // Adelantos (según migración 0049)
             // NO users, NO roles, NO accounting, NO audit, NO puede crear/validar expenses
           },
         },
@@ -121,6 +123,7 @@ export async function autoSeedIfNeeded(appDataSource: DataSource): Promise<boole
             schedule: ['read'], // Solo consulta, no puede editar cronograma
             employees: ['create', 'read', 'update', 'delete', 'manage'], // Gestión completa de empleados
             attendance: ['create', 'read', 'update', 'delete', 'manage'], // Gestión completa de asistencia
+            employee_advances: ['create', 'read', 'update', 'delete', 'manage'], // Adelantos de empleados
             // NO users, NO roles, NO audit, NO puede reopen meses, NO puede override contratos bloqueados
           },
         },
@@ -138,6 +141,7 @@ export async function autoSeedIfNeeded(appDataSource: DataSource): Promise<boole
             schedule: ['read'], // Solo consulta básica de cronogramas de obras asignadas
             employees: ['read'], // Solo lectura de empleados
             attendance: ['read', 'create'], // Puede registrar su propia asistencia
+            employee_advances: ['read', 'create'], // Adelantos (según migración 0049)
             // NO accounting, NO contracts, NO users, NO roles
           },
         },

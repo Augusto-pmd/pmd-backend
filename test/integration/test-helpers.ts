@@ -16,6 +16,7 @@ import { SupplierDocumentType } from '../../src/common/enums/supplier-document-t
 import { CashboxStatus } from '../../src/common/enums/cashbox-status.enum';
 import { Role } from '../../src/roles/role.entity';
 import { User } from '../../src/users/user.entity';
+import { Organization } from '../../src/organizations/organization.entity';
 import * as bcrypt from 'bcrypt';
 
 export class TestApp {
@@ -177,6 +178,19 @@ export class TestDataBuilder {
 
   constructor(dataSource: DataSource) {
     this.dataSource = dataSource;
+  }
+
+  async createOrganization(
+    name: string,
+    overrides?: Partial<Organization>,
+  ): Promise<Organization> {
+    const orgRepo = this.dataSource.getRepository(Organization);
+    const org = orgRepo.create({
+      name,
+      description: overrides?.description ?? null,
+      ...overrides,
+    });
+    return await orgRepo.save(org);
   }
 
   async createRole(name: UserRole, description?: string): Promise<Role> {

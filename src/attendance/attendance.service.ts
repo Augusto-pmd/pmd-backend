@@ -89,7 +89,11 @@ export class AttendanceService {
   /**
    * Get weekly attendance sheet (all employees for a week)
    */
-  async getWeeklyAttendance(weekStartDate: string, user: User): Promise<Attendance[]> {
+  async getWeeklyAttendance(
+    weekStartDate: string,
+    user: User,
+    filterByOrganization = false,
+  ): Promise<Attendance[]> {
     const organizationId = getOrganizationId(user);
     const qb = this.attendanceRepository
       .createQueryBuilder('attendance')
@@ -99,7 +103,9 @@ export class AttendanceService {
       })
       .orderBy('attendance.date', 'ASC');
 
-    if (organizationId) {
+    // Mantener el comportamiento global: por defecto NO filtrar por organización.
+    // Solo filtrar cuando el frontend/envíe filterByOrganization=true.
+    if (filterByOrganization === true && organizationId) {
       qb.andWhere('attendance.organization_id = :organizationId', {
         organizationId,
       });
@@ -119,17 +125,6 @@ export class AttendanceService {
 
     if (!attendance) {
       throw new NotFoundException(`Attendance with ID ${id} not found`);
-    }
-
-    const organizationId = getOrganizationId(user);
-    if (
-      organizationId &&
-      attendance.organization_id &&
-      attendance.organization_id !== organizationId
-    ) {
-      throw new BadRequestException(
-        'La asistencia no pertenece a tu organización',
-      );
     }
 
     return attendance;

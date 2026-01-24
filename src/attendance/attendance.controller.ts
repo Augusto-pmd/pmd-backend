@@ -113,8 +113,10 @@ export class AttendanceController {
   getWeeklyAttendance(
     @Param('week_start_date') weekStartDate: string,
     @Request() req,
+    @Query('filterByOrganization') filterByOrganization?: string,
   ) {
-    return this.attendanceService.getWeeklyAttendance(weekStartDate, req.user);
+    const filterByOrg = filterByOrganization === 'true' || filterByOrganization === '1';
+    return this.attendanceService.getWeeklyAttendance(weekStartDate, req.user, filterByOrg);
   }
 
   @Get(':id')
