@@ -34,6 +34,24 @@ import { RejectExpenseDto } from './dto/reject-expense.dto';
 export class ExpensesController {
   constructor(private readonly expensesService: ExpensesService) {}
 
+  @Post('from-payment/:payment_id')
+  @Roles(UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Crear gasto manual desde un pago de empleado (EmployeePayment)',
+    description:
+      'Crea un Expense desde un EmployeePayment si no tiene expense asociado. Idempotente.',
+  })
+  @ApiParam({
+    name: 'payment_id',
+    description: 'EmployeePayment UUID',
+    type: String,
+    format: 'uuid',
+  })
+  @ApiResponse({ status: 201, description: 'Expense creado desde pago' })
+  createFromPayment(@Param('payment_id') paymentId: string, @Request() req) {
+    return this.expensesService.createFromEmployeePayment(paymentId, req.user);
+  }
+
   @Post()
   @Roles(UserRole.OPERATOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
   @ApiOperation({

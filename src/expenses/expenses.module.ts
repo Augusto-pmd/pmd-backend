@@ -9,6 +9,7 @@ import { Supplier } from '../suppliers/suppliers.entity';
 import { Contract } from '../contracts/contracts.entity';
 import { AccountingRecord } from '../accounting/accounting.entity';
 import { SupplierDocument } from '../supplier-documents/supplier-documents.entity';
+import { EmployeePayment } from '../payroll/employee-payments.entity';
 import { AlertsModule } from '../alerts/alerts.module';
 import { ContractsModule } from '../contracts/contracts.module';
 import { WorksModule } from '../works/works.module';
@@ -24,6 +25,7 @@ import { AccountingModule } from '../accounting/accounting.module';
       Contract,
       AccountingRecord,
       SupplierDocument,
+      EmployeePayment,
     ]),
     AlertsModule,
     ContractsModule,

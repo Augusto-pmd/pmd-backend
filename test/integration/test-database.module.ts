@@ -23,6 +23,7 @@ import { AuditLog } from '../../src/audit/audit.entity';
 import { Employee } from '../../src/employees/employees.entity';
 import { Attendance } from '../../src/attendance/attendance.entity';
 import { EmployeeAdvance } from '../../src/employee-advances/employee-advances.entity';
+import { EmployeePayment } from '../../src/payroll/employee-payments.entity';
 
 export const getTestDataSource = (): DataSourceOptions => ({
   type: 'postgres',
@@ -53,6 +54,7 @@ export const getTestDataSource = (): DataSourceOptions => ({
     Employee,
     Attendance,
     EmployeeAdvance,
+    EmployeePayment,
   ],
   // Use migrations instead of synchronize to ensure enums are created correctly
   migrations: ['src/migrations/*.ts'],
