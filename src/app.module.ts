@@ -14,6 +14,7 @@ import { RolesModule } from './roles/roles.module';
 import { EmployeesModule } from './employees/employees.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { EmployeeAdvancesModule } from './employee-advances/employee-advances.module';
+import { PayrollModule } from './payroll/payroll.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { SupplierDocumentsModule } from './supplier-documents/supplier-documents.module';
 import { WorksModule } from './works/works.module';
@@ -86,6 +87,7 @@ import { HealthModule } from './health/health.module';
     EmployeesModule,
     AttendanceModule,
     EmployeeAdvancesModule,
+    PayrollModule,
     SuppliersModule,
     SupplierDocumentsModule,
     WorksModule,

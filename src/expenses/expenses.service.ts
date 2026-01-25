@@ -33,6 +33,7 @@ import { WorksService } from '../works/works.service';
 import { WorkStatus } from '../common/enums/work-status.enum';
 import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 import { CalculationsService } from '../accounting/calculations.service';
+import { EmployeePayment } from '../payroll/employee-payments.entity';
 
 @Injectable()
 export class ExpensesService {
@@ -53,12 +54,83 @@ export class ExpensesService {
     private accountingRepository: Repository<AccountingRecord>,
     @InjectRepository(SupplierDocument)
     private supplierDocumentRepository: Repository<SupplierDocument>,
+    @InjectRepository(EmployeePayment)
+    private employeePaymentRepository: Repository<EmployeePayment>,
     private dataSource: DataSource,
     private alertsService: AlertsService,
     private contractsService: ContractsService,
     private worksService: WorksService,
     private calculationsService: CalculationsService,
   ) {}
+
+  /**
+   * Crear un gasto manual desde un EmployeePayment (Fase 4).
+   * Idempotente: si el pago ya tiene expense_id, devuelve el gasto existente.
+   */
+  async createFromEmployeePayment(paymentId: string, user: User): Promise<Expense> {
+    const payment = await this.employeePaymentRepository.findOne({
+      where: { id: paymentId },
+      relations: ['employee', 'employee.work', 'expense'],
+    });
+
+    if (!payment) {
+      throw new NotFoundException(`EmployeePayment with ID ${paymentId} not found`);
+    }
+
+    if (payment.expense_id) {
+      const existingExpense = await this.expenseRepository.findOne({
+        where: { id: payment.expense_id },
+        relations: ['work', 'supplier', 'rubric', 'created_by', 'val', 'contract'],
+      });
+      if (existingExpense) {
+        return existingExpense;
+      }
+    }
+
+    if (!payment.employee) {
+      throw new BadRequestException('El pago no tiene empleado asociado');
+    }
+    if (!payment.employee.work_id) {
+      throw new BadRequestException(
+        `El empleado ${payment.employee.fullName} no tiene obra asignada (work_id). No se puede crear gasto.`,
+      );
+    }
+
+    const weekStr =
+      payment.week_start_date instanceof Date
+        ? payment.week_start_date.toISOString().split('T')[0]
+        : String(payment.week_start_date);
+
+    // Rubro fijo de nómina (migración 0050)
+    const payrollRubricId = '00000000-0000-0000-0000-000000000050';
+
+    const work =
+      payment.employee.work ??
+      (await this.workRepository.findOne({ where: { id: payment.employee.work_id } }));
+    if (!work) {
+      throw new NotFoundException(`Work with ID ${payment.employee.work_id} not found`);
+    }
+
+    const amount = Math.max(0, Number(payment.net_payment ?? 0));
+
+    const expense = await this.create(
+      {
+        work_id: payment.employee.work_id,
+        rubric_id: payrollRubricId,
+        amount,
+        currency: work.currency,
+        purchase_date: weekStr,
+        document_type: DocumentType.RECEIPT,
+        observations: `Nómina semanal - ${payment.employee.fullName} - Semana ${weekStr}`,
+      },
+      user,
+    );
+
+    payment.expense_id = expense.id;
+    await this.employeePaymentRepository.save(payment);
+
+    return expense;
+  }
 
   /**
    * Business Rule: Work is mandatory for every expense

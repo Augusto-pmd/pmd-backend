@@ -78,6 +78,7 @@ async function seed() {
           employees: ['create', 'read', 'update', 'delete', 'manage'], // Gestión de empleados (RRHH)
           attendance: ['create', 'read', 'update', 'delete', 'manage'], // Control de asistencia
           employee_advances: ['create', 'read', 'update', 'delete', 'manage'], // Adelantos de empleados
+          payroll: ['create', 'read', 'update', 'delete', 'manage'], // Nómina / pagos semanales
         },
       },
       {
@@ -98,6 +99,7 @@ async function seed() {
           employees: ['read'], // Puede ver empleados
           attendance: ['read', 'create', 'update'], // Puede registrar y ver asistencia
           employee_advances: ['read', 'create', 'update'], // Adelantos (según migración 0049)
+          payroll: ['read'], // Nómina (solo lectura)
           // NO users, NO roles, NO accounting, NO audit, NO puede crear/validar expenses
         },
       },
@@ -121,6 +123,7 @@ async function seed() {
           employees: ['create', 'read', 'update', 'delete', 'manage'], // Gestión completa de empleados
           attendance: ['create', 'read', 'update', 'delete', 'manage'], // Gestión completa de asistencia
           employee_advances: ['create', 'read', 'update', 'delete', 'manage'], // Adelantos de empleados
+          payroll: ['create', 'read', 'update', 'delete', 'manage'], // Nómina / pagos semanales
           // NO users, NO roles, NO audit, NO puede reopen meses, NO puede override contratos bloqueados
         },
       },
