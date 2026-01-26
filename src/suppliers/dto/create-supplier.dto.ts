@@ -4,7 +4,9 @@ import {
   IsOptional,
   IsEnum,
   IsUUID,
+  IsNumber,
   MaxLength,
+  Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SupplierStatus } from '../../common/enums/supplier-status.enum';
@@ -99,6 +101,30 @@ export class CreateSupplierDto {
   @IsEnum(SupplierType)
   @IsOptional()
   type?: SupplierType;
+
+  @ApiPropertyOptional({
+    description:
+      'Weekly base payment reference (only for suppliers with type=contractor).',
+    example: 50000,
+    minimum: 0,
+    type: Number,
+  })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  weekly_payment?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Total budget for contractor certifications (only for suppliers with type=contractor).',
+    example: 1000000,
+    minimum: 0,
+    type: Number,
+  })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  contractor_budget?: number;
 
   @ApiPropertyOptional({
     description: 'Fiscal condition of the supplier',

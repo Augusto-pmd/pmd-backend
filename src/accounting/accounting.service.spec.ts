@@ -398,7 +398,7 @@ describe('AccountingService', () => {
 
       await expect(service.reopenMonth(1, 2024, user)).rejects.toThrow(ForbiddenException);
       await expect(service.reopenMonth(1, 2024, user)).rejects.toThrow(
-        'Only Direction can reopen closed months',
+        'Solo Dirección puede reabrir meses cerrados',
       );
     });
   });

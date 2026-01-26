@@ -17,6 +17,7 @@ import { EmployeeAdvancesModule } from './employee-advances/employee-advances.mo
 import { PayrollModule } from './payroll/payroll.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { SupplierDocumentsModule } from './supplier-documents/supplier-documents.module';
+import { ContractorCertificationsModule } from './contractor-certifications/contractor-certifications.module';
 import { WorksModule } from './works/works.module';
 import { WorkBudgetsModule } from './work-budgets/work-budgets.module';
 import { WorkDocumentsModule } from './work-documents/work-documents.module';
@@ -90,6 +91,7 @@ import { HealthModule } from './health/health.module';
     PayrollModule,
     SuppliersModule,
     SupplierDocumentsModule,
+    ContractorCertificationsModule,
     WorksModule,
     WorkBudgetsModule,
     WorkDocumentsModule,

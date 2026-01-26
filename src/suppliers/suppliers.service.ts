@@ -13,6 +13,7 @@ import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { SupplierStatus } from '../common/enums/supplier-status.enum';
 import { SupplierDocumentType } from '../common/enums/supplier-document-type.enum';
+import { SupplierType } from '../common/enums/supplier-type.enum';
 import { UserRole } from '../common/enums/user-role.enum';
 import { User } from '../users/user.entity';
 import { AlertsService } from '../alerts/alerts.service';
@@ -59,6 +60,23 @@ export class SuppliersService {
       created_by_id: user.id,
       organization_id: organizationId,
     });
+
+    // Contractor fields: initialize calculated totals
+    if (supplier.type === SupplierType.CONTRACTOR) {
+      const budget =
+        createSupplierDto.contractor_budget !== undefined
+          ? Number(createSupplierDto.contractor_budget)
+          : null;
+      supplier.contractor_total_paid = 0;
+      supplier.contractor_remaining_balance =
+        budget !== null && !Number.isNaN(budget) ? budget : null;
+    } else {
+      // Not a contractor: keep contractor fields null to avoid confusion
+      supplier.weekly_payment = null;
+      supplier.contractor_budget = null;
+      supplier.contractor_total_paid = null;
+      supplier.contractor_remaining_balance = null;
+    }
 
     const savedSupplier = await this.supplierRepository.save(supplier);
 
@@ -249,20 +267,28 @@ export class SuppliersService {
     }
   }
 
-  async findAll(user: User): Promise<Supplier[]> {
+  async findAll(
+    user: User,
+    options?: { filterByOrganization?: boolean; type?: SupplierType },
+  ): Promise<Supplier[]> {
     try {
       const organizationId = getOrganizationId(user);
-      const where: any = {};
-      
-      if (organizationId) {
-        where.organization_id = organizationId;
+      const filterByOrg = options?.filterByOrganization === true;
+
+      const qb = this.supplierRepository
+        .createQueryBuilder('supplier')
+        .leftJoinAndSelect('supplier.documents', 'documents')
+        .orderBy('supplier.created_at', 'DESC');
+
+      if (filterByOrg && organizationId) {
+        qb.where('supplier.organization_id = :organizationId', { organizationId });
       }
 
-      return await this.supplierRepository.find({
-        where,
-        relations: ['documents'],
-        order: { created_at: 'DESC' },
-      });
+      if (options?.type) {
+        qb.andWhere('supplier.type = :type', { type: options.type });
+      }
+
+      return await qb.getMany();
     } catch (error) {
       this.logger.error('Error fetching suppliers', error);
       return [];
@@ -270,7 +296,6 @@ export class SuppliersService {
   }
 
   async findOne(id: string, user: User): Promise<Supplier> {
-    const organizationId = getOrganizationId(user);
     const supplier = await this.supplierRepository.findOne({
       where: { id },
       relations: ['documents', 'contracts'],
@@ -278,10 +303,6 @@ export class SuppliersService {
 
     if (!supplier) {
       throw new NotFoundException(`Supplier with ID ${id} not found`);
-    }
-
-    if (organizationId && supplier.organization_id !== organizationId) {
-      throw new ForbiddenException('El proveedor no pertenece a tu organización');
     }
 
     return supplier;
@@ -335,6 +356,30 @@ export class SuppliersService {
     }
 
     Object.assign(supplier, updateSupplierDto);
+
+    // Enforce contractor-only fields consistency
+    const effectiveType = (updateSupplierDto.type ?? supplier.type) as SupplierType | undefined;
+    if (effectiveType !== SupplierType.CONTRACTOR) {
+      supplier.weekly_payment = null;
+      supplier.contractor_budget = null;
+      supplier.contractor_total_paid = null;
+      supplier.contractor_remaining_balance = null;
+    } else {
+      // Contractor: ensure totals exist and recalculate remaining if budget is set/updated
+      const totalPaid = Number(supplier.contractor_total_paid ?? 0);
+      supplier.contractor_total_paid = totalPaid;
+
+      const budget =
+        updateSupplierDto.contractor_budget !== undefined
+          ? Number(updateSupplierDto.contractor_budget)
+          : supplier.contractor_budget !== undefined && supplier.contractor_budget !== null
+            ? Number(supplier.contractor_budget)
+            : null;
+
+      supplier.contractor_remaining_balance =
+        budget !== null && !Number.isNaN(budget) ? Number(budget) - totalPaid : null;
+    }
+
     const savedSupplier = await this.supplierRepository.save(supplier);
 
     // Check ART expiration after update (in case document was updated)

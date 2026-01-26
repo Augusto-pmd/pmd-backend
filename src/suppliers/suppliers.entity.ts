@@ -53,6 +53,21 @@ export class Supplier {
   })
   type: SupplierType;
 
+  // --- Contractor-only fields (when type === SupplierType.CONTRACTOR) ---
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
+  weekly_payment: number | null;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
+  contractor_budget: number | null;
+
+  // Calculated: sum of certifications amounts
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
+  contractor_total_paid: number | null;
+
+  // Calculated: contractor_budget - contractor_total_paid
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
+  contractor_remaining_balance: number | null;
+
   @Column({
     type: 'enum',
     enum: FiscalCondition,

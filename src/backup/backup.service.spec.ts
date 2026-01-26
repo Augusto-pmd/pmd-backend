@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { BackupService } from './backup.service';
 import { Backup, BackupType, BackupStatus } from './backup.entity';
@@ -31,6 +31,15 @@ describe('BackupService', () => {
     get: jest.fn(),
   };
 
+  const mockDataSource = {
+    options: {},
+    query: jest.fn(),
+    driver: {
+      escape: (value: string) => value,
+    },
+    createQueryRunner: jest.fn(),
+  } as unknown as DataSource;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -38,6 +47,10 @@ describe('BackupService', () => {
         {
           provide: getRepositoryToken(Backup),
           useValue: mockBackupRepository,
+        },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
         },
         {
           provide: StorageService,

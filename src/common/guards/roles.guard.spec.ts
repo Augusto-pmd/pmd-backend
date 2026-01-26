@@ -83,7 +83,7 @@ describe('RolesGuard', () => {
       } as unknown as ExecutionContext;
 
       expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
-      expect(() => guard.canActivate(context)).toThrow('Insufficient permissions');
+      expect(() => guard.canActivate(context)).toThrow('Permisos insuficientes');
     });
 
     it('should throw ForbiddenException when user is not present', () => {
@@ -98,7 +98,7 @@ describe('RolesGuard', () => {
       } as unknown as ExecutionContext;
 
       expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
-      expect(() => guard.canActivate(context)).toThrow('User role not found');
+      expect(() => guard.canActivate(context)).toThrow('Rol de usuario no encontrado');
     });
 
     it('should handle role as string directly', () => {

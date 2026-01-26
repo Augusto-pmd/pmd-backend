@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,6 +17,7 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -24,6 +26,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 import { SuppliersService } from './suppliers.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
+import { SupplierType } from '../common/enums/supplier-type.enum';
 
 @ApiTags('Suppliers')
 @ApiBearerAuth('JWT-auth')
@@ -48,9 +51,38 @@ export class SuppliersController {
   @Get()
   @Roles(UserRole.OPERATOR, UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
   @ApiOperation({ summary: 'Get all suppliers' })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: SupplierType,
+    description: 'Optional filter by supplier type (e.g. contractor)',
+  })
+  @ApiQuery({
+    name: 'filterByOrganization',
+    required: false,
+    type: Boolean,
+    description:
+      'If true, filter by user organization. Default false = show all.',
+  })
   @ApiResponse({ status: 200, description: 'List of suppliers' })
-  findAll(@Request() req) {
-    return this.suppliersService.findAll(req.user);
+  findAll(
+    @Request() req,
+    @Query('type') type?: string,
+    @Query('filterByOrganization') filterByOrganization?: string,
+  ) {
+    const filterByOrg =
+      filterByOrganization === 'true' || filterByOrganization === '1';
+    const normalizedType = type ? String(type).toLowerCase() : undefined;
+    const parsedType =
+      normalizedType &&
+      (Object.values(SupplierType) as string[]).includes(normalizedType)
+        ? (normalizedType as SupplierType)
+        : undefined;
+
+    return this.suppliersService.findAll(req.user, {
+      filterByOrganization: filterByOrg,
+      type: parsedType,
+    });
   }
 
   @Get(':id')

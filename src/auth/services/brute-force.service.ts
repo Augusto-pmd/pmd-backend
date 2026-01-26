@@ -13,7 +13,8 @@ export class BruteForceService {
   private readonly attempts: Map<string, AttemptRecord> = new Map();
 
   // Configuration
-  private readonly maxAttempts = 10; // Maximum failed attempts before blocking
+  // Keep defaults aligned with unit tests and reasonable security baseline
+  private readonly maxAttempts = 5; // Maximum failed attempts before blocking
   private readonly blockDuration = 15 * 60 * 1000; // 15 minutes in milliseconds
   private readonly windowDuration = 60 * 60 * 1000; // 1 hour window for counting attempts
 
