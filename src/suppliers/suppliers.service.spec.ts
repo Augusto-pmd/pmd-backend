@@ -205,7 +205,7 @@ describe('SuppliersService', () => {
 
       await expect(service.reject('supplier-id', user)).rejects.toThrow(ForbiddenException);
       await expect(service.reject('supplier-id', user)).rejects.toThrow(
-        'Only Administration and Direction can reject suppliers',
+        'Solo Administración y Dirección pueden rechazar proveedores',
       );
     });
 
@@ -375,7 +375,7 @@ describe('SuppliersService', () => {
         ForbiddenException,
       );
       await expect(service.update('supplier-id', updateDto, user)).rejects.toThrow(
-        'Operators cannot change supplier status',
+        'Los operadores no pueden cambiar el estado de los proveedores',
       );
     });
 
@@ -402,7 +402,7 @@ describe('SuppliersService', () => {
         ForbiddenException,
       );
       await expect(service.update('supplier-id', updateDto, user)).rejects.toThrow(
-        'Only Direction can unblock suppliers',
+        'Solo Dirección puede desbloquear proveedores',
       );
     });
 

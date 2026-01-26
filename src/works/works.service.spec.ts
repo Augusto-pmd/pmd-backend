@@ -254,7 +254,7 @@ describe('WorksService', () => {
 
       await expect(service.close('work-id', user)).rejects.toThrow(ForbiddenException);
       await expect(service.close('work-id', user)).rejects.toThrow(
-        'Only Direction can close works',
+        'Solo Dirección puede cerrar obras',
       );
       expect(mockWorkRepository.save).not.toHaveBeenCalled();
     });

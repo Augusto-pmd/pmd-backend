@@ -3,6 +3,7 @@ export enum AlertType {
   CASHBOX_DIFFERENCE = 'cashbox_difference',
   CONTRACT_ZERO_BALANCE = 'contract_zero_balance',
   CONTRACT_INSUFFICIENT_BALANCE = 'contract_insufficient_balance',
+  CONTRACTOR_BUDGET_LOW = 'contractor_budget_low',
   DUPLICATE_INVOICE = 'duplicate_invoice',
   OVERDUE_STAGE = 'overdue_stage',
   OBSERVED_EXPENSE = 'observed_expense',

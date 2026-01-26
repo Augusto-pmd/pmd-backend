@@ -34,6 +34,8 @@ import { WorkStatus } from '../common/enums/work-status.enum';
 import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 import { CalculationsService } from '../accounting/calculations.service';
 import { EmployeePayment } from '../payroll/employee-payments.entity';
+import { ContractorCertification } from '../contractor-certifications/contractor-certifications.entity';
+import { SupplierType } from '../common/enums/supplier-type.enum';
 
 @Injectable()
 export class ExpensesService {
@@ -56,6 +58,8 @@ export class ExpensesService {
     private supplierDocumentRepository: Repository<SupplierDocument>,
     @InjectRepository(EmployeePayment)
     private employeePaymentRepository: Repository<EmployeePayment>,
+    @InjectRepository(ContractorCertification)
+    private contractorCertificationRepository: Repository<ContractorCertification>,
     private dataSource: DataSource,
     private alertsService: AlertsService,
     private contractsService: ContractsService,
@@ -128,6 +132,101 @@ export class ExpensesService {
 
     payment.expense_id = expense.id;
     await this.employeePaymentRepository.save(payment);
+
+    return expense;
+  }
+
+  /**
+   * Crear un gasto manual desde una ContractorCertification (Fase 5).
+   * Idempotente: si la certificación ya tiene expense_id, devuelve el gasto existente.
+   */
+  async createFromContractorCertification(
+    certificationId: string,
+    user: User,
+  ): Promise<Expense> {
+    const certification = await this.contractorCertificationRepository.findOne({
+      where: { id: certificationId },
+      relations: ['supplier', 'contract', 'contract.work', 'expense'],
+    });
+
+    if (!certification) {
+      throw new NotFoundException(
+        `ContractorCertification with ID ${certificationId} not found`,
+      );
+    }
+
+    if (!certification.supplier) {
+      throw new BadRequestException('La certificación no tiene supplier asociado');
+    }
+
+    if (certification.supplier.type !== SupplierType.CONTRACTOR) {
+      throw new BadRequestException(
+        'Solo se pueden crear gastos desde certificaciones de suppliers tipo contractor',
+      );
+    }
+
+    if (certification.expense_id) {
+      const existingExpense = await this.expenseRepository.findOne({
+        where: { id: certification.expense_id },
+        relations: ['work', 'supplier', 'rubric', 'created_by', 'val', 'contract'],
+      });
+      if (existingExpense) {
+        return existingExpense;
+      }
+    }
+
+    // Determinar contrato (debería existir porque lo setea el módulo de certificaciones)
+    let contract = certification.contract;
+    if (!contract && certification.contract_id) {
+      contract = await this.contractRepository.findOne({
+        where: { id: certification.contract_id },
+        relations: ['work'],
+      });
+    }
+
+    if (!contract) {
+      // Fallback: buscar contrato del supplier (activo/aprobado) en cualquier obra
+      contract = await this.contractRepository.findOne({
+        where: { supplier_id: certification.supplier_id, is_blocked: false },
+        relations: ['work'],
+      });
+    }
+
+    if (!contract) {
+      throw new BadRequestException(
+        'No se encontró un contrato válido para el supplier. No se puede crear el gasto.',
+      );
+    }
+
+    const weekStr =
+      certification.week_start_date instanceof Date
+        ? certification.week_start_date.toISOString().split('T')[0]
+        : String(certification.week_start_date);
+
+    const work = contract.work ?? (await this.workRepository.findOne({ where: { id: contract.work_id } }));
+    if (!work) {
+      throw new NotFoundException(`Work with ID ${contract.work_id} not found`);
+    }
+
+    const amount = Math.max(0, Number(certification.amount ?? 0));
+
+    const expense = await this.create(
+      {
+        work_id: contract.work_id,
+        supplier_id: certification.supplier_id,
+        contract_id: contract.id,
+        rubric_id: contract.rubric_id,
+        amount,
+        currency: work.currency,
+        purchase_date: weekStr,
+        document_type: DocumentType.RECEIPT,
+        observations: `Certificación semanal - ${certification.supplier.name} - Semana ${weekStr}`,
+      },
+      user,
+    );
+
+    certification.expense_id = expense.id;
+    await this.contractorCertificationRepository.save(certification);
 
     return expense;
   }

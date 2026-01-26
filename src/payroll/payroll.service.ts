@@ -14,6 +14,8 @@ import { AttendanceStatus } from '../common/enums/attendance-status.enum';
 import { User } from '../users/user.entity';
 import { getOrganizationId } from '../common/helpers/get-organization-id.helper';
 import { ExpensesService } from '../expenses/expenses.service';
+import { ContractorCertificationsService } from '../contractor-certifications/contractor-certifications.service';
+import { ContractorCertification } from '../contractor-certifications/contractor-certifications.entity';
 
 function getWeekStartDate(date: Date): Date {
   const d = new Date(date);
@@ -31,6 +33,75 @@ function toIsoDate(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+export type EmployeeAdvanceLineItemDto = {
+  id: string;
+  date: string;
+  amount: number;
+  description: string | null;
+};
+
+export type EmployeeReceiptDto = {
+  type: 'employee';
+  week_start_date: string;
+  week_end_date: string;
+  employee: {
+    id: string;
+    fullName: string;
+    trade?: string | null;
+    work?: { id?: string; name?: string } | null;
+  };
+  totals: {
+    days_worked: number;
+    total_salary: number;
+    late_hours: number;
+    late_deduction: number;
+    total_advances: number;
+    total_discounts: number;
+    net_payment: number;
+  };
+  advances: EmployeeAdvanceLineItemDto[];
+  meta: {
+    payment_id: string;
+    paid_at: string | null;
+    expense_id: string | null;
+  };
+};
+
+export type ContractorReceiptDto = {
+  type: 'contractor';
+  week_start_date: string;
+  week_end_date: string;
+  contractor: {
+    id: string;
+    name: string;
+  };
+  work: { id?: string; name?: string } | null;
+  certification: {
+    id: string;
+    amount: number;
+    description: string | null;
+    expense_id: string | null;
+  };
+  balance: {
+    contractor_remaining_balance: number | null;
+    contractor_total_paid: number | null;
+    contractor_budget: number | null;
+  };
+};
+
+export type WeekReceiptsDto = {
+  week_start_date: string;
+  week_end_date: string;
+  employees: EmployeeReceiptDto[];
+  contractors: ContractorReceiptDto[];
+};
+
 @Injectable()
 export class PayrollService {
   private readonly logger = new Logger(PayrollService.name);
@@ -45,7 +116,15 @@ export class PayrollService {
     @InjectRepository(EmployeeAdvance)
     private readonly advancesRepository: Repository<EmployeeAdvance>,
     private readonly expensesService: ExpensesService,
+    private readonly contractorCertificationsService: ContractorCertificationsService,
   ) {}
+
+  private normalizeWeek(weekStartDate: string): { weekStart: Date; weekStr: string; weekEndStr: string } {
+    const weekStart = getWeekStartDate(new Date(weekStartDate));
+    const weekStr = toIsoDate(weekStart);
+    const weekEndStr = toIsoDate(addDays(weekStart, 6));
+    return { weekStart, weekStr, weekEndStr };
+  }
 
   async calculateWeek(
     weekStartDate: string,
@@ -348,6 +427,290 @@ export class PayrollService {
       total_net_payment: Number(r.total_net_payment ?? 0),
       missing_expense: Number(r.missing_expense ?? 0),
     }));
+  }
+
+  async getEmployeeReceipt(
+    employeeId: string,
+    weekStartDate: string,
+    user: User,
+    options?: { filterByOrganization?: boolean },
+  ): Promise<EmployeeReceiptDto> {
+    const { weekStr, weekEndStr } = this.normalizeWeek(weekStartDate);
+    const organizationId = getOrganizationId(user);
+    const filterByOrg = options?.filterByOrganization === true;
+
+    const paymentQb = this.paymentsRepository
+      .createQueryBuilder('payment')
+      .leftJoinAndSelect('payment.employee', 'employee')
+      .leftJoinAndSelect('employee.work', 'work')
+      .leftJoinAndSelect('payment.expense', 'expense')
+      .where('payment.employee_id = :employee_id', { employee_id: employeeId })
+      .andWhere('payment.week_start_date = :week_start_date', { week_start_date: weekStr });
+
+    if (filterByOrg && organizationId) {
+      paymentQb.andWhere('payment.organization_id = :organizationId', { organizationId });
+    }
+
+    const payment = await paymentQb.getOne();
+    if (!payment) {
+      throw new NotFoundException(
+        `No hay pago calculado para el empleado ${employeeId} en la semana ${weekStr}`,
+      );
+    }
+
+    const advancesQb = this.advancesRepository
+      .createQueryBuilder('advance')
+      .where('advance.employee_id = :employee_id', { employee_id: employeeId })
+      .andWhere('advance.week_start_date = :week_start_date', { week_start_date: weekStr })
+      .orderBy('advance.date', 'ASC')
+      .addOrderBy('advance.created_at', 'ASC');
+
+    if (filterByOrg && organizationId) {
+      advancesQb.andWhere('advance.organization_id = :organizationId', { organizationId });
+    }
+
+    const advances = await advancesQb.getMany();
+    const advanceItems: EmployeeAdvanceLineItemDto[] = advances.map((a) => ({
+      id: a.id,
+      date: toIsoDate(new Date(a.date)),
+      amount: Number(a.amount ?? 0),
+      description: a.description ?? null,
+    }));
+
+    const totalSalary = Number((payment as any).total_salary ?? 0);
+    const lateHours = Number((payment as any).late_hours ?? 0);
+    const lateDeduction = Number((payment as any).late_deduction ?? 0);
+    const totalAdvances = advanceItems.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
+    const totalDiscounts = totalAdvances + lateDeduction;
+    const netPayment = Math.max(0, totalSalary - totalDiscounts);
+
+    return {
+      type: 'employee',
+      week_start_date: weekStr,
+      week_end_date: weekEndStr,
+      employee: {
+        id: payment.employee?.id ?? payment.employee_id,
+        fullName: payment.employee?.fullName ?? payment.employee_id,
+        trade: (payment.employee as any)?.trade ?? null,
+        work: payment.employee?.work
+          ? { id: (payment.employee.work as any).id, name: (payment.employee.work as any).name }
+          : null,
+      },
+      totals: {
+        days_worked: Number((payment as any).days_worked ?? 0),
+        total_salary: totalSalary,
+        late_hours: lateHours,
+        late_deduction: lateDeduction,
+        total_advances: totalAdvances,
+        total_discounts: totalDiscounts,
+        net_payment: netPayment,
+      },
+      advances: advanceItems,
+      meta: {
+        payment_id: payment.id,
+        paid_at: payment.paid_at ? new Date(payment.paid_at).toISOString() : null,
+        expense_id: payment.expense_id ?? null,
+      },
+    };
+  }
+
+  async getContractorReceipt(
+    contractorId: string,
+    weekStartDate: string,
+    user: User,
+    options?: { filterByOrganization?: boolean },
+  ): Promise<ContractorReceiptDto> {
+    const { weekStr, weekEndStr } = this.normalizeWeek(weekStartDate);
+    const filterByOrg = options?.filterByOrganization === true;
+
+    // Reutilizamos el servicio existente (ya trae supplier, contract.work, expense)
+    const certs = await this.contractorCertificationsService.findAll(user, {
+      filterByOrganization: filterByOrg,
+      supplier_id: contractorId,
+      week_start_date: weekStr,
+    });
+
+    const certification = (certs?.[0] as ContractorCertification | undefined) ?? undefined;
+    if (!certification) {
+      throw new NotFoundException(
+        `No hay certificación para el contratista ${contractorId} en la semana ${weekStr}`,
+      );
+    }
+
+    const supplier: any = (certification as any).supplier;
+    const contract: any = (certification as any).contract;
+    const work: any = contract?.work ?? null;
+
+    return {
+      type: 'contractor',
+      week_start_date: weekStr,
+      week_end_date: weekEndStr,
+      contractor: {
+        id: supplier?.id ?? contractorId,
+        name: supplier?.name ?? contractorId,
+      },
+      work: work ? { id: work.id, name: work.name } : null,
+      certification: {
+        id: certification.id,
+        amount: Number((certification as any).amount ?? 0),
+        description: (certification as any).description ?? null,
+        expense_id: (certification as any).expense_id ?? null,
+      },
+      balance: {
+        contractor_remaining_balance:
+          supplier?.contractor_remaining_balance !== undefined && supplier?.contractor_remaining_balance !== null
+            ? Number(supplier.contractor_remaining_balance)
+            : null,
+        contractor_total_paid:
+          supplier?.contractor_total_paid !== undefined && supplier?.contractor_total_paid !== null
+            ? Number(supplier.contractor_total_paid)
+            : null,
+        contractor_budget:
+          supplier?.contractor_budget !== undefined && supplier?.contractor_budget !== null
+            ? Number(supplier.contractor_budget)
+            : null,
+      },
+    };
+  }
+
+  async getWeekReceipts(
+    weekStartDate: string,
+    user: User,
+    options?: { filterByOrganization?: boolean },
+  ): Promise<WeekReceiptsDto> {
+    const { weekStr, weekEndStr } = this.normalizeWeek(weekStartDate);
+    const organizationId = getOrganizationId(user);
+    const filterByOrg = options?.filterByOrganization === true;
+
+    // Pagos de empleados de la semana
+    const paymentsQb = this.paymentsRepository
+      .createQueryBuilder('payment')
+      .leftJoinAndSelect('payment.employee', 'employee')
+      .leftJoinAndSelect('employee.work', 'work')
+      .leftJoinAndSelect('payment.expense', 'expense')
+      .where('payment.week_start_date = :week_start_date', { week_start_date: weekStr })
+      .orderBy('employee.fullName', 'ASC')
+      .addOrderBy('payment.created_at', 'DESC');
+
+    if (filterByOrg && organizationId) {
+      paymentsQb.andWhere('payment.organization_id = :organizationId', { organizationId });
+    }
+
+    const payments = await paymentsQb.getMany();
+    const employeeIds = payments.map((p) => p.employee_id).filter(Boolean);
+
+    // Adelantos de la semana (para todos los empleados) para evitar N+1
+    const advancesQb = this.advancesRepository
+      .createQueryBuilder('advance')
+      .where('advance.week_start_date = :week_start_date', { week_start_date: weekStr })
+      .orderBy('advance.date', 'ASC')
+      .addOrderBy('advance.created_at', 'ASC');
+
+    if (employeeIds.length) {
+      advancesQb.andWhere('advance.employee_id IN (:...employeeIds)', { employeeIds });
+    } else {
+      // No hay pagos => no hay recibos de empleados
+      advancesQb.andWhere('1=0');
+    }
+
+    if (filterByOrg && organizationId) {
+      advancesQb.andWhere('advance.organization_id = :organizationId', { organizationId });
+    }
+
+    const advances = await advancesQb.getMany();
+    const advancesByEmployee = new Map<string, EmployeeAdvance[]>();
+    for (const a of advances) {
+      const arr = advancesByEmployee.get(a.employee_id) ?? [];
+      arr.push(a);
+      advancesByEmployee.set(a.employee_id, arr);
+    }
+
+    const employeeReceipts: EmployeeReceiptDto[] = payments.map((payment) => {
+      const advs = advancesByEmployee.get(payment.employee_id) ?? [];
+      const items: EmployeeAdvanceLineItemDto[] = advs.map((a) => ({
+        id: a.id,
+        date: toIsoDate(new Date(a.date)),
+        amount: Number(a.amount ?? 0),
+        description: a.description ?? null,
+      }));
+
+      const totalSalary = Number((payment as any).total_salary ?? 0);
+      const lateDeduction = Number((payment as any).late_deduction ?? 0);
+      const lateHours = Number((payment as any).late_hours ?? 0);
+      const totalAdvances = items.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
+      const totalDiscounts = totalAdvances + lateDeduction;
+      const netPayment = Math.max(0, totalSalary - totalDiscounts);
+
+      return {
+        type: 'employee',
+        week_start_date: weekStr,
+        week_end_date: weekEndStr,
+        employee: {
+          id: payment.employee?.id ?? payment.employee_id,
+          fullName: payment.employee?.fullName ?? payment.employee_id,
+          trade: (payment.employee as any)?.trade ?? null,
+          work: payment.employee?.work
+            ? { id: (payment.employee.work as any).id, name: (payment.employee.work as any).name }
+            : null,
+        },
+        totals: {
+          days_worked: Number((payment as any).days_worked ?? 0),
+          total_salary: totalSalary,
+          late_hours: lateHours,
+          late_deduction: lateDeduction,
+          total_advances: totalAdvances,
+          total_discounts: totalDiscounts,
+          net_payment: netPayment,
+        },
+        advances: items,
+        meta: {
+          payment_id: payment.id,
+          paid_at: payment.paid_at ? new Date(payment.paid_at).toISOString() : null,
+          expense_id: payment.expense_id ?? null,
+        },
+      };
+    });
+
+    // Certificaciones de contratistas de la semana
+    const certs = await this.contractorCertificationsService.findByWeek(weekStr, user, filterByOrg);
+    const contractorReceipts: ContractorReceiptDto[] = (certs || []).map((cert: any) => {
+      const supplier = cert.supplier;
+      const work = cert.contract?.work ?? null;
+      return {
+        type: 'contractor',
+        week_start_date: weekStr,
+        week_end_date: weekEndStr,
+        contractor: { id: supplier?.id ?? cert.supplier_id, name: supplier?.name ?? cert.supplier_id },
+        work: work ? { id: work.id, name: work.name } : null,
+        certification: {
+          id: cert.id,
+          amount: Number(cert.amount ?? 0),
+          description: cert.description ?? null,
+          expense_id: cert.expense_id ?? null,
+        },
+        balance: {
+          contractor_remaining_balance:
+            supplier?.contractor_remaining_balance !== undefined && supplier?.contractor_remaining_balance !== null
+              ? Number(supplier.contractor_remaining_balance)
+              : null,
+          contractor_total_paid:
+            supplier?.contractor_total_paid !== undefined && supplier?.contractor_total_paid !== null
+              ? Number(supplier.contractor_total_paid)
+              : null,
+          contractor_budget:
+            supplier?.contractor_budget !== undefined && supplier?.contractor_budget !== null
+              ? Number(supplier.contractor_budget)
+              : null,
+        },
+      };
+    });
+
+    return {
+      week_start_date: weekStr,
+      week_end_date: weekEndStr,
+      employees: employeeReceipts,
+      contractors: contractorReceipts,
+    };
   }
 }
 

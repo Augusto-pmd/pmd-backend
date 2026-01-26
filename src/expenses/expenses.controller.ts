@@ -52,6 +52,31 @@ export class ExpensesController {
     return this.expensesService.createFromEmployeePayment(paymentId, req.user);
   }
 
+  @Post('from-certification/:certification_id')
+  @Roles(UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({
+    summary:
+      'Crear gasto manual desde una certificación semanal (ContractorCertification)',
+    description:
+      'Crea un Expense desde una ContractorCertification si no tiene expense asociado. Idempotente.',
+  })
+  @ApiParam({
+    name: 'certification_id',
+    description: 'ContractorCertification UUID',
+    type: String,
+    format: 'uuid',
+  })
+  @ApiResponse({ status: 201, description: 'Expense creado desde certificación' })
+  createFromCertification(
+    @Param('certification_id') certificationId: string,
+    @Request() req,
+  ) {
+    return this.expensesService.createFromContractorCertification(
+      certificationId,
+      req.user,
+    );
+  }
+
   @Post()
   @Roles(UserRole.OPERATOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
   @ApiOperation({

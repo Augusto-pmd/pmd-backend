@@ -14,6 +14,8 @@ import { AlertsService } from '../alerts/alerts.service';
 import { ContractsService } from '../contracts/contracts.service';
 import { WorksService } from '../works/works.service';
 import { CalculationsService } from '../accounting/calculations.service';
+import { EmployeePayment } from '../payroll/employee-payments.entity';
+import { ContractorCertification } from '../contractor-certifications/contractor-certifications.entity';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { ValidateExpenseDto } from './dto/validate-expense.dto';
 import { User } from '../users/user.entity';
@@ -83,6 +85,16 @@ describe('ExpensesService', () => {
     save: jest.fn(),
   };
 
+  const mockEmployeePaymentRepository = {
+    findOne: jest.fn(),
+    save: jest.fn(),
+  };
+
+  const mockContractorCertificationRepository = {
+    findOne: jest.fn(),
+    save: jest.fn(),
+  };
+
   const mockContractRepository = {
     findOne: jest.fn(),
     save: jest.fn(),
@@ -108,7 +120,13 @@ describe('ExpensesService', () => {
   };
 
   const mockCalculationsService = {
-    calculateWorkTotals: jest.fn(),
+    calculateTaxes: jest.fn(() => ({
+      vat_perception: null,
+      vat_withholding: null,
+      iibb_perception: null,
+      income_tax_withholding: null,
+    })),
+    validateTaxCalculations: jest.fn(() => ({ isValid: true, errors: [] })),
   };
 
   // Mock QueryRunner
@@ -206,6 +224,14 @@ describe('ExpensesService', () => {
         {
           provide: getRepositoryToken(SupplierDocument),
           useValue: mockSupplierDocumentRepository,
+        },
+        {
+          provide: getRepositoryToken(EmployeePayment),
+          useValue: mockEmployeePaymentRepository,
+        },
+        {
+          provide: getRepositoryToken(ContractorCertification),
+          useValue: mockContractorCertificationRepository,
         },
         {
           provide: DataSource,
@@ -649,7 +675,7 @@ describe('ExpensesService', () => {
         ForbiddenException,
       );
       await expect(service.validate('expense-id', validateDto, user)).rejects.toThrow(
-        'Only Administration and Direction can validate expenses',
+        'Solo Administración y Dirección pueden validar gastos',
       );
     });
 

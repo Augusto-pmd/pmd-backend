@@ -34,6 +34,16 @@ export class CreateExpenseDto {
   @IsOptional()
   supplier_id?: string;
 
+  @ApiPropertyOptional({
+    description:
+      'Contract UUID (optional). If provided, links expense to a specific contract.',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    format: 'uuid',
+  })
+  @IsUUID()
+  @IsOptional()
+  contract_id?: string;
+
   @ApiProperty({
     description: 'Rubric/Category UUID',
     example: '123e4567-e89b-12d3-a456-426614174000',

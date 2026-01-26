@@ -111,6 +111,23 @@ describe('Payroll (Fase 4) (e2e)', () => {
 
     expect(Number(expense.body.amount)).toBe(42500);
     expect(String(expense.body.observations || '')).toContain('Nómina semanal');
+
+    // Recibo imprimible (Fase 6)
+    const receipt = await request(app.getHttpServer())
+      .get(`/api/payroll/receipts/employee/${employee.body.id}/week/${week}`)
+      .set(await dataBuilder.getAuthHeaders(directionToken))
+      .expect(200);
+
+    expect(receipt.body.type).toBe('employee');
+    expect(receipt.body.week_start_date).toBe(week);
+    expect(receipt.body.employee?.id).toBe(employee.body.id);
+    expect(Number(receipt.body.totals?.total_salary)).toBe(50000);
+    expect(Number(receipt.body.totals?.late_deduction)).toBe(2500);
+    expect(Number(receipt.body.totals?.total_advances)).toBe(5000);
+    expect(Number(receipt.body.totals?.net_payment)).toBe(42500);
+    expect(Array.isArray(receipt.body.advances)).toBe(true);
+    expect(receipt.body.advances.length).toBe(1);
+    expect(Number(receipt.body.advances[0].amount)).toBe(5000);
   });
 
   it('debe permitir crear gasto manualmente desde un pago sin gasto', async () => {
