@@ -120,5 +120,76 @@ describe('Contractor Certifications (e2e)', () => {
     expect(receipt.body.contractor?.id).toBe(contractorSupplier.id);
     expect(Number(receipt.body.certification?.amount)).toBe(123456);
   });
+
+  it('Fase 7: gastos de certificaciones deben aparecer en lista de gastos de la obra', async () => {
+    const week = '2026-01-26';
+
+    const certResp = await request(app.getHttpServer())
+      .post('/api/contractor-certifications')
+      .set(await dataBuilder.getAuthHeaders(adminToken))
+      .send({
+        supplier_id: contractorSupplier.id,
+        week_start_date: week,
+        amount: 200000,
+        description: 'Certificación Fase 7',
+        contract_id: contract.id,
+      })
+      .expect(201);
+
+    expect(certResp.body.expense_id).toBeTruthy();
+
+    // Verificar que el gasto aparece en la lista de gastos
+    const expenses = await request(app.getHttpServer())
+      .get('/api/expenses')
+      .set(await dataBuilder.getAuthHeaders(adminToken))
+      .expect(200);
+
+    const certExpense = expenses.body.find((e: any) => e.id === certResp.body.expense_id);
+    expect(certExpense).toBeTruthy();
+    expect(certExpense.work_id).toBe(work.id);
+    expect(certExpense.supplier_id).toBe(contractorSupplier.id);
+    expect(String(certExpense.observations || '')).toContain('Certificación semanal');
+  });
+
+  it('Fase 7: eliminar certificación debe anular gasto automáticamente', async () => {
+    const week = '2026-02-02';
+
+    const certResp = await request(app.getHttpServer())
+      .post('/api/contractor-certifications')
+      .set(await dataBuilder.getAuthHeaders(adminToken))
+      .send({
+        supplier_id: contractorSupplier.id,
+        week_start_date: week,
+        amount: 300000,
+        description: 'Certificación a eliminar',
+        contract_id: contract.id,
+      })
+      .expect(201);
+
+    expect(certResp.body.expense_id).toBeTruthy();
+
+    // Verificar que el gasto existe y está PENDING
+    const expenseBefore = await request(app.getHttpServer())
+      .get(`/api/expenses/${certResp.body.expense_id}`)
+      .set(await dataBuilder.getAuthHeaders(adminToken))
+      .expect(200);
+
+    expect(expenseBefore.body.state).toBe('pending');
+
+    // Eliminar certificación
+    await request(app.getHttpServer())
+      .delete(`/api/contractor-certifications/${certResp.body.id}`)
+      .set(await dataBuilder.getAuthHeaders(adminToken))
+      .expect(200);
+
+    // Verificar que el gasto fue anulado
+    const expenseAfter = await request(app.getHttpServer())
+      .get(`/api/expenses/${certResp.body.expense_id}`)
+      .set(await dataBuilder.getAuthHeaders(adminToken))
+      .expect(200);
+
+    expect(expenseAfter.body.state).toBe('annulled');
+    expect(String(expenseAfter.body.observations || '')).toContain('Anulado automáticamente por eliminación de certificación');
+  });
 });
 
