@@ -153,5 +153,135 @@ export class PayrollController {
       work_id: work_id || undefined,
     });
   }
+
+  @Get('receipts/employee/:employee_id/week/:week_start_date')
+  @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({ summary: 'Recibo imprimible de empleado (semana)' })
+  @ApiParam({ name: 'employee_id', description: 'Employee UUID', type: String, format: 'uuid' })
+  @ApiParam({
+    name: 'week_start_date',
+    description: 'Fecha lunes de la semana (YYYY-MM-DD) o cualquier fecha dentro de la semana',
+    example: '2026-01-19',
+  })
+  @ApiQuery({
+    name: 'filterByOrganization',
+    required: false,
+    type: Boolean,
+    description: 'Si true, filtra por la organización del usuario.',
+  })
+  @ApiResponse({ status: 200, description: 'Recibo de sueldo' })
+  getEmployeeReceipt(
+    @Param('employee_id') employeeId: string,
+    @Param('week_start_date') weekStartDate: string,
+    @Request() req,
+    @Query('filterByOrganization') filterByOrganization?: string,
+  ) {
+    const filterByOrg = filterByOrganization === 'true' || filterByOrganization === '1';
+    return this.payrollService.getEmployeeReceipt(employeeId, weekStartDate, req.user, {
+      filterByOrganization: filterByOrg,
+    });
+  }
+
+  @Get('receipts/contractor/:contractor_id/week/:week_start_date')
+  @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({ summary: 'Recibo imprimible de certificación de contratista (semana)' })
+  @ApiParam({
+    name: 'contractor_id',
+    description: 'Supplier UUID (type=CONTRACTOR)',
+    type: String,
+    format: 'uuid',
+  })
+  @ApiParam({
+    name: 'week_start_date',
+    description: 'Fecha lunes de la semana (YYYY-MM-DD) o cualquier fecha dentro de la semana',
+    example: '2026-01-19',
+  })
+  @ApiQuery({
+    name: 'filterByOrganization',
+    required: false,
+    type: Boolean,
+    description: 'Si true, filtra por la organización del usuario.',
+  })
+  @ApiResponse({ status: 200, description: 'Recibo de certificación' })
+  getContractorReceipt(
+    @Param('contractor_id') contractorId: string,
+    @Param('week_start_date') weekStartDate: string,
+    @Request() req,
+    @Query('filterByOrganization') filterByOrganization?: string,
+  ) {
+    const filterByOrg = filterByOrganization === 'true' || filterByOrganization === '1';
+    return this.payrollService.getContractorReceipt(contractorId, weekStartDate, req.user, {
+      filterByOrganization: filterByOrg,
+    });
+  }
+
+  @Get('receipts/week/:week_start_date')
+  @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({ summary: 'Todos los recibos de una semana (empleados + contratistas)' })
+  @ApiParam({
+    name: 'week_start_date',
+    description: 'Fecha lunes de la semana (YYYY-MM-DD) o cualquier fecha dentro de la semana',
+    example: '2026-01-19',
+  })
+  @ApiQuery({
+    name: 'filterByOrganization',
+    required: false,
+    type: Boolean,
+    description: 'Si true, filtra por la organización del usuario.',
+  })
+  @ApiResponse({ status: 200, description: 'Recibos de la semana' })
+  getWeekReceipts(
+    @Param('week_start_date') weekStartDate: string,
+    @Request() req,
+    @Query('filterByOrganization') filterByOrganization?: string,
+  ) {
+    const filterByOrg = filterByOrganization === 'true' || filterByOrganization === '1';
+    return this.payrollService.getWeekReceipts(weekStartDate, req.user, {
+      filterByOrganization: filterByOrg,
+    });
+  }
+
+  @Get('receipts/print/:type/:week_start_date')
+  @Roles(UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
+  @ApiOperation({
+    summary: 'Recibos para imprimir (empleados/contratistas/todos) de una semana',
+  })
+  @ApiParam({
+    name: 'type',
+    description: 'Tipo de impresión: employees | contractors | all',
+    example: 'all',
+  })
+  @ApiParam({
+    name: 'week_start_date',
+    description: 'Fecha lunes de la semana (YYYY-MM-DD) o cualquier fecha dentro de la semana',
+    example: '2026-01-19',
+  })
+  @ApiQuery({
+    name: 'filterByOrganization',
+    required: false,
+    type: Boolean,
+    description: 'Si true, filtra por la organización del usuario.',
+  })
+  @ApiResponse({ status: 200, description: 'Recibos listos para imprimir' })
+  async getReceiptsToPrint(
+    @Param('type') type: string,
+    @Param('week_start_date') weekStartDate: string,
+    @Request() req,
+    @Query('filterByOrganization') filterByOrganization?: string,
+  ) {
+    const filterByOrg = filterByOrganization === 'true' || filterByOrganization === '1';
+    const normalized = String(type || '').toLowerCase();
+    const receipts = await this.payrollService.getWeekReceipts(weekStartDate, req.user, {
+      filterByOrganization: filterByOrg,
+    });
+
+    if (normalized === 'employees' || normalized === 'empleados' || normalized === 'employee') {
+      return { ...receipts, type: 'employees', items: receipts.employees };
+    }
+    if (normalized === 'contractors' || normalized === 'contratistas' || normalized === 'contractor') {
+      return { ...receipts, type: 'contractors', items: receipts.contractors };
+    }
+    return { ...receipts, type: 'all', items: [...receipts.employees, ...receipts.contractors] };
+  }
 }
 

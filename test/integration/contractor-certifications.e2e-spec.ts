@@ -108,6 +108,17 @@ describe('Contractor Certifications (e2e)', () => {
 
     expect(Number(supplierAfter.body.contractor_total_paid)).toBeGreaterThanOrEqual(123456);
     expect(Number(supplierAfter.body.contractor_remaining_balance)).toBeLessThanOrEqual(500000);
+
+    // Recibo imprimible (Fase 6)
+    const receipt = await request(app.getHttpServer())
+      .get(`/api/payroll/receipts/contractor/${contractorSupplier.id}/week/${week}`)
+      .set(await dataBuilder.getAuthHeaders(adminToken))
+      .expect(200);
+
+    expect(receipt.body.type).toBe('contractor');
+    expect(receipt.body.week_start_date).toBe(week);
+    expect(receipt.body.contractor?.id).toBe(contractorSupplier.id);
+    expect(Number(receipt.body.certification?.amount)).toBe(123456);
   });
 });
 
