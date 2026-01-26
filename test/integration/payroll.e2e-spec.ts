@@ -183,5 +183,52 @@ describe('Payroll (Fase 4) (e2e)', () => {
     expect(updated).toBeTruthy();
     expect(updated.expense_id).toBe(expense.body.id);
   });
+
+  it('Fase 7: gastos de nómina deben aparecer en lista de gastos de la obra', async () => {
+    const work = await dataBuilder.createWork('Obra Integración', Currency.ARS);
+
+    const employee = await request(app.getHttpServer())
+      .post('/api/employees')
+      .set(await dataBuilder.getAuthHeaders(directionToken))
+      .send({
+        fullName: 'Empleado Integración',
+        daily_salary: 15000,
+        work_id: work.id,
+        isActive: true,
+      })
+      .expect(201);
+
+    const week = '2024-01-29';
+    await request(app.getHttpServer())
+      .post('/api/attendance')
+      .set(await dataBuilder.getAuthHeaders(directionToken))
+      .send({
+        employee_id: employee.body.id,
+        date: week,
+        status: AttendanceStatus.PRESENT,
+      })
+      .expect(201);
+
+    // Calcular pagos (crea gasto automáticamente)
+    const calculated = await request(app.getHttpServer())
+      .post(`/api/payroll/calculate/${week}`)
+      .set(await dataBuilder.getAuthHeaders(directionToken))
+      .expect(201);
+
+    const payment = calculated.body.find((p: any) => p.employee_id === employee.body.id);
+    expect(payment).toBeTruthy();
+    expect(payment.expense_id).toBeTruthy();
+
+    // Verificar que el gasto aparece en la lista de gastos
+    const expenses = await request(app.getHttpServer())
+      .get('/api/expenses')
+      .set(await dataBuilder.getAuthHeaders(directionToken))
+      .expect(200);
+
+    const payrollExpense = expenses.body.find((e: any) => e.id === payment.expense_id);
+    expect(payrollExpense).toBeTruthy();
+    expect(payrollExpense.work_id).toBe(work.id);
+    expect(String(payrollExpense.observations || '')).toContain('Nómina semanal');
+  });
 });
 
