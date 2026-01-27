@@ -132,8 +132,8 @@ export class EmployeesController {
   @Delete(':id')
   @Roles(UserRole.DIRECTION)
   @ApiOperation({
-    summary: 'Delete employee (soft delete)',
-    description: 'Soft delete employee (sets isActive=false). Only Direction can delete.',
+    summary: 'Delete employee',
+    description: 'Permanently delete employee from database. Cascades to attendance, advances and payments. Only Direction can delete.',
   })
   @ApiParam({ name: 'id', description: 'Employee UUID', type: String, format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Employee deleted successfully' })

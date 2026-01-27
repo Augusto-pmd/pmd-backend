@@ -120,7 +120,8 @@ export class EmployeesService {
   }
 
   /**
-   * Soft delete: set isActive = false.
+   * Hard delete: remove employee from database.
+   * Cascades to Attendance, EmployeeAdvance, EmployeePayment (onDelete: CASCADE).
    * Only DIRECTION can delete.
    */
   async remove(id: string, user: User): Promise<void> {
@@ -131,7 +132,6 @@ export class EmployeesService {
     }
 
     const employee = await this.findOne(id, user);
-    employee.isActive = false;
-    await this.employeeRepository.save(employee);
+    await this.employeeRepository.remove(employee);
   }
 }
