@@ -19,6 +19,7 @@ import {
   ApiBody,
   ApiQuery,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -49,6 +50,14 @@ export class EmployeesController {
   }
 
   @Get()
+  @Throttle({
+    // Aumentar límite para endpoint de lectura frecuente
+    // Producción: 30 requests/minuto, Desarrollo/Test: 200 requests/minuto
+    default: {
+      limit: process.env.NODE_ENV === 'production' ? 30 : 200,
+      ttl: 60000, // 1 minuto
+    },
+  })
   @Roles(UserRole.OPERATOR, UserRole.SUPERVISOR, UserRole.ADMINISTRATION, UserRole.DIRECTION)
   @ApiOperation({
     summary: 'Get all employees',
@@ -81,6 +90,7 @@ export class EmployeesController {
     description: 'Filter by active status',
   })
   @ApiResponse({ status: 200, description: 'List of employees' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
   findAll(
     @Request() req,
     @Query('filterByOrganization') filterByOrganization?: string,
