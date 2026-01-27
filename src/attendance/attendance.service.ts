@@ -93,6 +93,7 @@ export class AttendanceService {
     weekStartDate: string,
     user: User,
     filterByOrganization = false,
+    work_id?: string,
   ): Promise<Attendance[]> {
     const organizationId = getOrganizationId(user);
     const qb = this.attendanceRepository
@@ -108,6 +109,12 @@ export class AttendanceService {
     if (filterByOrganization === true && organizationId) {
       qb.andWhere('attendance.organization_id = :organizationId', {
         organizationId,
+      });
+    }
+
+    if (work_id) {
+      qb.andWhere('employee.work_id = :work_id', {
+        work_id,
       });
     }
 

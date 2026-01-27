@@ -109,14 +109,27 @@ export class AttendanceController {
     description: 'Week start date (Monday)',
     example: '2024-01-15',
   })
+  @ApiQuery({
+    name: 'filterByOrganization',
+    required: false,
+    type: Boolean,
+    description: 'If true, filter by user organization. Default false = show all.',
+  })
+  @ApiQuery({
+    name: 'work_id',
+    required: false,
+    type: String,
+    description: 'Filter by work (obra) UUID',
+  })
   @ApiResponse({ status: 200, description: 'Weekly attendance sheet' })
   getWeeklyAttendance(
     @Param('week_start_date') weekStartDate: string,
     @Request() req,
     @Query('filterByOrganization') filterByOrganization?: string,
+    @Query('work_id') work_id?: string,
   ) {
     const filterByOrg = filterByOrganization === 'true' || filterByOrganization === '1';
-    return this.attendanceService.getWeeklyAttendance(weekStartDate, req.user, filterByOrg);
+    return this.attendanceService.getWeeklyAttendance(weekStartDate, req.user, filterByOrg, work_id);
   }
 
   @Get(':id')
